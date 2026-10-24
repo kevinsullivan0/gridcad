@@ -1,0 +1,16 @@
+test_500_by_4_selection_keeps_all_empty_rows_and_columns (test_transpose_mapping.LongWorkbookTests.test_500_by_4_selection_keeps_all_empty_rows_and_columns) ... ok
+test_long_sheet_preview_window_keeps_original_end_page_addresses (test_transpose_mapping.LongWorkbookTests.test_long_sheet_preview_window_keeps_original_end_page_addresses) ... ok
+test_selected_rectangles_above_100000_cells_are_rejected (test_transpose_mapping.LongWorkbookTests.test_selected_rectangles_above_100000_cells_are_rejected) ... ok
+test_validation_reaches_last_page_and_does_not_turn_errors_into_holes (test_transpose_mapping.LongWorkbookTests.test_validation_reaches_last_page_and_does_not_turn_errors_into_holes) ... ok
+test_explicit_toggle_filters_candidates_without_transposing_source_data (test_transpose_mapping.TransposeAPITests.test_explicit_toggle_filters_candidates_without_transposing_source_data) ... ok
+test_transpose_accepts_only_explicit_boolean (test_transpose_mapping.TransposeAPITests.test_transpose_accepts_only_explicit_boolean) ... ok
+test_hole_moves_without_becoming_a_sample_or_losing_its_address (test_transpose_mapping.TransposeMappingTests.test_hole_moves_without_becoming_a_sample_or_losing_its_address) ... ok
+test_original_4_by_2_cell_addresses_map_to_physical_2_by_4 (test_transpose_mapping.TransposeMappingTests.test_original_4_by_2_cell_addresses_map_to_physical_2_by_4) ... ok
+test_physical_label_regions_and_direct_black_roles_do_not_swap (test_transpose_mapping.TransposeMappingTests.test_physical_label_regions_and_direct_black_roles_do_not_swap) ... ok
+test_transpose_does_not_silently_confirm_orientation_or_labels (test_transpose_mapping.TransposeMappingTests.test_transpose_does_not_silently_confirm_orientation_or_labels) ... ok
+test_transposed_candidate_materials_and_every_nonmaterial_field_preserved (test_transpose_mapping.TransposeMappingTests.test_transposed_candidate_materials_and_every_nonmaterial_field_preserved) ... ok
+
+----------------------------------------------------------------------
+Ran 11 tests in 0.860s
+
+OK

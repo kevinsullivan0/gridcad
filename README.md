@@ -1,47 +1,33 @@
-# GridCAD | Windows x64 portable candidate-copy tool
+# GridCAD v0.1.0-alpha.2 | Windows x64 portable prerelease
 
 **Known launch limitation: Windows Smart App Control can block the downloaded launch-windows.cmd file. This prerelease is not currently verified usable on machines enforcing that policy. Do not disable security protection to run it. A supported alternative distribution is under investigation.**
 
 ## Start here
 
-1. Extract the ENTIRE ZIP into a normal writable folder. Do not launch from inside the ZIP.
-2. Double-click **launch-windows.cmd**. A console and your default browser should open.
-3. Keep the console open while working. If the browser does not open, copy the complete local link printed in the console, including its session fragment. Keep that link private.
-4. When finished, press Ctrl+C in the console. Closing/crashing the console may leave temporary files for normal OS cleanup.
+Extract the entire ZIP into a new writable folder. Do not replace alpha.1 or run from inside the ZIP. Double-click launch-windows.cmd and keep its console open. If the browser does not open, copy the full local link printed in the console, including its private session fragment. Press Ctrl+C when finished.
 
-No install, administrator rights, PATH changes, pip, network download or Python setup is needed. The included official Python runtime is for Windows x64, not 32-bit or native ARM64. The tool uses a local browser page, no external assets or telemetry. This is an unsigned custom tool; source is included for inspection and official runtime hashes/provenance are included. Do not bypass Windows or organizational security warnings. If blocked, ask your IT/support contact rather than weakening security settings.
+The Windows x64 embedded runtime, dependencies and launcher are byte-for-byte unchanged from alpha.1. No install, administrator access, PATH changes, pip or network download is required by design. This is not a signed application. Windows downloaded-file protection or Smart App Control may block an unsigned downloaded CMD launcher. No automatic unblock, trust changes or security-policy changes are included. Do not disable Windows or organizational protection to run it; stop and consult your IT/support contact if blocked.
 
-**Successful Windows execution remains unverified.** Linux checks of the bundled Python dependencies and application do not prove that the Windows launcher or browser workflow works on your computer.
+Alpha.2 has not been executed on Windows. The user's reported alpha.1 launcher success does not validate this prerelease's full workflow.
 
-## Make a candidate copy
+## Workbook workflow
 
-1. Choose your `.xlsx` grid and saved `.PRINT` project. Keep the original project.
-2. Select the worksheet, cell rectangle and six-channel recipe schema. The order is C/M/Y/K/W/T; T is clear. Blank cells are holes. Each occupied cell needs six percentages summing exactly to 100.
-3. Inspect. On the XY tray view, drag separate enclosing regions for samples, row-label glyphs and column-label glyphs; all chosen bodies must be wholly enclosed. Update mapping proposals.
-4. Explicitly choose and review orientation. Check cell-to-body recipes, sample positions, labels, preserved objects and warnings. Labels receive direct EcoFlex Black, not a K=100 mixer.
-5. Confirm the role/orientation selection and replacement of selected materials, then preview exact changes. Complete exact material matches are skipped; existing colors are not proof that manual work is complete.
-6. Save and download the new **unverified candidate**. If asked where to save, choose a new path, never your original. Use Download again if the browser missed the first download.
-7. Open that copy in normal GrabCAD Print. Inspect representative sample recipes and label material mode, then recompose before considering a print.
+1. Choose the .xlsx and saved .PRINT files. Keep originals unchanged.
+2. Choose the actual Excel tab. Select only the recipe rectangle, not headings or sidebar inputs. Keep blank positions inside the rectangle.
+3. Drag in the addressed data preview, type the range, or select the first cell and Shift-click the last after paging. Long sheets are paginated, not silently truncated. The inspection limit is 100,000 selected cells.
+4. Each occupied cell needs six percentages summing exactly to 100. Default CMYKWT means cyan, magenta, yellow, black, white, clear. Example: 20 / 0 / 0 / 0 / 30 / 50. Spaces around slashes work. Adjust channel order or separator explicitly when needed.
+5. For ordinary per-cell formulas, first recalculate and save in Excel, reselect the file and confirm use of saved results. GridCAD never calculates formulas and cannot prove cache freshness. Missing/error caches remain errors. Array/spill and data-table ranges need evaluated values pasted into a workbook copy. Numeric scalars are not silently expanded into six channels.
+6. Optionally transpose the selected sample grid in GridCAD. This does not change Excel; source addresses and holes remain attached. Review the resulting dimensions and orientation explicitly.
+7. Inspect. Select physical sample, row-label and column-label regions on the .PRINT tray separately. Excel sidebars are not these printed glyphs. Check cell addresses on the tray. Label text associations are not inferred or rewritten.
+8. Confirm exact material replacement and preview changes. Selected labels receive direct EcoFlex Black, not K=100. Complete exact matches are skipped, unselected objects are preserved and no silent rounding occurs.
+9. Save a separate unverified candidate. Open it in normal GrabCAD Print, inspect recipes/material modes and recompose before considering any print. This tool never connects to a printer or submits a job.
 
-The tool never connects to a printer or submits jobs. It does not certify print readiness. Previewing performs checks with a disposable private candidate; saving repeats checks before publishing a new candidate. Changes to inputs invalidate review. Recipe/project data in exported review reports should be kept private.
+See docs/WORKBOOK_INPUT.md for selection, formulas, scalar errors, long sheets and transpose; docs/UI.md for the complete review/save workflow.
 
-## Exact support boundary
+## Validation and limits
 
-- Stored Print internal schema 2191 / PolyJet 2190; descriptive patch strings are preserved. Unknown active schemas fail closed.
-- Recognized PolyJet / Stratasys J850 TechStyle, PrintOnFabric, job type 0, HighMix mode 3, required six EcoFlex channels. Optional EcoContactFlex, separate FullCure705 support, and valid existing adhesion settings are preserved. No live printer configuration or material feasibility is fabricated.
-- Flat independent plain STL parts with supported transforms/material structures. Active core/coating/hollow/anatomy/grid/FlexTouch and unsupported assemblies or inheritance are rejected. Passive nesting may be inspectable without being writable.
-- XLSX only; slash, semicolon and whitespace can be proposed; commas require explicit selection. Decimal-comma values, formulas, merged grid cells and XLS are unsupported. Empty channel positions require an explicit zero policy; five-value bundles are rejected.
-- No silent normalization or rounding. Exact native numeric round-trip determines admission. Four-decimal recipes are extensively tested, but there is no blanket decimal-place rule. Rejected precision is identified by workbook cell/channel.
-- Geometry payloads, transforms, non-material JSON and non-project archive files are checked for preservation. Original files and existing writer output paths are not overwritten. Orientation must still be reviewed by you; geometric mapping is not proof of intended physical orientation.
+72 new Python tests and 23 Node minimal-DOM contract checks pass on Linux. Independent review reran them. The original 134-test suite could not be recovered; these are new checks, not a claim of 134 passes. Real-browser visual QA was blocked before checks. No representative user workbook has been supplied. Windows execution, Excel recalculation, GrabCAD GUI/recomposition and physical output remain unverified.
 
-See `docs/UI.md` for the full workflow, `COMPATIBILITY_GATES.md` for boundaries, and `ACCEPTANCE-AND-LIMITS.md` for tests and remaining gaps. `bootstrap/artifacts.json` records official runtime/dependency URLs and hashes; license notices remain with the runtime. No proprietary GrabCAD application code, database, installers, Wine runtime or per-recipe material catalog is distributed.
+The .PRINT profile, material, geometry and writing rules are unchanged. See COMPATIBILITY_GATES.md and docs/ECOFLEX_MATERIAL_CONTRACT.md. Unknown profiles/features still fail closed. Geometry/nonmaterial archive preservation and new-copy output safeguards remain in place.
 
-## If something fails
-
-- Missing runtime: extract the whole ZIP, not just the launcher.
-- Unsupported source: read the displayed reason. Do not edit version or resin IDs to bypass it.
-- Invalid recipe: correct the workbook, reselect it and inspect again. The program will not guess or silently round.
-- Failed/stale save: preview again before retrying. No print job was sent.
-- Browser download: use Download again while the session is open. Starting a new session does not recover prior private session data.
-
-GrabCAD GUI reopening/recomposition, the user's real project/version and complex features, service-derived feasibility and printing remain unverified. This is a small offline candidate-preparation tool, not a replacement for GrabCAD Print validation.
+Official runtime/dependency provenance and licenses remain in bootstrap/artifacts.json and runtime. SHA-256 manifests provide integrity checks, not code signing or trust certification. Synthetic demos and test fixtures are explicitly DO_NOT_PRINT. No personal workbook data, proprietary GrabCAD runtime or external browser assets are included.

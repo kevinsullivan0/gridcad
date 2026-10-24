@@ -104,7 +104,8 @@ class Handler(BaseHTTPRequestHandler):
                 path = Path(self.server.storage.name) / ('workbook.xlsx' if kind=='workbook' else 'project.print')
                 path.write_bytes(data)
                 self.server.files[kind] = path
-                self.reply(200, {'bytes':len(data), 'source_modified':False}); return
+                info = read_workbook(path, metadata_only=True) if kind == 'workbook' else None
+                self.reply(200, {'bytes':len(data), 'source_modified':False, 'workbook_info':info}); return
             if self.headers.get('Content-Type') != 'application/json': raise ValidationError('JSON content type required.')
             options = strict_json(self.body(API_LIMIT))
             if not isinstance(options, dict): raise ValidationError('Expected an options object.')
@@ -113,15 +114,23 @@ class Handler(BaseHTTPRequestHandler):
             if self.path == '/api/invalidate':
                 self.server.invalidate()
                 self.reply(200, {'invalidated':True}); return
+            if self.path == '/api/workbook-preview':
+                if set(options) - {'sheet','start_cell'}: raise ValidationError('Unexpected workbook preview options.')
+                if 'workbook' not in self.server.files: raise ValidationError('Choose a workbook first.')
+                if not options.get('sheet'): raise ValidationError('Choose an Excel tab first.')
+                self.reply(200, read_workbook(self.server.files['workbook'], metadata_only=True, sheet=options['sheet'], cell_range=options.get('start_cell') or 'A1')); return
             if self.path == '/api/analyze':
                 self.server.invalidate()
-                if set(options)-{'sheet','range','order','delimiter','empty_zero','tray_id','selection'}:
+                if set(options)-{'sheet','range','order','delimiter','empty_zero','formula_cache_confirmed','transpose','tray_id','selection'}:
                     raise ValidationError('Unexpected analysis options. Use the visible workbook and geometry controls.')
                 if set(self.server.files) != {'workbook','project'}: raise ValidationError('Choose both files first.')
+                if type(options.get('transpose', False)) is not bool: raise ValidationError('Transpose must be an explicit on/off choice.')
+                if not options.get('range'):
+                    raise ValidationError('Enter the recipe grid rectangle, for example B2:F4. Exclude Excel headers and sidebar inputs, but keep blank positions inside the grid.')
                 grid = read_workbook(self.server.files['workbook'], sheet=options.get('sheet') or None,
                     cell_range=options.get('range') or None, order=options.get('order','CMYKWT'),
                     delimiter=options.get('delimiter','auto'), empty_channels_zero=options.get('empty_zero') is True,
-                    tolerance=Decimal(0))
+                    formula_cache_confirmed=options.get('formula_cache_confirmed') is True, tolerance=Decimal(0))
                 project = inspect_project(self.server.files['project'])
                 gate = candidate_readiness(self.server.files['project'])
                 stored = archive_inventory(self.server.files['project'])['project_document']['project']
@@ -135,6 +144,12 @@ class Handler(BaseHTTPRequestHandler):
                     result['geometry'] = inspect_geometry(self.server.files['project'], tray_id=options.get('tray_id') or None)
                     result['proposal'] = propose_grid_mapping(grid, self.server.files['project'], selection=options.get('selection'), tray_id=options.get('tray_id') or None)
                 except ValidationError as exc: result['geometry_error'] = str(exc)
+                if result.get('proposal'):
+                    proposal = result['proposal']
+                    proposal['orientation_candidates'] = [c for c in proposal['orientation_candidates'] if c['transform']['transpose'] is options.get('transpose', False)]
+                    if not proposal['orientation_candidates']:
+                        proposal['issues'].append('No orientation matches the selected transpose setting. Check the recipe rectangle, sample region and transpose choice; no alternative is selected automatically.')
+                result['transpose'] = options.get('transpose', False)
                 self.server.analysis = {'id':result['analysis_id'], 'options':copy.deepcopy(options), 'hashes':{k:file_hash(v) for k,v in self.server.files.items()}}
                 self.server.report = result
                 self.reply(200,result); return

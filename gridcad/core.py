@@ -280,7 +280,7 @@ def inspect_project(path):
                             for oid,n in occ.items()],
             'warning': 'Read-only observed JSON structure. This inspection changes nothing and does not establish GUI reopen, composition or print readiness. A separate candidate-copy gate is required before any save.'}
 
-def read_workbook(path, *, sheet=None, cell_range=None, **parse_options):
+def read_workbook(path, *, sheet=None, cell_range=None, formula_cache_confirmed=False, metadata_only=False, **parse_options):
     from openpyxl import load_workbook
     from openpyxl.utils.cell import range_boundaries, get_column_letter
     path = Path(path)
@@ -360,32 +360,112 @@ def read_workbook(path, *, sheet=None, cell_range=None, **parse_options):
         wb = load_workbook(path, read_only=False, data_only=False, keep_links=False)
     except Exception as exc:
         raise ValidationError('Workbook could not be loaded: '+str(exc)[:500]) from exc
+    cached_wb = None
     try:
+        sheets = [{'name': ws.title, 'used_range': ws.calculate_dimension()} for ws in wb.worksheets]
+        def structured_regions(ws):
+            regions=[]
+            # Iterate physically allocated cells, not the potentially enormous
+            # used rectangle. openpyxl is pinned; its formula objects expose ref.
+            for cell in list(ws._cells.values()):
+                if cell.data_type != 'f' or isinstance(cell.value, str): continue
+                anchor=cell.coordinate
+                ref=getattr(cell.value, 'ref', None) or anchor
+                try: bounds=range_boundaries(ref)
+                except (ValueError, TypeError) as exc: raise ValidationError('Unsupported structured formula range. Paste evaluated recipes as values in a workbook copy.') from exc
+                if None in bounds: raise ValidationError('Unsupported unbounded structured formula range.')
+                regions.append((anchor,ref,bounds))
+            return regions
+        if metadata_only:
+            result = {'sheets': sheets, 'source_modified': False}
+            if sheet is None: return result
+            if sheet not in wb.sheetnames:
+                raise ValidationError('Choose one of the available Excel tabs.')
+            ws = wb[sheet]
+            try: startc, startr, endc, endr = range_boundaries(cell_range or 'A1')
+            except ValueError as exc: raise ValidationError('Preview starts at a cell address, for example A1.') from exc
+            if None in (startc, startr, endc, endr) or startc != endc or startr != endr or not (1 <= startc <= 16384 and 1 <= startr <= 1048576):
+                raise ValidationError('Preview starts at one Excel cell, for example A1.')
+            # Bounded data grid, not a renderer or formula engine. Sidebar cells
+            # are shown, never parsed as recipes until explicitly selected.
+            endc = min(16384, max(startc, min(ws.max_column, startc+29)))
+            endr = min(1048576, max(startr, min(ws.max_row, startr+39)))
+            cached_wb = load_workbook(path, read_only=False, data_only=True, keep_links=False)
+            arrays=structured_regions(ws)
+            preview=[]
+            for row in ws.iter_rows(min_row=startr,max_row=endr,min_col=startc,max_col=endc):
+                for cell in row:
+                    raw=cell.value
+                    raw=raw if raw is None or type(raw) in (str,int,float,bool) else str(getattr(raw,'text',raw))
+                    cached=cached_wb[sheet][cell.coordinate].value if cell.data_type=='f' else None
+                    array_region=next((f'{anchor} ({ref})' for anchor,ref,(ac,ar,bc,br) in arrays if ac<=cell.column<=bc and ar<=cell.row<=br),None)
+                    preview.append({'unsupported_formula_region':array_region,'cell':cell.coordinate,'row':cell.row,'column':cell.column,
+                                    'raw':raw,'is_formula':cell.data_type=='f',
+                                    'cached_value':cached if cached is None or type(cached) in (str,int,float,bool) else str(cached)})
+            result.update(sheet=sheet, preview_cells=preview,
+                          preview_range=f'{get_column_letter(startc)}{startr}:{get_column_letter(endc)}{endr}',
+                          start_row=startr,start_column=startc,rows=endr-startr+1,columns=endc-startc+1,
+                          column_labels=[get_column_letter(c) for c in range(startc,endc+1)],
+                          preview_limited=ws.max_row>endr or ws.max_column>endc or startr>1 or startc>1)
+            return result
         if sheet is None:
             if len(wb.sheetnames) != 1:
-                raise ValidationError('Multiple worksheets: select one explicitly with --sheet.')
+                raise ValidationError('Choose the Excel tab containing your recipe grid. Available tabs: ' + ', '.join(wb.sheetnames))
             sheet = wb.sheetnames[0]
         if sheet not in wb.sheetnames:
-            raise ValidationError(f'Worksheet not found: {sheet}')
+            raise ValidationError(f'Excel tab not found: {sheet}. Available tabs: ' + ', '.join(wb.sheetnames))
         ws = wb[sheet]
         bounds = range_boundaries(cell_range or ws.calculate_dimension())
         minc,minr,maxc,maxr = bounds
-        if any(v is None for v in bounds) or minr < 1 or minc < 1 or maxr < minr or maxc < minc:
+        if any(v is None for v in bounds) or minr < 1 or minc < 1 or maxr < minr or maxc < minc or maxr > 1048576 or maxc > 16384:
             raise ValidationError('Range must be a finite cell rectangle, e.g. B2:F4.')
         if (maxr-minr+1)*(maxc-minc+1) > MAX_CELLS:
             raise ValidationError('Selected range exceeds cell limit.')
         for merged in ws.merged_cells.ranges:
             if not (merged.max_row < minr or merged.min_row > maxr or merged.max_col < minc or merged.min_col > maxc):
                 raise ValidationError(f'Merged cells intersect selected grid: {merged}; choose a grid without merged cells.')
-        cells=[]; errors=[]
+        for anchor, ref, (ac, ar, bc, br) in structured_regions(ws):
+            if not (br < minr or ar > maxr or bc < minc or ac > maxc):
+                raise ValidationError(f'Selected recipe grid intersects unsupported array/spill or data-table formula {anchor} ({ref}). Structured formula ranges are not supported, even when their anchor is outside the selection. Paste evaluated recipes as values in a workbook copy, then select that copy.')
+        cells=[]; errors=[]; formula_count=0
+        # Read saved results separately. Neither openpyxl read executes formulas,
+        # macros, links or a spreadsheet calculation engine. Trust is explicit.
+        if any(cell.data_type == 'f' for row in ws.iter_rows(min_row=minr,max_row=maxr,min_col=minc,max_col=maxc) for cell in row):
+            try:
+                cached_wb = load_workbook(path, read_only=False, data_only=True, keep_links=False)
+            except Exception as exc:
+                raise ValidationError('Saved formula results could not be read: ' + str(exc)[:500]) from exc
+        def display_value(value):
+            return value if value is None or type(value) in (str,int,float,bool) else str(getattr(value, 'text', value))
         for row in ws.iter_rows(min_row=minr,max_row=maxr,min_col=minc,max_col=maxc):
             for cell in row:
                 record={'cell':cell.coordinate,'row':cell.row,'column':cell.column,
-                        'grid_row':cell.row-minr,'grid_column':cell.column-minc,'raw':cell.value if cell.value is None or type(cell.value) in (str,int,float,bool) else str(cell.value), 'raw_type':type(cell.value).__name__}
+                        'grid_row':cell.row-minr,'grid_column':cell.column-minc,
+                        'raw':display_value(cell.value), 'raw_type':type(cell.value).__name__,
+                        'value_source':'literal', 'value_used':display_value(cell.value)}
                 try:
+                    value = cell.value
                     if cell.data_type == 'f':
-                        raise ValidationError('Formula cell is not evaluated.')
-                    record['recipe']=parse_bundle(cell.value,**parse_options)
+                        if not isinstance(cell.value, str):
+                            raise ValidationError('This structured Excel formula type is not supported. Paste evaluated recipes as values in a workbook copy.')
+                        formula_count += 1
+                        cached_cell = cached_wb[sheet][cell.coordinate]
+                        record.update(value_source='saved_formula_result', formula=display_value(cell.value),
+                                      cached_value=display_value(cached_cell.value), value_used=None,
+                                      cache_freshness='not_verifiable', cache_confirmed=formula_cache_confirmed is True)
+                        if cached_cell.value is None:
+                            record['formula_status']='missing_saved_result'
+                            raise ValidationError('Formula has no readable saved result. Open the workbook in Excel, recalculate, save, then select the saved file again; or paste the evaluated recipe as values in a workbook copy. GridCAD does not calculate formulas. A missing result is not treated as a blank grid cell.')
+                        if cached_cell.data_type == 'e':
+                            record['formula_status']='saved_excel_error'
+                            raise ValidationError('Saved formula result is an Excel error (' + str(cached_cell.value) + '). Fix it in Excel, recalculate and save, then select the file again.')
+                        if formula_cache_confirmed is not True:
+                            record['formula_status']='confirmation_required'
+                            raise ValidationError('A saved formula result is available but its freshness cannot be verified. Recalculate and save in Excel, reselect the file, then confirm use of saved formula results; or paste evaluated recipes as values in a copy.')
+                        record['formula_status']='saved_result_confirmed'
+                        value = cached_cell.value
+                        record['value_used']=display_value(value)
+                    record['recipe']=parse_bundle(value,**parse_options)
                     record['role']='hole' if record['recipe'] is None else 'sample'
                 except ValidationError as exc:
                     record.update(recipe=None,role='invalid',error=str(exc)); errors.append({'cell':cell.coordinate,'error':str(exc)})
@@ -393,12 +473,16 @@ def read_workbook(path, *, sheet=None, cell_range=None, **parse_options):
         return {'workbook':str(path),'sha256':file_hash(path),'sheet':sheet,
                 'range':f'{get_column_letter(minc)}{minr}:{get_column_letter(maxc)}{maxr}',
                 'rows':maxr-minr+1,'columns':maxc-minc+1,'cells':cells,'errors':errors,
+                'formula_count':formula_count, 'available_sheets':sheets,
+                'warnings':(['Formula results are saved by Excel, not calculated by GridCAD. Their freshness cannot be verified; review the displayed saved values.'] if formula_count else []),
                 'parser_policy':{'order':parse_options.get('order','CMYKWT'),
                                  'empty_channels_zero':parse_options.get('empty_channels_zero',False),
                                  'sum_tolerance':str(parse_options.get('tolerance',Decimal(0))),
-                                 'delimiter':parse_options.get('delimiter','auto')}}
+                                 'delimiter':parse_options.get('delimiter','auto'),
+                                 'formula_cache_confirmed':formula_cache_confirmed is True}}
     finally:
         wb.close()
+        if cached_wb is not None: cached_wb.close()
 
 def transform_position(row, column, rows, columns, transform):
     required={'transpose','mirror_rows','mirror_columns','row_offset','column_offset'}

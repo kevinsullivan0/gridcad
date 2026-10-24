@@ -1,0 +1,29 @@
+{
+  "kind": "Node minimal-DOM contract tests, not browser QA",
+  "checks_passed": 23,
+  "checks": [
+    "Absolute addressed ranges recognized",
+    "Invalid/unbounded range rejected: A0",
+    "Invalid/unbounded range rejected: B3:A2",
+    "Invalid/unbounded range rejected: A1:XFE1",
+    "Invalid/unbounded range rejected: A1:A1048577",
+    "Invalid/unbounded range rejected: A:A",
+    "Invalid/unbounded range rejected: 1:2",
+    "UI sends explicit transpose and formula cache confirmations",
+    "Addressed worksheet grid builds bounded cells",
+    "Drag sets rectangle including holes",
+    "Drag highlights every selected cell",
+    "Scalar worksheet detail explains bundle mismatch",
+    "Shift-click extends anchored selection across pages",
+    "Selection revokes prior reviewed save",
+    "Failed tab refresh clears old selectable cells and old sheet data",
+    "Failed refresh clears stale details and displays recovery instruction",
+    "Workbook replacement resets range, start address and transpose",
+    "Workbook replacement clears selection anchor",
+    "Transposed dimensions shown with original source dimensions",
+    "Long transposed recipe preview renders only visible page",
+    "Paging reaches next transposed columns",
+    "Recipe detail retains formula, saved value, channel sum",
+    "Editing role regions does not hide controls mid-entry"
+  ]
+}

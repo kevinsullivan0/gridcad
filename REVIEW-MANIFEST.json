@@ -1,0 +1,50 @@
+{
+  "baseline_repository_source": "40c85b969593a1080d8ee9d9bcfc4a8803076478",
+  "release_payload_files_verified": 288,
+  "verification": {
+    "python_tests": 72,
+    "node_minimal_dom_checks": 23,
+    "real_browser": "blocked before checks",
+    "windows": "not tested",
+    "actual_user_workbook": "not supplied",
+    "grabcad_gui": "not tested"
+  },
+  "changed_files": [
+    {
+      "path": "grabcad_grid_ui.py",
+      "baseline_sha256": "20e6edbfd82de9e68f7b40c52d0b3dfff15f45d45cd269b0bbe4394cf431572a",
+      "review_sha256": "0e584d9ec841273aea81d96860ea158a80f7669cec3c3cb2c91324963ecc0888"
+    },
+    {
+      "path": "gridcad/core.py",
+      "baseline_sha256": "8914c9215a4617c333253ca8fe7dff4cc1320f03f0150e1c205e63ce788a8462",
+      "review_sha256": "c4c094a578242611b1789e16bba2fac2bfb1774c43f8147950a1d5208da61fbc"
+    },
+    {
+      "path": "ui/index.html",
+      "baseline_sha256": "b48dea4b223c8a46e665955d668ee3395b0c43d4537c911af56ec0e9f567537e",
+      "review_sha256": "f2c8796399e28869835acb6ab45ec8a9351eb7a47c5144d87367d324d66c46e4"
+    },
+    {
+      "path": "ui/app.js",
+      "baseline_sha256": "79770b3688407475e8096a6f3484398e797aad873b1a91b13b9240f4305742c3",
+      "review_sha256": "964a45dcdc2ae3c9595df6faf7c42a7ae956d3c8e279a4f04cca9337bfb78e8e"
+    },
+    {
+      "path": "ui/style.css",
+      "baseline_sha256": "1961a10e20ba00feef200f80dbc60a0c92fc8cf113c1cb610faf58e83f38682a",
+      "review_sha256": "27361a53cab9a376a129fc2148ceb7864c9f9201f226dded4073d5163ec5c738"
+    },
+    {
+      "path": "docs/UI.md",
+      "baseline_sha256": "2ad53c1b32bebabc26790082225a89b9d2dbb0f58eb4d488bd85e3f53ab6d482",
+      "review_sha256": "04769bca32cea41262994a607879da8f99d8d33d5cf546be79e97546f0942f86"
+    },
+    {
+      "path": "docs/WORKBOOK_INPUT.md",
+      "baseline_sha256": null,
+      "review_sha256": "9bc2d288bf39e1c73333f37519eb1a86d94ab9b22c7a3b25a62bfb97d5ff4c7d"
+    }
+  ],
+  "sealed_release_modified": false
+}

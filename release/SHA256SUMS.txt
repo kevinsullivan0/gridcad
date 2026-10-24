@@ -1,1 +1,3 @@
 b0dd8d5b87ac896b291a6506d326e28ce942517b5a27f8942d68fb93fbc5748c  GridCAD-Windows-x64-2026-10-24.zip
+2ae902a15412f9e40af3bee12161280001c2234c6f378b8820fde918b8d3f1cf  GridCAD-Windows-x64-v0.1.0-alpha.2.zip
+80ac30ac8b5582bea38551e3ae43465dcf7595ce4a7628ebbdcd23bd3a59887e  GridCAD-v0.1.0-alpha.2-Review-Report.txt

@@ -1,0 +1,10 @@
+{
+  "status": "blocked_before_browser_checks",
+  "checks_passed": 0,
+  "attempts": [
+    "Local Linux Chromium launch: process singleton socket creation was not permitted in the command sandbox.",
+    "Supported escalation: sandbox setup failed on a read-only sessions mount before execution.",
+    "Supported cloud browser: execution-namespace loopback URL returned connection refused."
+  ],
+  "limitations": "No visual, real-browser, Windows, Excel or GrabCAD validation is established by this run. The prepared browser smoke script has not run to completion."
+}

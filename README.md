@@ -1,5 +1,7 @@
 # GridCAD | Windows x64 portable candidate-copy tool
 
+**Known launch limitation: Windows Smart App Control can block the downloaded launch-windows.cmd file. This prerelease is not currently verified usable on machines enforcing that policy. Do not disable security protection to run it. A supported alternative distribution is under investigation.**
+
 ## Start here
 
 1. Extract the ENTIRE ZIP into a normal writable folder. Do not launch from inside the ZIP.
@@ -9,7 +11,7 @@
 
 No install, administrator rights, PATH changes, pip, network download or Python setup is needed. The included official Python runtime is for Windows x64, not 32-bit or native ARM64. The tool uses a local browser page, no external assets or telemetry. This is an unsigned custom tool; source is included for inspection and official runtime hashes/provenance are included. Do not bypass Windows or organizational security warnings. If blocked, ask your IT/support contact rather than weakening security settings.
 
-**Windows execution has not been tested.** Linux checks of the bundled Python dependencies and application do not prove that the Windows launcher or browser workflow works on your computer.
+**Successful Windows execution remains unverified.** Linux checks of the bundled Python dependencies and application do not prove that the Windows launcher or browser workflow works on your computer.
 
 ## Make a candidate copy
 

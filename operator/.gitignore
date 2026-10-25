@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+*.print
+*.PRINT
+*.xlsx
+*.xlsm
+*.png
+*.jpg
+*.stl
+private/
+results/
+*.zip

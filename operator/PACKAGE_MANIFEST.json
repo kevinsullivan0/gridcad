@@ -1,0 +1,90 @@
+{
+  "status": "REVIEW_REVISION_3_NOT_PUBLISHED",
+  "prior_package_sha256": "fed5192d38930a7550656158b63b13193a40efc061fb9b8c06cd31d7a6f04f32",
+  "private_identifiers_scanned": 13338,
+  "private_identifiers_found": 0,
+  "private_scan_scope": "Executor comparison against authorized private source set; public reviewers need that set to repeat this particular comparison. ZIP contents independently inspectable.",
+  "public_source_attribution_intentionally_retained": true,
+  "synthetic_tests_passed": 61,
+  "private_real_case_replays": 2,
+  "both_replays_byte_identical_to_existing_candidates": true,
+  "native_acceptance_verified": false,
+  "new_license_grant_added": false,
+  "files": [
+    {
+      "path": ".gitignore",
+      "bytes": 91,
+      "sha256": "2ac69ddf13136fd050d1ea1e7869db23bf232d0e86faffdb160210e1a942689e"
+    },
+    {
+      "path": "PLAN.md",
+      "bytes": 5972,
+      "sha256": "220810a74aa9635c54de986d0156e0a0186f5075b7ba82b46354d37b24da13d6"
+    },
+    {
+      "path": "PROVENANCE.md",
+      "bytes": 2044,
+      "sha256": "6c8ee2e010b4048bb5aabe493f3f3a6a18a342c4126dd8b217351b20d4dd67c5"
+    },
+    {
+      "path": "README.md",
+      "bytes": 11787,
+      "sha256": "b1e1ab4d041260d3be7bf7f7c422fd4f342385a966cf0b06633b06d5e62438e5"
+    },
+    {
+      "path": "REVIEW.md",
+      "bytes": 3701,
+      "sha256": "3ddb3d929558591854a20af9e36df92ac3e0abcab20dca042804b71d4ff7c734"
+    },
+    {
+      "path": "REVIEWED_ID_MODE.md",
+      "bytes": 4193,
+      "sha256": "0c1cfafa5bc1ed60d10b49a2e9f7095815d457da13910071e877c941c8fcf6da"
+    },
+    {
+      "path": "REVISION_NOTES.md",
+      "bytes": 4195,
+      "sha256": "ea21fc828d4fd3e344de659edd1dd55ca6ecba52acf06e3b17967e52435ed4f6"
+    },
+    {
+      "path": "TEST_RESULTS.txt",
+      "bytes": 7784,
+      "sha256": "e087cbb435d1488bee64a18953ff8ce9b9f9caf3b2d04eb4af1a40a9f55927f1"
+    },
+    {
+      "path": "examples/make_synthetic_case.py",
+      "bytes": 8051,
+      "sha256": "7b6ff2a4f01db86f8980f0c054159f52632dfb55cd11056da2554c7e41da6e2a"
+    },
+    {
+      "path": "gridcad_operator/__init__.py",
+      "bytes": 89,
+      "sha256": "afcb3f9b42cbc874a42416e2dc323d5f4d7bec2921eecaaca866f01945f1124e"
+    },
+    {
+      "path": "gridcad_operator/__main__.py",
+      "bytes": 34,
+      "sha256": "8a86913e19970254884decd69a8e344f15d39a339440fe0204e91d0f977546d9"
+    },
+    {
+      "path": "gridcad_operator/core.py",
+      "bytes": 2075,
+      "sha256": "79813adad3f05b7eb7b88f3bc98c49aca7ce252a44ddf5103c8818a918842d0f"
+    },
+    {
+      "path": "gridcad_operator/material_converter.py",
+      "bytes": 10514,
+      "sha256": "186c01cd34e6ace8636001f68c78c10fcc2f6ed7bd56effa5a3bee0ba11cfb76"
+    },
+    {
+      "path": "gridcad_operator/operator.py",
+      "bytes": 35510,
+      "sha256": "da362b348beb49c20ef52b36c941c295aba111cd2c0a3868578f469654789751"
+    },
+    {
+      "path": "tests/test_operator.py",
+      "bytes": 20962,
+      "sha256": "4bbd0cc81aea9e20df5a3c48d255e088f422eb0b93a3229fcecd0986e30bc296"
+    }
+  ]
+}

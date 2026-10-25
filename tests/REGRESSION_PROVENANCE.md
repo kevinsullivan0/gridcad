@@ -66,3 +66,8 @@ Not recovered or re-established by this suite:
 The extension also covers a 500-by-4 selected rectangle, wholly blank internal rows/columns, validation at the end of the worksheet, the last bounded workbook-preview page retaining original cell addresses, rejection above 100,000 selected cells, explicit HTTP transpose filtering without source-grid mutation, and rejection of non-boolean transpose flags.
 
 All 11 extension tests passed in 0.860 seconds. The combined current suite of 42 preserved-safeguard, 11 transpose/long-sheet, and 14 workbook UX/API tests passed: **67 tests in 3.833 seconds**, zero failures/skips. Logs: `transpose-mapping.log`, `combined-python-tests.log`. This combined run occurred on 2026-10-24 around 23:02 UTC. It is not a rerun or recovery of the historical 134-test suite and does not establish actual browser layout behavior, Windows execution, or printer acceptance.
+
+
+## Current alpha.3 input-flow checkpoint (2026-10-25)
+
+The current root test-results.txt records 96 passing Python checks. qa/dom-contract-results.json records 23 contracts. qa/input-flow-http-results.json records 49 production-JavaScript/real-HTTP checks over 123 requests and an audited synthetic save/download. Older per-suite logs in this directory describe earlier alpha.2 runs, not the current total. Two independent reviews reran current checks. No browser rendering, real pointer hit-testing, Windows or actual-user-file acceptance is inferred.

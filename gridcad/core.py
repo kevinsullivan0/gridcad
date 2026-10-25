@@ -3,6 +3,7 @@ import csv
 import hashlib
 import html
 import json
+import math
 import re
 import stat
 import unicodedata
@@ -57,7 +58,7 @@ def strict_json(data):
 
 def json_text(value):
     # Reports serialize Decimal as an exact decimal string, never a rounded float.
-    return json.dumps(value, ensure_ascii=False, indent=2, default=lambda x: str(x) if isinstance(x, Decimal) else (_ for _ in ()).throw(TypeError(type(x).__name__)))
+    return json.dumps(value, ensure_ascii=False, indent=2, allow_nan=False, default=lambda x: str(x) if isinstance(x, Decimal) else (_ for _ in ()).throw(TypeError(type(x).__name__)))
 
 def validate_recipe(values, *, order='CMYKWT', tolerance=Decimal(0)):
     if len(order) != 6 or set(order) != set(CHANNELS):
@@ -280,6 +281,12 @@ def inspect_project(path):
                             for oid,n in occ.items()],
             'warning': 'Read-only observed JSON structure. This inspection changes nothing and does not establish GUI reopen, composition or print readiness. A separate candidate-copy gate is required before any save.'}
 
+def workbook_display_value(value):
+    # JSON has no Infinity/NaN literals. Preserve their visible text, never emit
+    # invalid JSON or coerce them into a channel value.
+    if isinstance(value,float) and not math.isfinite(value): return str(value)
+    return value if value is None or type(value) in (str,int,float,bool) else str(getattr(value,'text',value))
+
 def read_workbook(path, *, sheet=None, cell_range=None, formula_cache_confirmed=False, metadata_only=False, **parse_options):
     from openpyxl import load_workbook
     from openpyxl.utils.cell import range_boundaries, get_column_letter
@@ -357,7 +364,8 @@ def read_workbook(path, *, sheet=None, cell_range=None, formula_cache_confirmed=
                     elem.clear()
             except (ET.ParseError,DefusedXmlException) as exc: raise ValidationError('Malformed or unsafe workbook XML: '+name) from exc
     try:
-        wb = load_workbook(path, read_only=False, data_only=False, keep_links=False)
+        with path.open('rb') as stream:
+            wb = load_workbook(stream, read_only=False, data_only=False, keep_links=False)
     except Exception as exc:
         raise ValidationError('Workbook could not be loaded: '+str(exc)[:500]) from exc
     cached_wb = None
@@ -377,7 +385,15 @@ def read_workbook(path, *, sheet=None, cell_range=None, formula_cache_confirmed=
                 regions.append((anchor,ref,bounds))
             return regions
         if metadata_only:
-            result = {'sheets': sheets, 'source_modified': False}
+            origins={}; nonempty_counts={}
+            for tab in wb.worksheets:
+                occupied=[c for c in tab._cells.values() if c.value is not None]
+                nonempty_counts[tab.title]=len(occupied)
+                first=min(occupied,key=lambda c:(c.row,c.column)) if occupied else None
+                origins[tab.title]=first.coordinate if first is not None else 'A1'
+            result = {'sheets': sheets, 'source_modified': False,
+                      'active_sheet':wb.active.title if wb.active and wb.active.title in origins else (sheets[0]['name'] if sheets else None),
+                      'preview_origins':origins,'sheet_nonempty_counts':nonempty_counts}
             if sheet is None: return result
             if sheet not in wb.sheetnames:
                 raise ValidationError('Choose one of the available Excel tabs.')
@@ -390,19 +406,25 @@ def read_workbook(path, *, sheet=None, cell_range=None, formula_cache_confirmed=
             # are shown, never parsed as recipes until explicitly selected.
             endc = min(16384, max(startc, min(ws.max_column, startc+29)))
             endr = min(1048576, max(startr, min(ws.max_row, startr+39)))
-            cached_wb = load_workbook(path, read_only=False, data_only=True, keep_links=False)
+            cache_read_error=None
+            try:
+                with path.open('rb') as stream:
+                    cached_wb = load_workbook(stream, read_only=False, data_only=True, keep_links=False)
+            except Exception:
+                cache_read_error='Saved formula results could not be read. Showing original cell contents only; no saved formula value is being used. Recalculate and save a workbook copy, or provide evaluated recipe values.'
             arrays=structured_regions(ws)
             preview=[]
             for row in ws.iter_rows(min_row=startr,max_row=endr,min_col=startc,max_col=endc):
                 for cell in row:
                     raw=cell.value
-                    raw=raw if raw is None or type(raw) in (str,int,float,bool) else str(getattr(raw,'text',raw))
-                    cached=cached_wb[sheet][cell.coordinate].value if cell.data_type=='f' else None
+                    raw=workbook_display_value(raw)
+                    cached=cached_wb[sheet][cell.coordinate].value if cached_wb is not None and cell.data_type=='f' else None
                     array_region=next((f'{anchor} ({ref})' for anchor,ref,(ac,ar,bc,br) in arrays if ac<=cell.column<=bc and ar<=cell.row<=br),None)
-                    preview.append({'unsupported_formula_region':array_region,'cell':cell.coordinate,'row':cell.row,'column':cell.column,
+                    preview.append({'cache_read_error':cache_read_error if cell.data_type=='f' else None,'unsupported_formula_region':array_region,'cell':cell.coordinate,'row':cell.row,'column':cell.column,
                                     'raw':raw,'is_formula':cell.data_type=='f',
-                                    'cached_value':cached if cached is None or type(cached) in (str,int,float,bool) else str(cached)})
-            result.update(sheet=sheet, preview_cells=preview,
+                                    'cached_value':workbook_display_value(cached)})
+            result.update(sheet=sheet, preview_cells=preview,cache_read_error=cache_read_error,
+                          sheet_nonempty_count=nonempty_counts[sheet],preview_nonempty_count=sum(c['raw'] is not None for c in preview),
                           preview_range=f'{get_column_letter(startc)}{startr}:{get_column_letter(endc)}{endr}',
                           start_row=startr,start_column=startc,rows=endr-startr+1,columns=endc-startc+1,
                           column_labels=[get_column_letter(c) for c in range(startc,endc+1)],
@@ -432,11 +454,12 @@ def read_workbook(path, *, sheet=None, cell_range=None, formula_cache_confirmed=
         # macros, links or a spreadsheet calculation engine. Trust is explicit.
         if any(cell.data_type == 'f' for row in ws.iter_rows(min_row=minr,max_row=maxr,min_col=minc,max_col=maxc) for cell in row):
             try:
-                cached_wb = load_workbook(path, read_only=False, data_only=True, keep_links=False)
+                with path.open('rb') as stream:
+                    cached_wb = load_workbook(stream, read_only=False, data_only=True, keep_links=False)
             except Exception as exc:
                 raise ValidationError('Saved formula results could not be read: ' + str(exc)[:500]) from exc
         def display_value(value):
-            return value if value is None or type(value) in (str,int,float,bool) else str(getattr(value, 'text', value))
+            return workbook_display_value(value)
         for row in ws.iter_rows(min_row=minr,max_row=maxr,min_col=minc,max_col=maxc):
             for cell in row:
                 record={'cell':cell.coordinate,'row':cell.row,'column':cell.column,
@@ -453,6 +476,9 @@ def read_workbook(path, *, sheet=None, cell_range=None, formula_cache_confirmed=
                         record.update(value_source='saved_formula_result', formula=display_value(cell.value),
                                       cached_value=display_value(cached_cell.value), value_used=None,
                                       cache_freshness='not_verifiable', cache_confirmed=formula_cache_confirmed is True)
+                        if isinstance(cached_cell.value,float) and not math.isfinite(cached_cell.value):
+                            record['formula_status']='nonfinite_saved_result'
+                            raise ValidationError('Saved formula result is non-finite, not a six-channel recipe. Fix the formula result and save a workbook copy. No value is inferred.')
                         if cached_cell.value is None:
                             record['formula_status']='missing_saved_result'
                             raise ValidationError('Formula has no readable saved result. Open the workbook in Excel, recalculate, save, then select the saved file again; or paste the evaluated recipe as values in a workbook copy. GridCAD does not calculate formulas. A missing result is not treated as a blank grid cell.')

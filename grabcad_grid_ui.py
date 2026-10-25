@@ -14,8 +14,33 @@ from gridcad.geometry import inspect_geometry, propose_grid_mapping
 from gridcad.candidate_writer import candidate_readiness, write_reviewed_candidate_copy, CHANNEL_RESINS
 
 ROOT = Path(__file__).resolve().parent
+BUILD = 'v0.1.0-alpha.3-input-flow-review'
 LIMITS = {'workbook': 20 * 1024**2, 'project': 128 * 1024**2}
 API_LIMIT = 64 * 1024
+
+def validate_workbook_regions(options):
+    """Workbook reference annotations never mask recipe cells or affect materials."""
+    from openpyxl.utils.cell import range_boundaries
+    def bounds(value):
+        if not isinstance(value,str): raise ValidationError('Region range must be an Excel cell rectangle.')
+        try: b=range_boundaries(value.strip().upper())
+        except ValueError as exc: raise ValidationError('Region range must be an Excel cell rectangle.') from exc
+        if None in b or not (1<=b[0]<=b[2]<=16384 and 1<=b[1]<=b[3]<=1048576):
+            raise ValidationError('Region range must be a finite Excel cell rectangle.')
+        return b
+    selected=bounds(options.get('range',''))
+    regions=options.get('workbook_regions',[])
+    if not isinstance(regions,list) or len(regions)>32: raise ValidationError('Use at most 32 optional workbook reference regions.')
+    def overlaps(a,b): return not (a[2]<b[0] or b[2]<a[0] or a[3]<b[1] or b[3]<a[1])
+    prior=[]
+    for region in regions:
+        if not isinstance(region,dict) or set(region)!={'role','range'} or region['role'] not in ('sidebar','header'):
+            raise ValidationError('Workbook reference regions must explicitly be sidebar or header rectangles.')
+        b=bounds(region['range'])
+        if overlaps(selected,b): raise ValidationError('Recipe selection overlaps a marked '+region['role']+' region ('+region['range']+'). Adjust the recipe rectangle or remove that reference mark; no cells are silently skipped.')
+        if any(overlaps(b,other) for other in prior): raise ValidationError('Workbook reference regions overlap. Remove or adjust the duplicate marks.')
+        prior.append(b)
+    return copy.deepcopy(regions)
 
 class ReviewServer(HTTPServer):
     allow_reuse_address = False
@@ -109,6 +134,9 @@ class Handler(BaseHTTPRequestHandler):
             if self.headers.get('Content-Type') != 'application/json': raise ValidationError('JSON content type required.')
             options = strict_json(self.body(API_LIMIT))
             if not isinstance(options, dict): raise ValidationError('Expected an options object.')
+            if self.path == '/api/session':
+                if options: raise ValidationError('Session check requires no options.')
+                self.reply(200, {'build':BUILD,'session_ready':True,'max_recipe_cells':100000,'source_modified':False}); return
             if self.path == '/api/revoke-review':
                 self.reply(200, {'revoked':True}); return
             if self.path == '/api/invalidate':
@@ -119,14 +147,22 @@ class Handler(BaseHTTPRequestHandler):
                 if 'workbook' not in self.server.files: raise ValidationError('Choose a workbook first.')
                 if not options.get('sheet'): raise ValidationError('Choose an Excel tab first.')
                 self.reply(200, read_workbook(self.server.files['workbook'], metadata_only=True, sheet=options['sheet'], cell_range=options.get('start_cell') or 'A1')); return
+            if self.path == '/api/workbook-check':
+                self.server.invalidate()
+                if set(options)-{'sheet','range','order','delimiter','empty_zero','formula_cache_confirmed','transpose','workbook_regions'}: raise ValidationError('Unexpected workbook check options.')
+                if 'workbook' not in self.server.files: raise ValidationError('Choose a workbook first.')
+                regions=validate_workbook_regions(options)
+                grid=read_workbook(self.server.files['workbook'],sheet=options.get('sheet') or None,cell_range=options['range'],order=options.get('order','CMYKWT'),delimiter=options.get('delimiter','auto'),empty_channels_zero=options.get('empty_zero') is True,formula_cache_confirmed=options.get('formula_cache_confirmed') is True,tolerance=Decimal(0))
+                self.reply(200, {'grid':grid,'workbook_regions':regions,'source_modified':False}); return
             if self.path == '/api/analyze':
                 self.server.invalidate()
-                if set(options)-{'sheet','range','order','delimiter','empty_zero','formula_cache_confirmed','transpose','tray_id','selection'}:
+                if set(options)-{'sheet','range','order','delimiter','empty_zero','formula_cache_confirmed','transpose','workbook_regions','tray_id','selection'}:
                     raise ValidationError('Unexpected analysis options. Use the visible workbook and geometry controls.')
                 if set(self.server.files) != {'workbook','project'}: raise ValidationError('Choose both files first.')
                 if type(options.get('transpose', False)) is not bool: raise ValidationError('Transpose must be an explicit on/off choice.')
                 if not options.get('range'):
                     raise ValidationError('Enter the recipe grid rectangle, for example B2:F4. Exclude Excel headers and sidebar inputs, but keep blank positions inside the grid.')
+                workbook_regions=validate_workbook_regions(options)
                 grid = read_workbook(self.server.files['workbook'], sheet=options.get('sheet') or None,
                     cell_range=options.get('range') or None, order=options.get('order','CMYKWT'),
                     delimiter=options.get('delimiter','auto'), empty_channels_zero=options.get('empty_zero') is True,
@@ -150,6 +186,7 @@ class Handler(BaseHTTPRequestHandler):
                     if not proposal['orientation_candidates']:
                         proposal['issues'].append('No orientation matches the selected transpose setting. Check the recipe rectangle, sample region and transpose choice; no alternative is selected automatically.')
                 result['transpose'] = options.get('transpose', False)
+                result['workbook_regions'] = workbook_regions
                 self.server.analysis = {'id':result['analysis_id'], 'options':copy.deepcopy(options), 'hashes':{k:file_hash(v) for k,v in self.server.files.items()}}
                 self.server.report = result
                 self.reply(200,result); return

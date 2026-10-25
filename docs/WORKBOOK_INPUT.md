@@ -1,50 +1,52 @@
-# Selecting and checking an Excel recipe grid
+# Workbook input, without switching back to Excel for cell addresses
 
-## Start with the actual recipe cells
+## View and select
 
-1. Choose your .xlsx workbook. The Excel tab picker lists its real worksheet names.
-2. Choose the tab containing the recipe grid. The displayed used area may also contain headings, instructions and sidebar inputs; it is not automatically selected.
-3. Drag from the first to last recipe cell. Alternatively enter a rectangle such as B2:F4. Keep blank positions inside the rectangle: removing them would move the remaining recipes to different sample positions.
-4. For a long selection, click its first cell, page or jump to another address, then Shift-click its last cell. The address and row/column count above the preview show the complete selected rectangle.
-5. Leave sidebar inputs and headings outside the recipe rectangle, but keep them in the workbook. Formulas may depend on them. Excel sidebars are not the printed row/column labels in the .PRINT project.
+1. Start the app through its launcher, not by opening index.html. Check the visible build and Connected status.
+2. Choose an .xlsx. Its saved active tab opens immediately at its first populated cell. The tab picker contains all actual worksheets. Showing a tab does not select any recipe range.
+3. With “Recipe grid” selected, drag across the recipe cells. Keep blank positions inside the rectangle. The displayed selection shows the exact tab, addresses and dimensions.
+4. For a range spanning pages, click the first cell, choose “Choose last cell next”, navigate, and click the last cell. Shift-click also works. Previous/next row and column buttons and First used cells avoid external address lookup. Optional exact addresses allow a precise typed adjustment or jump.
+5. If useful, mark sidebar/reference or heading rectangles separately. These marks do not supply recipe data, alter formulas, or represent printed project labels. Multiple marks are allowed; remove unwanted marks individually. Overlaps with recipes or other marks are rejected rather than silently dropping cells.
+6. Choose Inspect a cell to see original content, formula, saved result and checked percentages without changing the selection.
 
-The selector is a bounded data grid, not an Excel renderer. It shows at most 40 rows × 30 columns at a time and does not reproduce Excel formatting or merged-cell layout. Page controls and “Preview starts at” reach other addresses. The recipe inspection limit is 100,000 cells; selections above the limit are refused, not silently shortened. Merged cells intersecting the recipe rectangle are refused.
+The grid is a bounded data view, not Excel formatting or a calculation engine. It renders 40 rows × 30 columns per page. Up to 100,000 selected cells are checked, including every blank position, not only the visible page. Larger selections and merged cells intersecting a recipe grid are rejected.
 
-## Expected recipe value
+## Check recipes before loading a project
 
-Each occupied cell must contain all six channel percentages. Default order:
+Choose Check selected recipes. No .PRINT is required. The result reports valid recipes, blank positions, formula cells and errors. Show cell buttons navigate directly to errors. Correct the selection or schema here before project mapping.
 
-Cyan / Magenta / Yellow / Black / White / Clear
+Each occupied cell must contain six percentages. Default CMYKWT order means Cyan / Magenta / Yellow / Black / White / Clear. Example: 20 / 0 / 0 / 0 / 30 / 50. Spaces around slashes, consistent semicolons or whitespace, decimal points and percentage signs are supported. Commas require an explicit separator choice. No mixed separators, inferred decimal commas, silent normalization or rounding.
 
-Example: 20 / 0 / 0 / 0 / 30 / 50
+Use explicit 0 for unused channels. An optional policy permits empty positions inside a six-position bundle. A blank cell remains a grid hole, not an all-zero recipe. A scalar such as 20 may be a sidebar input or one formula component; it is never expanded into six channels automatically.
 
-Spaces around slashes are accepted. Consistent semicolons or whitespace also work. Decimal points and percentage signs are accepted. Commas need an explicit separator choice; decimal commas and mixed separators are not inferred. Values must total exactly 100. No normalization or silent rounding is performed.
+## Formula results
 
-Use explicit zeros for unused channels. The optional empty-channel setting permits empty positions only within a complete six-position bundle. A blank cell is a hole, never an all-zero recipe.
+The data view shows original formula text and any saved result. GridCAD never evaluates formulas. After recalculating/saving the workbook, explicitly confirm use of its saved results. Freshness cannot be verified automatically.
 
-A scalar such as 20 is not a bundle. It may be a sidebar input, a formula returning just one component, or a different worksheet layout. GridCAD does not guess the other five channels or combine adjacent cells automatically. Check the raw value and the selected rectangle.
+Missing caches, Excel errors, non-finite values and scalar results remain invalid recipes. Array/spill and data-table ranges are unsupported, including selected cells whose formula anchor is outside the selection. For those cases, recalculate/save in Excel or paste evaluated recipes as values into a workbook copy. Keep originals unchanged.
 
-## Formula cells
+If a saved-value cache is unreadable, the viewer still shows raw addressed cells with a warning. Valid literal regions remain checkable; unreadable formula results do not become recipes. File streams close even when cache parsing fails.
 
-The original release rejects every formula cell, even if Excel saved its calculated result. Its workaround is to copy the workbook and paste the evaluated recipe cells as values.
+## Transpose, map and save
 
-This review build can read Excel's saved formula results after an explicit confirmation that the workbook was recalculated and saved. It never runs formulas, macros or external links. It shows the original formula, saved result, parsed channels and exact total. A saved result may be stale: GridCAD cannot verify freshness.
+Transpose explicitly swaps sample-grid rows and columns in GridCAD, preserving original Excel addresses and holes. The selected shape updates before mapping. The workbook is never edited. Mirroring and orientation still require an explicit choice.
 
-If no readable saved result exists, open the workbook in Excel, recalculate, save and select that saved file again. Alternatively paste the evaluated recipes as values in a copy. A missing/unreadable cache, including an indistinguishable empty formula cache, is not silently treated as a grid hole. Saved Excel errors remain errors. A saved numeric scalar still needs a six-channel bundle. Array/spill ranges, data tables and other structured formula types are not supported; a selection touching one of these ranges is refused even if its anchor lies outside the selection. Paste their evaluated recipes as values in a copy. Ordinary per-cell formulas with readable saved results remain supported.
+For saving, the current supported project workflow requires a sample region plus BOTH complete physical printed row-label and column-label regions. These are project bodies, not Excel sidebars. Label text associations are not inferred or rewritten. Selected glyphs receive direct EcoFlex Black, not a K=100 mixer. Other objects are preserved.
 
-## Transpose and orientation
+Review the cell addresses drawn on the tray, confirm orientation and exact material replacement, then preview changes. A preview can prepare a private disposable candidate to check preservation. Only Save produces a downloadable separate candidate. Changing selection/options or checking the workbook invalidates the previous save review. The original files are never overwritten.
 
-“Transpose the selected recipe grid” swaps the sample grid's rows and columns in GridCAD, without modifying the workbook. The source addresses and recipes are retained. The recipe preview shows both source dimensions and transposed dimensions, and only geometric orientations matching the explicit transpose choice are offered.
+Open a saved candidate in normal GrabCAD Print, inspect recipes/label modes and recompose before considering a print. The app never connects to a printer or submits a job.
 
-Choose an orientation yourself and compare the original Excel addresses drawn on the tray. Mirroring is separate from transposing. Blank positions move with their original row/column positions.
+## Visible recovery states
 
-Physical row-label and column-label regions remain where you selected them. Their glyph text and association with source rows or columns are not inferred, swapped or rewritten. Check those regions explicitly. Selected glyphs receive direct EcoFlex Black, not a K=100 mixer recipe. Unselected bodies are preserved.
+- Starting interface never changes: scripts have not initialized. The build label and startup guidance remain visible.
+- HTML file opened directly: launch the app and use its local browser link.
+- Session missing/expired: reopen the complete current launcher link; keep its private session fragment private.
+- Workbook upload failed: choose a readable .xlsx or retry that file. Originals remain unchanged.
+- Workbook loaded, preview failed: real tabs remain available. Change tabs or Reload this view.
+- Empty worksheet: choose another tab; this is not an upload failure.
+- Empty page on a nonempty worksheet: use First used cells or navigate. No selected region is inferred.
 
-## What previews mean
+## Acceptance limits
 
-- Worksheet selector: raw data and saved formula results, before recipe validation.
-- Recipe inspection: exact parsed channels, total and errors for all selected cells, not just the visible page.
-- Tray view: bounding boxes, not rendered meshes or simulated printed colors.
-- Exact-change preview: reviewed cell-to-body assignments, selected label changes, complete exact matches skipped and unselected bodies preserved.
-
-Inspection and preview do not change either original. Only the separate-copy save produces a candidate .PRINT. Normal GrabCAD reopen/recompose and print validation are still required.
+Synthetic parser/API/event-to-HTTP/save tests are not real-browser rendering, Windows execution or actual-file acceptance. The user's representative workbook and a normal GrabCAD review remain necessary to establish their particular end-to-end workflow.

@@ -1,25 +1,16 @@
 /* New DOM-contract tests using a minimal test double, NOT browser/visual QA. */
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict'),path=require('node:path');
 const root=path.resolve(__dirname,'..'),html=fs.readFileSync(path.join(root,'ui/index.html'),'utf8');
-class Node {
- constructor(tag){this.tagName=tag.toUpperCase();this.children=[];this._text='';this._value='';this.dataset={};this.attributes={};this.hidden=false;this.disabled=false;this.checked=false;this.events={};this.files=[];this.classes=new Set();this.classList={add:x=>this.classes.add(x),contains:x=>this.classes.has(x),toggle:(x,on)=>on?this.classes.add(x):this.classes.delete(x)};}
- set textContent(v){this._text=String(v);this.children=[];}get textContent(){return this._text+this.children.map(c=>c.textContent).join('');}
- set value(v){this._value=String(v);}get value(){return this._value;}
- set className(v){this.classes=new Set(v.split(' ').filter(Boolean));}get className(){return [...this.classes].join(' ');}
- append(...nodes){this.children.push(...nodes);}replaceChildren(...nodes){this.children=nodes;this._text='';}get firstChild(){return this.children[0];}
- setAttribute(k,v){this.attributes[k]=String(v);}addEventListener(k,fn){(this.events[k]??=[]).push(fn);}remove(){}click(){this.onclick?.({detail:0});}
-}
-const nodes=new Map();for(const m of html.matchAll(/<([a-z]+)[^>]*\bid="([^"]+)"[^>]*>/g)){const n=new Node(m[1]);n.id=m[2];n.value=/\bvalue="([^"]*)"/.exec(m[0])?.[1]||'';n.hidden=/\bhidden\b/.test(m[0]);nodes.set(n.id,n);}
-const all=()=>[...nodes.values()].flatMap(function walk(n){return[n,...n.children.flatMap(walk)]});
-const document={getElementById:id=>{assert(nodes.has(id),`Missing HTML id: ${id}`);return nodes.get(id);},createElement:t=>new Node(t),createElementNS:(_,t)=>new Node(t),querySelectorAll:q=>q==='#sheet-preview button[data-row]'?all().filter(n=>n.tagName==='BUTTON'&&n.dataset.row!==undefined):all().filter(n=>['INPUT','SELECT','BUTTON'].includes(n.tagName))};
-const window={events:{},addEventListener(k,f){this.events[k]=f;}};
+const {makeDOM}=require('./dom_test_double');
+const {nodes,document,window,all}=makeDOM(html);
 const requests=[];
 let response={},previewFails=false;
-const ctx=vm.createContext({document,window,location:{hash:'#testtoken',reload(){}},fetch:async(url,opts)=>{requests.push({url,body:JSON.parse(opts.body)});return{ok:!(previewFails&&url==='/api/workbook-preview'),json:async()=>previewFails&&url==='/api/workbook-preview'?{error:'Preview starts at one Excel cell'}:response};},console,URL:{createObjectURL(){return'test';},revokeObjectURL(){}},Blob:function(){},setTimeout(){}});
+const ctx=vm.createContext({document,window,location:{hash:'#testtoken',protocol:'http:',reload(){}},fetch:async(url,opts)=>{requests.push({url,body:JSON.parse(opts.body)});return{ok:!(previewFails&&url==='/api/workbook-preview'),json:async()=>url==='/api/session'?{session_ready:true,build:'test-build'}:previewFails&&url==='/api/workbook-preview'?{error:'Preview starts at one Excel cell'}:response};},console,URL:{createObjectURL(){return'test';},revokeObjectURL(){}},Blob:function(){},AbortController,setTimeout,clearTimeout});
 vm.runInContext(fs.readFileSync(path.join(root,'ui/app.js'),'utf8'),ctx);
 const run=code=>vm.runInContext(code,ctx),checks=[];
 function check(value,label){assert(value,label);checks.push(label);}
 (async()=>{
+ await run('startup');
  check(run("JSON.stringify(rangeBounds('$B$2:$F$4'))")==='[2,2,6,4]','Absolute addressed ranges recognized');
  for(const bad of ['A0','B3:A2','A1:XFE1','A1:A1048577','A:A','1:2'])check(run(`rangeBounds(${JSON.stringify(bad)})===null`),'Invalid/unbounded range rejected: '+bad);
  nodes.get('sheet').value='Samples';nodes.get('range').value='B2:E3';nodes.get('transpose').checked=true;nodes.get('formula-cache').checked=true;

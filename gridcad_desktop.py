@@ -105,7 +105,7 @@ class App:
         self.logo=ImageTk.PhotoImage(Image.open(resource('resources/gridcad.png')).resize((32,32),Image.Resampling.LANCZOS))
         tk.Label(header,image=self.logo,bg='#182a3c').pack(side='left',padx=(20,0))
         tk.Label(header, text='GRIDCAD', font=('Segoe UI', 23, 'bold'), bg='#182a3c', fg='white').pack(side='left', padx=22)
-        tk.Label(header, text='RECTANGULAR MATERIAL CONVERTER   /   0.2 RC3', font=('Segoe UI', 10), bg='#182a3c', fg='#bdcbd8').pack(side='left', padx=10)
+        tk.Label(header, text='RECTANGULAR MATERIAL CONVERTER   /   '+core.VERSION, font=('Segoe UI', 10), bg='#182a3c', fg='#bdcbd8').pack(side='left', padx=10)
         body = ttk.Frame(self.root, padding=12); body.pack(fill='both', expand=True)
         body.columnconfigure(0, weight=1); body.rowconfigure(1, weight=1)
         inputs = ttk.Frame(body); inputs.grid(row=0, column=0, sticky='ew')

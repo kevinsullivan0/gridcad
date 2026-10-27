@@ -17,7 +17,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parent / 'operator'))
 from gridcad_operator import operator as op
 
-VERSION = '0.2.0rc1'
+VERSION = '0.2.0rc2'
 PROFILE = 'rectangular-2170-mesh-review-v1'
 TOLERANCE = 0.0001  # mm, fixed; never enlarged to make an input fit.
 ORIENTATIONS = {
@@ -194,8 +194,84 @@ def _clusters(values):
     return centers
 
 
+
+def _shape_grid(records, bodies):
+    """Resolve positions from geometry, with a strictly contained anchor fallback.
+
+    Shape/mesh equality is irrelevant. Different heights are allowed on a shared
+    base plane. An anchor fallback is admitted only if every footprint contains
+    its own stored anchor and lies strictly inside that anchor's rectangular
+    half-pitch cell, so asymmetric geometry cannot drift into another cell.
+    """
+    for record in records:
+        expected = [(record['bounds'][0][i] + record['bounds'][1][i]) / 2 for i in range(3)]
+        if any(abs(a-b)>TOLERANCE for a,b in zip(expected,record['center'])):
+            op.fail('A sample preview has inconsistent geometry bounds. Reopen the original project before mapping.')
+    bases=[r['bounds'][0][2] for r in records]
+    if max(bases)-min(bases)>TOLERANCE:
+        op.fail('The samples do not share one base plane. Place the sample bottoms on one level before exporting the project.')
+
+    def candidate(points, anchors=False):
+        axes=[_clusters([p[i] for p in points.values()]) for i in (0,1)]
+        if len(axes[0])*len(axes[1])!=len(records):
+            op.fail('The samples do not fill a complete rectangular grid. Check for missing samples, duplicates, or a wrong sample group.')
+        ranks={}; occupied=set()
+        for r in records:
+            point=points[r['id']]
+            rank=tuple(min(range(len(axes[i])),key=lambda j:abs(axes[i][j]-point[i])) for i in (0,1))
+            if rank in occupied:op.fail('Two samples occupy the same grid position. Separate them or select the correct sample group.')
+            occupied.add(rank);ranks[r['id']]=rank
+            if anchors:
+                for axis in (0,1):
+                    lo,hi=r['bounds'][0][axis],r['bounds'][1][axis]
+                    if not lo-TOLERANCE<=point[axis]<=hi+TOLERANCE:
+                        op.fail('A sample is offset from its stored grid position. Center its geometry on its placement origin before exporting.')
+                    if len(axes[axis])>1:
+                        half=(axes[axis][1]-axes[axis][0])/2
+                        if lo<=point[axis]-half+TOLERANCE or hi>=point[axis]+half-TOLERANCE:
+                            op.fail('A sample extends into a neighboring grid cell. Increase the spacing or align sample centers before exporting.')
+        # Separation is determined from the real footprints, not mesh identity
+        # or one global width. Neighbor rows/columns may have different sizes.
+        by_id={r['id']:r for r in records}
+        by_rank={rank:by_id[oid] for oid,rank in ranks.items()}
+        for rank,r in by_rank.items():
+            for axis in (0,1):
+                other=list(rank);other[axis]+=1;other=by_rank.get(tuple(other))
+                if other and r['bounds'][1][axis]>=other['bounds'][0][axis]-TOLERANCE:
+                    op.fail('Neighboring sample footprints overlap or touch. Increase the grid spacing or choose separated sample bodies.')
+        for rank,r in by_rank.items():
+            for dx,dy in ((1,1),(1,-1)):
+                other=by_rank.get((rank[0]+dx,rank[1]+dy))
+                if other and all(r['bounds'][0][i]<=other['bounds'][1][i]+TOLERANCE and other['bounds'][0][i]<=r['bounds'][1][i]+TOLERANCE for i in (0,1)):
+                    op.fail('Diagonal sample footprints overlap or touch. Increase the grid spacing before exporting.')
+        return axes,ranks
+
+    points={r['id']:r['center'][:2] for r in records}
+    try:
+        axes,ranks=candidate(points)
+        return axes,ranks,'mesh-footprint-centers'
+    except op.ValidationError as geometry_error:
+        anchors={r['id']:[float(bodies[r['id']]['transform'][i])*1000 for i in (3,7)] for r in records}
+        try:
+            axes,ranks=candidate(anchors,True)
+            return axes,ranks,'contained-placement-anchors'
+        except op.ValidationError:
+            # Prefer the directly observed geometry diagnosis to a confusing
+            # secondary origin explanation; neither route guesses a mapping.
+            raise geometry_error
+
+
+def reference_material_info(project, reference):
+    """Read-only, validated description for a visible reference-object selector."""
+    material = op.native_reference_material(project['nodes'], project['bodies'], project['leaves'], reference)
+    return {'id': reference, 'name': project['nodes'][reference].get('name', ''),
+            'material_name': material.get('metadata', {}).get('displayName', material['name']),
+            'material_sha256': op.fingerprint(material)}
+
+
 def propose(project, workbook_path, book, sheet, selected_range, sample_name,
-            label_container, orientation, *, transpose=False, cache_confirmed=False):
+            label_container, orientation, *, transpose=False, cache_confirmed=False,
+            label_mode="black", label_reference=None, confirm_label_replacement=False):
     if orientation not in ORIENTATIONS:
         op.fail('Choose how worksheet rows and columns run across the geometry preview.')
     cells, shape = read_rectangle(book, sheet, selected_range, cache_confirmed=cache_confirmed)
@@ -208,16 +284,7 @@ def propose(project, workbook_path, book, sheet, selected_range, sample_name,
     if set(samples) & labels:
         op.fail('Sample and label selections overlap. Choose the label-only container.')
     records = [project['records'][oid] for oid in samples]
-    if len({r['mesh_sha256'] for r in records}) != 1:
-        op.fail('Samples must share exactly the same embedded mesh payload in this profile.')
-    axes = [_clusters([r['center'][i] for r in records]) for i in range(3)]
-    if len(axes[2]) != 1 or len(axes[0]) * len(axes[1]) != len(samples):
-        op.fail('Samples must fill one complete planar rectangular lattice without holes or duplicates.')
-    for axis in (0,1):
-        if len(axes[axis])>1:
-            pitch=axes[axis][1]-axes[axis][0]
-            if any(r['bounds'][1][axis]-r['bounds'][0][axis]>=pitch-TOLERANCE for r in records):
-                op.fail('Selected sample bounds overlap or touch adjacent grid positions; this separated-sample profile refuses them.')
+    axes, grid_ranks, grid_basis = _shape_grid(records, project['bodies'])
     # Independently stored occurrence positions corroborate relative geometry:
     # observed profile quarter-turn maps occurrence +Y to tray +X and +X to -Y.
     first = samples[0]
@@ -232,7 +299,7 @@ def propose(project, workbook_path, book, sheet, selected_range, sample_name,
         op.fail(f'Geometry has {len(axes[ra])} × {len(axes[ca])} positions in this orientation; worksheet is {h} × {w}. Check transpose and orientation.')
     positions, used = {}, set()
     for r in records:
-        ranks = [min(range(len(axes[i])), key=lambda j: abs(axes[i][j]-r['center'][i])) for i in (0,1)]
+        ranks = grid_ranks[r['id']]
         row = ranks[ra] if rd == 1 else h-1-ranks[ra]
         col = ranks[ca] if cd == 1 else w-1-ranks[ca]
         if (row, col) in positions:
@@ -259,19 +326,37 @@ def propose(project, workbook_path, book, sheet, selected_range, sample_name,
                                 'source_material_sha256': op.fingerprint(material),
                                 'expected_percentages': cell['percentages'], 'action': action})
         mapping.append({**cell, 'id': oid, 'center': project['records'][oid]['center'], 'action': action})
+    if label_mode not in ('black','reference'):
+        op.fail('Choose black labels or copy the material from an existing reference object.')
+    label_info = {'mode': label_mode, 'reference_id': None, 'conflicts': [],
+                  'replacement_confirmed': confirm_label_replacement is True}
+    if label_mode == 'reference':
+        reference_material = op.native_reference_material(nodes, bodies, project['leaves'], label_reference)
+        label_info.update(reference_id=label_reference, reference_name=nodes[label_reference].get('name', ''),
+                          material_name=reference_material.get('metadata', {}).get('displayName', reference_material['name']))
     black_refs = [oid for oid in sorted(project['leaves']) if op.black(nodes[oid]['material'])]
     for oid in sorted(labels):
         material = nodes[oid]['material']
         entry = {'occurrence_id': oid, 'tray_body_id': bodies[oid]['id'],
                  'source_material_sha256': op.fingerprint(material), 'action': 'preserve_native_black'}
-        if not op.black(material):
+        if label_mode == 'reference':
+            unchanged = op.same_material_definition(material, reference_material)
+            entry.update(action='preserve_reference_material' if unchanged else 'copy_native_reference',
+                         reference_occurrence_id=label_reference,
+                         reference_material_sha256=op.fingerprint(reference_material),
+                         replacement_confirmed=confirm_label_replacement is True)
+            if not unchanged and material.get('metadata', {}).get('materialType') != 'color_picker':
+                label_info['conflicts'].append({'id': oid, 'name': nodes[oid].get('name',''),
+                    'current_material': material.get('metadata',{}).get('displayName',material.get('name',''))})
+        elif not op.black(material):
             entry['action'] = 'assign_from_picker_using_native_black' if black_refs else 'assign_from_picker_using_unverified_black'
             if black_refs:
                 entry['reference_occurrence_id'] = black_refs[0]
         plan['labels'].append(entry)
+    label_info['conflict_count'] = len(label_info['conflicts'])
     return {'plan': plan, 'mapping': mapping, 'orientation': orientation, 'transpose': transpose,
-            'profile': PROFILE, 'shape': shape, 'label_ids': sorted(labels),
-            'preserved_count': len(plan['preserve_occurrence_ids'])}
+            'profile': PROFILE, 'shape': shape, 'grid_basis': grid_basis, 'label_ids': sorted(labels),
+            'preserved_count': len(plan['preserve_occurrence_ids']), 'label_material': label_info}
 
 
 def confirm(proposal, evidence):
@@ -280,7 +365,7 @@ def confirm(proposal, evidence):
     plan = copy.deepcopy(proposal['plan'])
     plan['review'] = {'geometry_and_labels_confirmed': True,
         'evidence': (f"{PROFILE}; mesh-derived relative XY, occurrence corroboration; "
-                     f"orientation={proposal['orientation']}; transpose={proposal['transpose']}. "
+                     f"orientation={proposal['orientation']}; transpose={proposal['transpose']}; grid_basis={proposal.get('grid_basis','mesh-footprint-centers')}. "
                      'Expected percentages are worksheet-derived requests, not OCR or independent label transcription. '
                      'User inspected actual displayed glyph geometry and confirms the requested mapping: ' + evidence.strip())}
     plan['review']['mapping_sha256'] = op.mapping_digest(plan)

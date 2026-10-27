@@ -45,3 +45,17 @@ assert not audit["print_ready"]
 Use `core.op.ValidationError` and a nonzero CLI exit to handle refusal. No overwrite/conflict-bypass API is provided. Preserve hashes and the complete private output audit. `load_project` supplies bounded binary-STL top-surface arrays for relative XY visualization; it does not recognize glyph text or implement native compose semantics.
 
 For another geometry, supply a separate mapper with explicit source and numeric contracts, independently reviewed mapping evidence, preservation and round-trip tests, and native acceptance evidence when claiming native compatibility. Triangular, hexagonal, arbitrary rotation/scale and 3D automatic conversion are currently unsupported.
+
+## Copy a saved material onto labels
+
+The optional reference mode copies a complete compatible **existing assignment**; it does not synthesize arbitrary new materials or run GrabCAD. Use `inspect` to identify a reference leaf ID, then add:
+
+```sh
+--label-mode reference --label-reference EXACT-LEAF-ID
+```
+
+`propose` reports `label_material`: the reference's friendly name/material, `conflicts` (all target IDs, names and current materials), `conflict_count`, and `replacement_confirmed`. Review the complete list. If intentional label assignments would change, `convert` additionally requires `--confirm-label-replacement`; the ordinary physical-mapping review and unverified-profile acknowledgement remain required. A color-picker target can be replaced without that extra conflict confirmation. Already identical complete assignments are preserved.
+
+Python callers pass `label_mode='reference'`, `label_reference=leaf_id`, and, only after reviewing conflicts, `confirm_label_replacement=True` to `core.propose`. `core.reference_material_info(project, leaf_id)` returns a validated, read-only description. The default remains `label_mode='black'`.
+
+The reference must be a consistent saved PolyJet EcoFlex direct material (C/M/Y/K/W/T) or valid six-channel mixer in the supported profile. Unknown families, malformed definitions, desired/actual disagreements and conflicting material-ID aliases fail closed. Its complete material object is copied, retaining each target's existing unique ID and updating occurrence/tray/appearance consistently. The reference must remain unchanged. Shared mutable target IDs remain refused even with replacement confirmation; resolve that native ambiguity instead of deleting IDs or bypassing the guard. Source hashes, reference fingerprints, policy choices and replacement confirmation bind the reviewed plan. Native application and printer acceptance remain unverified.

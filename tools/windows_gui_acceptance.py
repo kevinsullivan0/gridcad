@@ -14,7 +14,8 @@ import time
 import zipfile
 
 ROOT=Path(__file__).resolve().parents[1];sys.path.insert(0,str(ROOT))
-from tools.make_desktop_examples import make_workbook
+from tools.make_desktop_examples import make_workbook, create
+from tools.make_reference_example import create_reference_example, REFERENCE_ID
 import desktop_core as core
 
 
@@ -44,8 +45,8 @@ def main():
         mouse.click(coords=(p['x']+p['w']//2,p['y']+p['h']//2));time.sleep(.25)
     def select_combo(key,index):
         click(key);keyboard.send_keys('{ESC}');keyboard.send_keys('%{DOWN}');time.sleep(.3)
-        keyboard.send_keys('{UP 20}');keyboard.send_keys('{DOWN}'*index+'{ENTER}');time.sleep(.4)
-        expected = state()['label_choices'][index] if key == 'labels' else list(core.ORIENTATIONS)[index]
+        keyboard.send_keys('{HOME}{UP 50}');keyboard.send_keys('{DOWN}'*index+'{ENTER}');time.sleep(.4)
+        expected = (state()['label_choices'][index] if key == 'labels' else state()['reference_choices'][index] if key == 'label_reference' else ['Direct black','Copy from reference body'][index] if key == 'label_mode' else list(core.ORIENTATIONS)[index])
         wait(lambda s:s.get(key)==expected,'Explicit combobox selection: '+expected)
     def enter(key,text):
         click(key);keyboard.send_keys('^a');keyboard.send_keys(str(text),with_spaces=True,vk_packet=True);time.sleep(.2)
@@ -73,12 +74,22 @@ def main():
         screenshot('02-long-sheet.png')
         cached=out/'cached formula.xlsx';make_workbook(cached,{'D4':'2/0/0/0/98/0'},1,1,formula_cache={'D4':'2/0/0/0/98/0'})
         load_book(cached);enter('range','D4:D4');click('check_recipes')
-        wait(lambda s:'formula uses a saved result' in s.get('status',''),'Unconfirmed formula cache blocked by real UI')
-        screenshot('03-formula-refusal.png');dismiss();click('cache');click('check_recipes')
+        wait(lambda s:s.get('diagnostic',{}).get('code')=='GCD101','Unconfirmed formula cache blocked by real UI')
+        screenshot('03-formula-refusal.png')
+        report=Path(state()['diagnostic']['report']);assert report.is_file()
+        report_json=json.loads(report.read_text());assert 'settings' in report_json and 'traceback' in report_json
+        click('diagnostic_details');screenshot('03b-technical-details.png');click('diagnostic_copy')
+        import win32clipboard
+        win32clipboard.OpenClipboard()
+        try:prompt=win32clipboard.GetClipboardData()
+        finally:win32clipboard.CloseClipboard()
+        assert str(report) in prompt and 'grant file access' in prompt and 'nothing was uploaded' in prompt
+        checks.append('Optional local report and copied debugging prompt expose no automatic upload or agent execution')
+        dismiss();click('cache');click('check_recipes')
         wait(lambda s:'1 recipes valid' in s.get('status',''),'Explicit cache confirmation permits stored recipe')
         missing=out/'missing formula.xlsx';make_workbook(missing,{'D4':'2/0/0/0/98/0'},1,1,formula_cache={'D4':None})
         load_book(missing);enter('range','D4:D4');click('cache');click('check_recipes')
-        wait(lambda s:'missing value, formula cache' in s.get('status',''),'Missing formula cache refused despite confirmation');dismiss()
+        wait(lambda s:s.get('diagnostic',{}).get('code')=='GCD102','Missing formula cache refused despite confirmation');dismiss()
         load_book(example/'DO_NOT_PRINT.xlsx')
         click('open_project');dialog_path(example/'DO_NOT_PRINT.PRINT')
         wait(lambda s:s.get('project')==str(example/'DO_NOT_PRINT.PRINT') and not s.get('busy'),'Project loaded by native file dialog')
@@ -93,7 +104,7 @@ def main():
         # Use the real tab control to return to worksheet and transpose.
         p=state()['controls']['tabs'];mouse.click(coords=(p['x']+70,p['y']+12));time.sleep(.3)
         click('transpose');click('preview')
-        wait(lambda s:'Check transpose and orientation' in s.get('status',''),'Dimension mismatch is visible after transpose');dismiss()
+        wait(lambda s:s.get('diagnostic',{}).get('code')=='GCD201','Dimension mismatch is visible after transpose');dismiss()
         p=state()['controls']['tabs'];mouse.click(coords=(p['x']+250,p['y']+12));time.sleep(.3)
         select_combo('orientation',1);click('preview')
         wait(lambda s:s.get('proposal') and not s.get('busy'),'Explicit transposed orientation builds correct map')
@@ -118,6 +129,42 @@ def main():
         wait(lambda s:not s.get('busy') and not s.get('transpose') and s.get('orientation')=='Rows down; columns right','Load example resets previous transpose and review state')
         click('preview');wait(lambda s:s.get('proposal') and not s.get('busy'),'Example can be reopened after a completed transposed conversion')
         assert not state()['save_enabled'];checks.append('Reopened example requires fresh review before saving')
+        # Real pyramid and mixed-shape file workflows, not just unit counts.
+        for shape in ['pyramid','mixed']:
+            fixture=create(out/('generated '+shape),rows=3,columns=5,pitch=16,size=9,sample_shape=shape,height=7)
+            load_book(fixture/'DO_NOT_PRINT.xlsx')
+            click('open_project');dialog_path(fixture/'DO_NOT_PRINT.PRINT')
+            wait(lambda s:s.get('project')==str(fixture/'DO_NOT_PRINT.PRINT') and not s.get('busy'),'Loaded genuine '+shape+' mesh archive')
+            select_combo('labels',next(i for i,v in enumerate(state()['label_choices']) if v.startswith('Printed labels ')))
+            select_combo('orientation',0);click('preview')
+            wait(lambda s:s.get('proposal') and not s.get('busy'),'Shape-independent '+shape+' grid preview')
+            screenshot('08-'+shape+'-preview.png')
+        fixture=create_reference_example(out/'reference material fixture')
+        load_book(fixture/'DO_NOT_PRINT.xlsx')
+        click('open_project');dialog_path(fixture/'DO_NOT_PRINT.PRINT')
+        wait(lambda s:s.get('project')==str(fixture/'DO_NOT_PRINT.PRINT') and not s.get('busy'),'Reference-material fixture loaded')
+        select_combo('labels',next(i for i,v in enumerate(state()['label_choices']) if v.startswith('Printed labels ')))
+        select_combo('orientation',0);select_combo('label_mode',1)
+        select_combo('label_reference',next(i for i,v in enumerate(state()['reference_choices']) if v.startswith('Reference white ')))
+        click('preview');wait(lambda s:s.get('proposal') and not s.get('busy'),'Reference-copy conflict preview lists existing assignments')
+        assert not state()['save_enabled'];click('replace_labels');screenshot('09-reference-conflict-review.png')
+        click('label_review_cancel');assert not state()['save_enabled']
+        click('preview');wait(lambda s:s.get('proposal') and not s.get('busy'),'Cancel conflict review keeps existing labels protected')
+        click('replace_labels');click('label_review_confirm');click('preview')
+        wait(lambda s:s.get('proposal') and not s.get('busy'),'Explicitly confirmed reference-material preview')
+        click('reviewed');enter('evidence','Synthetic grid and all ten label replacements reviewed against Reference white.');click('material_ack')
+        wait(lambda s:s.get('save_enabled'),'Reference-material save requires physical and replacement review')
+        screenshot('10-reference-ready.png')
+        destination=out/'reference copied result';click('save');dialog_path(destination)
+        wait(lambda s:(destination/'audit.json').is_file() and not s.get('busy'),'Native UI saves explicit reference material copy');dismiss()
+        original=core.op.project_document(fixture/'DO_NOT_PRINT.PRINT');saved=core.op.project_document(destination/'candidate_UNVERIFIED.PRINT')
+        oldnodes,_,oldbodies=core.op.index(original);newnodes,_,newbodies=core.op.index(saved)
+        reference=oldnodes[REFERENCE_ID]['material']
+        for oid in core.load_project(fixture/'DO_NOT_PRINT.PRINT')['containers']['synthetic-labels']['leaves']:
+            expected=dict(reference);expected['id']=oldnodes[oid]['material']['id']
+            assert newnodes[oid]['material']==expected==newbodies[oid]['material']
+        assert newnodes[REFERENCE_ID]==oldnodes[REFERENCE_ID]
+        checks.append('Complete native reference metadata cloned; target identities and source reference preserved')
         command=[str(folder/'advanced/GridCAD-core.exe'),'inspect','--project',str(example/'DO_NOT_PRINT.PRINT'),'--workbook',str(example/'DO_NOT_PRINT.xlsx')]
         inspected=subprocess.run(command,cwd=out,capture_output=True,text=True,check=True)
         assert json.loads(inspected.stdout)['profile']==core.PROFILE;checks.append('Bundled agent CLI executes outside source tree')

@@ -4,6 +4,7 @@ import argparse
 import copy
 import html
 import json
+import math
 import struct
 import sys
 import zipfile
@@ -19,8 +20,23 @@ def box(x0,y0,x1,y1,z1=2):
     return [tuple(points[i] for i in face) for face in faces]
 
 
+def pyramid(size, height):
+    """Closed square-based pyramid: two base triangles and four side faces."""
+    h=size/2
+    points=[(-h,-h,0),(h,-h,0),(h,h,0),(-h,h,0),(0,0,height)]
+    faces=[(0,2,1),(0,3,2),(0,1,4),(1,2,4),(2,3,4),(3,0,4)]
+    return [tuple(points[i] for i in face) for face in faces]
+
+
 def binary_stl(triangles):
-    return b'GRIDCAD INVENTED DO NOT PRINT'.ljust(80,b'\0')+struct.pack('<I',len(triangles))+b''.join(struct.pack('<12fH',0,0,1,*(v for point in tri for v in point),0) for tri in triangles)
+    records=[]
+    for tri in triangles:
+        tri=[tuple(map(float,v)) for v in tri]
+        a=[tri[1][i]-tri[0][i] for i in range(3)];b=[tri[2][i]-tri[0][i] for i in range(3)]
+        normal=(a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0])
+        length=math.sqrt(sum(v*v for v in normal));normal=tuple(v/length for v in normal) if length else (0.,0.,0.)
+        records.append(struct.pack('<12fH',*normal,*(v for point in tri for v in point),0))
+    return b'GRIDCAD INVENTED DO NOT PRINT'.ljust(80,b'\0')+struct.pack('<I',len(triangles))+b''.join(records)
 
 
 SEGMENTS={'0':'abcedf','1':'bc','2':'abged','3':'abgcd','4':'fgbc','5':'afgcd','6':'afgecd','7':'abc','8':'abcdefg','9':'abfgcd'}
@@ -38,10 +54,12 @@ def number_mesh(number):
     return [tuple((-p[1],p[0],p[2]) for p in tri) for tri in tris]
 
 
-def create(folder,rows=4,columns=6,pitch=12,size=8):
+def create(folder,rows=4,columns=6,pitch=12,size=8,*,sample_shape="box",height=2):
     folder=Path(folder);folder.mkdir(parents=True,exist_ok=True)
     if not 2<=rows<=100 or not 2<=columns<=100 or not 0<size<pitch<=100:
         raise ValueError('Use 2–100 rows/columns and 0 < size < pitch <= 100 mm.')
+    if sample_shape not in ('box','pyramid','mixed') or not 0<height<=100:
+        raise ValueError('Example shape must be box, pyramid or mixed; height must be greater than zero and at most 100 mm.')
     from decimal import Decimal as D
     pitch, size = D(str(pitch)), D(str(size))
     def affine(scale=1):return [scale,0,0,0,0,scale,0,0,0,0,scale,0,0,0,0,1]
@@ -53,7 +71,7 @@ def create(folder,rows=4,columns=6,pitch=12,size=8):
         if material:n['material']=copy.deepcopy(material);n['tessellationKey']=oid
         return n
     def picker(oid):return {'id':'material-'+oid,'properties':{},'name':'rgba,210,213,207,255','vendorMaterialId':'rgba,210,213,207,255','printerFamily':'PolyJet','threeDAppearance':{'r':210,'g':213,'b':207,'a':255},'uiColor':'rgb(210,213,207)','metadata':{'materialType':'color_picker','pickerSelectedColor':'synthetic-gray'}}
-    bodies=[];parts=[];labels=[];meshes={'mesh/sample.stl':binary_stl(box(-size/2,-size/2,size/2,size/2))};tess={}
+    bodies=[];parts=[];labels=[];meshes={};tess={}
     def body(n,x,y,member):
         # Occurrence and tray convention agree exactly with the bounded profile.
         n['transform'][3]=-y;n['transform'][7]=x
@@ -65,7 +83,14 @@ def create(folder,rows=4,columns=6,pitch=12,size=8):
     values={}
     for r in range(rows):
         for c in range(columns):
-            oid=f'synthetic-sample-{r+1}-{c+1}';n=node(oid,'Sample',material=picker(oid));parts.append(n);body(n,c*pitch,-r*pitch,'mesh/sample.stl')
+            oid=f'synthetic-sample-{r+1}-{c+1}';n=node(oid,'Sample',material=picker(oid));parts.append(n)
+            # This generator offers examples, not an application shape whitelist.
+            kind=('pyramid' if (r+c)%2 else 'box') if sample_shape=='mixed' else sample_shape
+            width=size*(D('0.65') if sample_shape=='mixed' and (r+c)%3==1 else 1)
+            tall=float(height)*(1+(r%3)*0.25 if sample_shape=='mixed' else 1)
+            triangles=pyramid(width,tall) if kind=='pyramid' else box(-width/2,-width/2,width/2,width/2,tall)
+            member=f'mesh/sample-{kind}-{width}-{tall}.stl';meshes[member]=binary_stl(triangles)
+            body(n,c*pitch,-r*pitch,member)
             cyan=(r*7+c*3)%51;clear=(c*5)%31;recipe=f'{cyan}/0/0/0/{100-cyan-clear}/{clear}'
             values[address(r+4,c+4)]=recipe
     black=op.EcoFlexMaterialProvider().direct_black();black['id']='synthetic-shared-black';black['metadata']['synthetic_preserve_marker']='keep-complete-object'
@@ -107,7 +132,7 @@ def create(folder,rows=4,columns=6,pitch=12,size=8):
         'The adjacent synthetic .PRINT lets you exercise GridCAD directly without native import.\n'
         'Do not print either example without ordinary native preparation and process review.\n',encoding='utf-8')
     make_workbook(folder/'DO_NOT_PRINT.xlsx',values,rows,columns)
-    (folder/'README.txt').write_text(f'INVENTED EXAMPLE — DO NOT PRINT\n{rows} rows x {columns} columns, pitch {pitch} mm, sample width {size} mm.\nWorksheet Recipes!D4:{address(rows+3,columns+3)}. Sample group Sample; label container Printed labels.\nChoose Rows down; columns right. No transpose. Printed index digits start at 1.\nThese archives test software contracts. Native GrabCAD opening/recomposition is unverified.\n',encoding='utf-8')
+    (folder/'README.txt').write_text(f'INVENTED EXAMPLE — DO NOT PRINT\n{rows} rows x {columns} columns, pitch {pitch} mm, maximum sample width {size} mm, {sample_shape} shapes.\nWorksheet Recipes!D4:{address(rows+3,columns+3)}. Sample group Sample; label container Printed labels.\nChoose Rows down; columns right. No transpose. Printed index digits start at 1.\nThese archives test software contracts. Native GrabCAD opening/recomposition is unverified.\n',encoding='utf-8')
     return folder
 
 
@@ -134,4 +159,5 @@ def make_workbook(path,values,rows=4,columns=6,*,formula_cache=None):
 
 if __name__=='__main__':
     p=argparse.ArgumentParser();p.add_argument('folder',type=Path);p.add_argument('--rows',type=int,default=4);p.add_argument('--columns',type=int,default=6);p.add_argument('--pitch',type=float,default=12);p.add_argument('--size',type=float,default=8)
-    args=p.parse_args();create(args.folder,args.rows,args.columns,args.pitch,args.size)
+    p.add_argument('--shape',choices=('box','pyramid','mixed'),default='box');p.add_argument('--height',type=float,default=2)
+    args=p.parse_args();create(args.folder,args.rows,args.columns,args.pitch,args.size,sample_shape=args.shape,height=args.height)

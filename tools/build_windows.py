@@ -9,7 +9,7 @@ import sys
 import zipfile
 
 ROOT=Path(__file__).resolve().parents[1]
-VERSION='0.2.0-rc.1'
+VERSION='0.2.0-rc.2'
 
 
 def digest(path):return hashlib.sha256(path.read_bytes()).hexdigest()
@@ -24,16 +24,18 @@ def zip_folder(folder,destination):
 def main():
     if sys.platform!='win32':raise SystemExit('Build this distribution on Windows; no cross-build claims.')
     subprocess.run([sys.executable,'tools/make_desktop_examples.py','examples/rectangular'],cwd=ROOT,check=True)
+    for shape in ['pyramid','mixed']:
+        subprocess.run([sys.executable,'tools/make_desktop_examples.py','examples/'+shape,'--shape',shape],cwd=ROOT,check=True)
     for name,script,console in [('GridCAD','gridcad_desktop.py',False),('GridCAD-core','desktop_cli.py',True)]:
         args=[sys.executable,'-m','PyInstaller','--clean','--noconfirm','--onedir','--name',name,'--icon','resources/gridcad.ico','--paths','operator','--collect-submodules','gridcad_operator',
               '--add-data','operator/gridcad_operator/material_converter.py;gridcad_operator']
-        if not console:args+=['--windowed','--add-data','docs;docs','--add-data','examples/rectangular;examples/rectangular','--add-data','resources;resources']
+        if not console:args+=['--windowed','--add-data','docs;docs','--add-data','examples/rectangular;examples/rectangular','--add-data','examples/pyramid;examples/pyramid','--add-data','examples/mixed;examples/mixed','--add-data','resources;resources']
         subprocess.run(args+[script],cwd=ROOT,check=True)
     folder=ROOT/'dist/GridCAD';companion=ROOT/'dist/GridCAD-core'
     shutil.copytree(companion,folder/'advanced',dirs_exist_ok=True)
-    for source in ['docs','examples/rectangular','operator']:
+    for source in ['docs','examples/rectangular','examples/pyramid','examples/mixed','operator']:
         shutil.copytree(ROOT/source,folder/source,dirs_exist_ok=True,ignore=shutil.ignore_patterns('__pycache__','*.pyc'))
-    for name in ['README.md','AGENTS.md','desktop_core.py','desktop_cli.py','gridcad_desktop.py']:
+    for name in ['README.md','AGENTS.md','desktop_core.py','desktop_cli.py','diagnostics.py','gridcad_desktop.py']:
         shutil.copy2(ROOT/name,folder/name)
     shutil.copytree(ROOT/'tools',folder/'tools',ignore=shutil.ignore_patterns('__pycache__','*.pyc'))
     notices=folder/'THIRD_PARTY_NOTICES';notices.mkdir(exist_ok=True)
@@ -61,9 +63,9 @@ def main():
     (folder/'PACKAGE_MANIFEST.json').write_text(json.dumps(entries,indent=2),encoding='utf-8')
     destination=ROOT/f'dist/GridCAD-Windows-x64-v{VERSION}.zip';zip_folder(folder,destination)
     portable=ROOT/'dist/GridCAD-portable-core';portable.mkdir(exist_ok=True)
-    for name in ['desktop_core.py','desktop_cli.py','AGENTS.md']:
+    for name in ['desktop_core.py','desktop_cli.py','diagnostics.py','AGENTS.md']:
         shutil.copy2(ROOT/name,portable/name)
-    for source in ['operator','docs','examples/rectangular']:
+    for source in ['operator','docs','examples/rectangular','examples/pyramid','examples/mixed']:
         shutil.copytree(ROOT/source,portable/source,dirs_exist_ok=True,ignore=shutil.ignore_patterns('__pycache__','*.pyc'))
     (portable/'tools').mkdir(exist_ok=True)
     shutil.copy2(ROOT/'tools/make_desktop_examples.py',portable/'tools/make_desktop_examples.py')

@@ -1,4 +1,4 @@
-# GridCAD desktop 0.2 candidate
+# GridCAD desktop 0.2 RC2 candidate
 
 GridCAD is a deterministic Windows desktop converter for the documented rectangular labeled-grid / CMYKWT workflow. It uses native `ttk` controls, reads Excel recipe rectangles, previews embedded geometry and exact cell/body assignments, and writes a separate candidate with a complete preservation audit. No LLM, account, browser, vendor runtime or network service is used.
 
@@ -15,7 +15,7 @@ Start with **Load example**, then **Build mapping preview**. The synthetic examp
 
 The **Advanced / Agent & help** tab has documentation and a copyable prompt. The Windows package includes `advanced/GridCAD-core.exe`; the separate portable core source bundle runs with Python 3.10+ and the standard library. Other geometries need an explicit new adapter and evidence; triangular, hexagonal and arbitrary 3D automatic conversion are not implemented.
 
-The new mesh-derived rectangular mapping was independently compared against two previously reviewed actual-file mappings. Both complete generated candidates reproduced the earlier deliveries byte for byte, with 1,404 and 693 material changes respectively and every non-project payload preserved. Those private inputs and mappings are excluded from the public repository/release. Twelve new synthetic core tests supplement the existing 61 operator tests. Hosted Windows package/GUI acceptance results are published separately with the release; a green component suite alone is not full usability evidence.
+The new mesh-derived rectangular mapping was independently compared against two previously reviewed actual-file mappings. Both complete generated candidates reproduced the earlier deliveries byte for byte, with 1,404 and 693 material changes respectively and every non-project payload preserved. Those private inputs and mappings are excluded from the public repository/release. Shape-agnostic grid and diagnostic regressions plus thirteen original desktop core tests supplement the expanded operator suite. Hosted Windows package/GUI acceptance results are published separately with the release; a green component suite alone is not full usability evidence.
 
 **Native GrabCAD open/recompose/save and physical print acceptance remain unverified.** The bounded source uses older 2170 serialization with a newer observed material serializer. Geometry display conventions and a source-bound digest do not establish native compose semantics or independently recognize glyph text. User physical-label review remains required. Every candidate audit retains `print_ready=false`; inspect exact channels, direct-black labels, geometry and process settings in native GrabCAD before printing. GridCAD never submits printer jobs.
 
@@ -27,3 +27,5 @@ Build and test the Windows distribution with `.github/workflows/windows-desktop.
 python -m unittest discover -s operator/tests -v
 python -m unittest discover -s tests -p test_desktop_core.py -v
 ```
+
+RC2 adds shape-agnostic samples on unambiguous rectangular grids, tested pyramid/mixed examples, copying compatible existing material assignments to labels with explicit conflict review, and plain-language diagnostics with optional local external-agent handoff. It does not add arbitrary grid layouts/material families or native print certification.

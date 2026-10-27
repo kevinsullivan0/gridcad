@@ -12,9 +12,10 @@ from tkinter import filedialog, messagebox, ttk
 from PIL import Image, ImageDraw, ImageTk
 
 import desktop_core as core
+import diagnostics
 
 PROMPT = '''Use the installed GridCAD source folder (beside GridCAD.exe), or the exact release source:
-https://github.com/kevinsullivan0/gridcad/tree/v0.2.0-rc.1
+https://github.com/kevinsullivan0/gridcad/tree/v0.2.0-rc.2
 Do not assume the repository default branch matches this installed release.
 Read AGENTS.md, docs/DESKTOP_API.md, docs/RECTANGULAR_SCHEMA.md, and operator/README.md first.
 Use the portable deterministic core. Keep my original files untouched and all private
@@ -42,6 +43,8 @@ class App:
         self.book = self.project = self.proposal = None
         self.workbook_path = self.project_path = None
         self.controls, self.errors = {}, []
+        self.last_diagnostic = {}; self.operation_context = {}
+        self.reference_ids = {}
         self.page_row, self.page_col = 1, 1
         self.selection_start = None
         self.container_ids = {}
@@ -53,6 +56,8 @@ class App:
         self.sheet = tk.StringVar(); self.cell_range = tk.StringVar(value='D4:I7')
         self.sample = tk.StringVar(); self.labels = tk.StringVar(); self.orientation = tk.StringVar()
         self.transpose = tk.BooleanVar(); self.cache = tk.BooleanVar()
+        self.label_mode=tk.StringVar(value="Direct black");self.label_reference=tk.StringVar()
+        self.replace_labels=tk.BooleanVar()
         self.reviewed = tk.BooleanVar(); self.material_ack = tk.BooleanVar()
         self.detail = tk.StringVar(value='Select a worksheet cell or mapped sample to inspect exact values.')
         self.summary = tk.StringVar(value='No mapping preview yet.')
@@ -71,7 +76,7 @@ class App:
         style.configure('Treeview', rowheight=27, font=('Consolas', 10))
         style.configure('Treeview.Heading', font=('Segoe UI', 9, 'bold'))
         self.build()
-        for variable in (self.cell_range, self.sample, self.labels, self.orientation, self.transpose, self.cache):
+        for variable in (self.cell_range, self.sample, self.labels, self.orientation, self.transpose, self.cache, self.label_mode, self.label_reference):
             variable.trace_add('write', lambda *_: self.invalidate())
         self.root.bind('<Control-o>', lambda _: self.choose_workbook())
         self.root.bind('<Control-p>', lambda _: self.choose_project())
@@ -94,7 +99,7 @@ class App:
         header = tk.Frame(self.root, bg='#182a3c', height=58)
         header.pack(fill='x'); header.pack_propagate(False)
         tk.Label(header, text='GRIDCAD', font=('Segoe UI', 23, 'bold'), bg='#182a3c', fg='white').pack(side='left', padx=22)
-        tk.Label(header, text='RECTANGULAR MATERIAL CONVERTER   /   0.2 RC1', font=('Segoe UI', 10), bg='#182a3c', fg='#bdcbd8').pack(side='left', padx=10)
+        tk.Label(header, text='RECTANGULAR MATERIAL CONVERTER   /   0.2 RC2', font=('Segoe UI', 10), bg='#182a3c', fg='#bdcbd8').pack(side='left', padx=10)
         body = ttk.Frame(self.root, padding=12); body.pack(fill='both', expand=True)
         body.columnconfigure(0, weight=1); body.rowconfigure(1, weight=1)
         inputs = ttk.Frame(body); inputs.grid(row=0, column=0, sticky='ew')
@@ -160,7 +165,15 @@ class App:
             cb = self.remember(key, ttk.Combobox(selectors,textvariable=var,state='readonly',width=width))
             cb.grid(row=1,column=i,sticky='ew',padx=(0,10),pady=(3,8)); selectors.columnconfigure(i,weight=1)
             if key == 'orientation': cb['values'] = list(core.ORIENTATIONS)
-        ttk.Label(self.geotab, textvariable=self.summary, wraplength=1100).pack(fill='x')
+        materialrow=ttk.Frame(self.geotab);materialrow.pack(fill='x',pady=(0,4))
+        ttk.Label(materialrow,text='Label material').pack(side='left')
+        mode=self.remember('label_mode',ttk.Combobox(materialrow,textvariable=self.label_mode,values=['Direct black','Copy from reference body'],state='readonly',width=24))
+        mode.pack(side='left',padx=6)
+        reference=self.remember('label_reference',ttk.Combobox(materialrow,textvariable=self.label_reference,state='disabled',width=32))
+        reference.pack(side='left',fill='x',expand=True,padx=4)
+        mode.bind('<<ComboboxSelected>>',lambda _:reference.configure(state='readonly' if self.label_mode.get()!='Direct black' else 'disabled'))
+        self.remember('replace_labels',ttk.Checkbutton(self.geotab,text='I reviewed the listed existing label materials and want to replace them with the reference material.',variable=self.replace_labels,command=self.review_label_replacements)).pack(anchor='w')
+        ttk.Label(self.geotab, textvariable=self.summary, wraplength=900).pack(fill='x')
         zoomrow=ttk.Frame(self.geotab);zoomrow.pack(fill='x',pady=3)
         self.button(zoomrow,'Zoom +',lambda:self.set_zoom(min(4,self.zoom*2)),'zoom_in').pack(side='left',padx=(0,4))
         self.button(zoomrow,'Zoom −',lambda:self.set_zoom(max(1,self.zoom/2)),'zoom_out').pack(side='left',padx=4)
@@ -196,6 +209,7 @@ class App:
         self.mapping_tree.bind('<<TreeviewSelect>>',self.mapping_detail)
 
     def build_help(self):
+        ttk.Label(self.helptab,text='Optional: use the app normally without an agent. For extra help, copy a prompt below and paste it into an agent you already use. Grant access or attach named files only if needed; review private paths and names before sharing.',wraplength=900).pack(anchor='w',pady=(0,8))
         bar=ttk.Frame(self.helptab);bar.pack(fill='x',pady=(0,8))
         self.button(bar,'Quick start',lambda:self.show_help('docs/DESKTOP_MANUAL.md')).pack(side='left',padx=4)
         self.button(bar,'Schema',lambda:self.show_help('docs/RECTANGULAR_SCHEMA.md')).pack(side='left',padx=4)
@@ -215,15 +229,44 @@ class App:
 
     def invalidate(self):
         self.revision+=1
-        self.proposal=None;self.reviewed.set(False);self.material_ack.set(False)
+        self.proposal=None;self.reviewed.set(False);self.material_ack.set(False);self.replace_labels.set(False)
         if hasattr(self,'save_button'):self.save_button.configure(state='disabled')
         if hasattr(self,'mapping_tree'):self.mapping_tree.delete(*self.mapping_tree.get_children())
         self.summary.set('Inputs changed. Build a fresh mapping preview before saving.')
         if hasattr(self,'canvas'):self.draw_geometry()
 
+    def review_label_replacements(self):
+        requested=self.replace_labels.get()
+        info=self.proposal.get('label_material',{}) if self.proposal else {}
+        conflicts=info.get('conflicts',[])
+        if requested and not conflicts:
+            self.replace_labels.set(False)
+            self.status.set('Build a reference-material preview first. Any existing assignments needing replacement will be listed for review.')
+            return
+        approved=False
+        if requested:
+            dialog=tk.Toplevel(self.root);dialog.title('Review existing label materials');dialog.geometry('760x420');dialog.transient(self.root)
+            frame=ttk.Frame(dialog,padding=16);frame.pack(fill='both',expand=True)
+            ttk.Label(frame,text='Replace these existing assignments?',style='Heading.TLabel').pack(anchor='w')
+            ttk.Label(frame,text='Reference: '+self.label_reference.get()+'\nEvery listed target will receive this complete saved material. Originals stay unchanged.',wraplength=720).pack(anchor='w',pady=8)
+            table=ttk.Treeview(frame,columns=('object','material'),show='headings');table.heading('object',text='Label object');table.heading('material',text='Current material')
+            table.column('object',width=300);table.column('material',width=350)
+            scroll=ttk.Scrollbar(frame,command=table.yview);scroll.pack(side='right',fill='y');table.configure(yscrollcommand=scroll.set);table.pack(fill='both',expand=True)
+            for row in conflicts:table.insert('','end',values=(row['name'],row['current_material']))
+            buttons=ttk.Frame(frame);buttons.pack(fill='x',pady=8)
+            def accept():
+                nonlocal approved
+                approved=True;dialog.destroy()
+            self.button(buttons,'Cancel',dialog.destroy,'label_review_cancel').pack(side='right')
+            self.button(buttons,'Confirm these replacements',accept,'label_review_confirm').pack(side='right',padx=8)
+            dialog.bind('<Escape>',lambda _:dialog.destroy());dialog.grab_set();self.root.wait_window(dialog)
+        self.invalidate();self.replace_labels.set(approved)
+        self.status.set('Build the preview again to bind this label-material choice to the selected inputs.')
+
     def run(self,description,work,done):
         if self.future:
             self.status.set('A file operation is still running. Please wait.');return
+        self.operation_context['operation']=description
         self.status.set(description);self.progress.pack(side='right',padx=8);self.progress.start(12)
         self.save_button.configure(state='disabled')
         self.future=self.pool.submit(work)
@@ -235,8 +278,57 @@ class App:
             self.update_save()
         self.root.after(100,poll)
 
+    def diagnostic_context(self):
+        c={'project':self.project_path,'workbook':self.workbook_path,'sheet':self.sheet.get(),
+           'range':self.cell_range.get(),'sample_group':self.sample.get(),'label_container':self.labels.get(),
+           'orientation':self.orientation.get(),'transpose':self.transpose.get(),'label_mode':self.label_mode.get(),
+           'reference_body':self.label_reference.get()}
+        c.update(self.operation_context)
+        return c
+
     def show_error(self,exc):
-        self.status.set('Could not complete: '+str(exc));messagebox.showerror('GridCAD — input needs attention',str(exc),parent=self.root)
+        d=diagnostics.describe(exc,self.diagnostic_context())
+        self.status.set(d.title+' See the suggested correction in the dialog.')
+        self.last_diagnostic={'code':d.code,'title':d.title,'report':None}
+        try:
+            report=diagnostics.create_report(exc,d,self.diagnostic_context())
+            self.last_diagnostic['report']=str(report)
+            note='Saved only on this computer: '+str(report)+'\nContains local paths and selected names; nothing was uploaded.'
+        except OSError:
+            report=None;note='The local diagnostic report could not be saved. Your original error is shown above; choose a writable location before retrying.'
+        dialog=tk.Toplevel(self.root);dialog.title('GridCAD — how to fix this');dialog.transient(self.root)
+        dialog.geometry('700x460');dialog.minsize(580,400)
+        body=ttk.Frame(dialog,padding=18);body.pack(fill='both',expand=True)
+        ttk.Label(body,text=d.title,style='Heading.TLabel',wraplength=650).pack(anchor='w',pady=(0,10))
+        ttk.Label(body,text=d.text().split('\n\n',1)[-1],wraplength=650).pack(anchor='w')
+        note_var=tk.StringVar(value=note)
+        ttk.Label(body,textvariable=note_var,wraplength=650).pack(anchor='w',pady=12)
+        details=tk.Text(body,height=6,wrap='word',font=('Consolas',9))
+        details.insert('1.0','['+d.code+'] '+d.technical);details.configure(state='disabled')
+        def toggle():
+            if details.winfo_ismapped():details.pack_forget()
+            else:details.pack(fill='both',expand=True,before=buttons,pady=6)
+        def copy():
+            prompt=diagnostics.debugging_prompt(report)
+            if not diagnostics.try_copy_prompt(self.root,prompt):
+                note_var.set('Clipboard is unavailable. Your report is still at '+str(report)+'. The prompt is shown below for manual selection; the original error has not changed.')
+                details.configure(state='normal');details.delete('1.0','end');details.insert('1.0',prompt);details.configure(state='disabled')
+                if not details.winfo_ismapped():details.pack(fill='both',expand=True,before=buttons,pady=6)
+            else:note_var.set('Prompt copied. Paste it into the agent you already use; attach report.json if it cannot access this folder. Nothing was uploaded or launched. Report: '+str(report))
+        def open_folder():
+            try:
+                if sys.platform=='win32':os.startfile(str(report.parent))
+                else:
+                    import subprocess
+                    subprocess.Popen(['open' if sys.platform=='darwin' else 'xdg-open',str(report.parent)])
+            except OSError:messagebox.showinfo('Report folder',str(report.parent),parent=dialog)
+        buttons=ttk.Frame(body);buttons.pack(side='bottom',fill='x',pady=(8,0))
+        self.button(buttons,'View technical details',toggle,'diagnostic_details').pack(side='left')
+        self.button(buttons,'Copy debugging prompt',copy,'diagnostic_copy',state='normal' if report else 'disabled').pack(side='left',padx=6)
+        self.button(buttons,'Open report folder',open_folder,'diagnostic_folder',state='normal' if report else 'disabled').pack(side='left')
+        self.button(buttons,'Close',dialog.destroy,'diagnostic_close').pack(side='right')
+        dialog.bind('<Return>',lambda _:dialog.destroy());dialog.bind('<Escape>',lambda _:dialog.destroy())
+        dialog.grab_set();dialog.focus_force();self.root.wait_window(dialog)
 
     def choose_workbook(self):
         if self.future:return
@@ -244,6 +336,7 @@ class App:
         if path:self.load_workbook(path)
 
     def load_workbook(self,path):
+        self.operation_context={'workbook':str(path)}
         self.invalidate();self.book=None;self.cache.set(False)
         self.workbook_path=None;self.book_label.configure(text='Reading workbook…')
         def done(book):
@@ -258,6 +351,7 @@ class App:
         if path:self.load_project(path)
 
     def load_project(self,path,after=None):
+        self.operation_context={'project':str(path)}
         self.invalidate();self.project=None
         self.project_path=None;self.project_label.configure(text='Reading geometry…')
         def done(project):
@@ -266,6 +360,8 @@ class App:
             self.controls['samples']['values']=groups;self.sample.set(groups[0])
             self.container_ids={f"{v['name']} ({len(v['leaves'])} bodies) [{i+1}]":oid for i,(oid,v) in enumerate(project['containers'].items())}
             self.controls['labels']['values']=list(self.container_ids);self.labels.set('');self.orientation.set('')
+            self.reference_ids={f"{project['nodes'][oid].get('name','Body')} — {project['nodes'][oid]['material'].get('name','material')} [{i+1}]":oid for i,oid in enumerate(sorted(project['leaves']))}
+            self.controls['label_reference']['values']=list(self.reference_ids);self.label_reference.set('');self.label_mode.set('Direct black');self.controls['label_reference'].configure(state='disabled')
             self.notebook.select(self.geotab);self.draw_geometry();self.status.set('Geometry loaded. Explicitly choose the printed-label container and worksheet directions.')
             if after:after()
         self.run('Inspecting embedded meshes and source storage guards…',lambda:core.load_project(path),done)
@@ -340,25 +436,35 @@ class App:
         try:
             if not self.book or not self.project:core.op.fail('Open both the workbook and the project first.')
             args=(self.project,self.workbook_path,self.book,self.sheet.get(),self.cell_range.get(),self.sample.get(),self.container_ids.get(self.labels.get()),self.orientation.get())
-            kwargs={'transpose':self.transpose.get(),'cache_confirmed':self.cache.get()}
+            kwargs={'transpose':self.transpose.get(),'cache_confirmed':self.cache.get(),
+                    'label_mode':'black' if self.label_mode.get()=='Direct black' else 'reference',
+                    'label_reference':self.reference_ids.get(self.label_reference.get()),
+                    'confirm_label_replacement':self.replace_labels.get()}
         except Exception as exc:self.show_error(exc);return
-        self.invalidate()
+        confirmed=self.replace_labels.get()
+        self.invalidate();self.replace_labels.set(confirmed)
         revision=self.revision
         def done(proposal):
             if revision!=self.revision:
                 self.status.set('Inputs changed during preview. Build the mapping again.');return
             self.proposal=proposal;self.notebook.select(self.geotab)
+            material=proposal.get('label_material',{});conflicts=material.get('conflicts',[])
+            pending=conflicts and not material.get('replacement_confirmed')
             p=proposal['plan'];changes=sum(x['action']!='preserve_exact_mixer' for x in p['samples'])+sum(x['action']!='preserve_native_black' for x in p['labels'])
             self.summary.set(f"{len(p['samples'])} mapped samples • {len(p['labels'])} labels • {proposal['preserved_count']} unrelated bodies preserved • {changes} material changes. Check real glyphs, four corners, and interior recipes.")
             for row in proposal['mapping']:
                 self.mapping_tree.insert('', 'end', iid=row['id'], values=(row['cell'],*row['percentages'],row['action'],row['id']))
+            if conflicts:
+                self.summary.set(self.summary.get()+' Label replacements: '+', '.join(x['name']+' ('+x['current_material']+')' for x in conflicts[:4])+(' …' if len(conflicts)>4 else '')+'.')
             self.draw_geometry();self.status.set('Preview ready. Select samples for exact recipes. Record your physical-label checks before saving.')
         def work():
             proposal=core.propose(*args,**kwargs)
             # Exercise the complete writer refusal rules before requesting user
             # review. Discard this structural check; never save it as physical
             # review or use it to write a candidate.
-            core.op.prepare(args[0]['path'],args[1],core.confirm(proposal,'Structural preflight only; user physical-label review is still pending.'))
+            material=proposal.get('label_material',{})
+            if not (material.get('conflicts') and not material.get('replacement_confirmed')):
+                core.op.prepare(args[0]['path'],args[1],core.confirm(proposal,'Structural preflight only; user physical-label review is still pending.'))
             return proposal
         self.run('Constructing and checking the rectangular mapping…',work,done)
 
@@ -412,7 +518,8 @@ class App:
             row=next(x for x in self.proposal['mapping'] if x['id']==values[0]);self.detail.set(f"{row['cell']}: {' / '.join(map(str,row['percentages']))}  |  {row['action']}  |  {row['id']}")
 
     def update_save(self):
-        enabled=self.proposal is not None and self.reviewed.get() and self.material_ack.get() and bool(self.evidence.get().strip()) and not self.future
+        pending=self.proposal and self.proposal.get('label_material',{}).get('conflicts') and not self.proposal.get('label_material',{}).get('replacement_confirmed')
+        enabled=not pending and self.proposal is not None and self.reviewed.get() and self.material_ack.get() and bool(self.evidence.get().strip()) and not self.future
         self.save_button.configure(state='normal' if enabled else 'disabled')
 
     def save(self):
@@ -437,6 +544,8 @@ class App:
                'save_enabled':str(self.save_button['state'])!='disabled',
                'transpose':self.transpose.get(), 'labels':self.labels.get(),
                'label_choices':list(self.container_ids), 'orientation':self.orientation.get(),
+               'label_mode':self.label_mode.get(),'label_reference':self.label_reference.get(),'reference_choices':list(self.reference_ids),
+               'diagnostic':self.last_diagnostic,
                'controls':{}}
         for key,w in self.controls.items():
             if w.winfo_ismapped():state['controls'][key]={'x':w.winfo_rootx(),'y':w.winfo_rooty(),'w':w.winfo_width(),'h':w.winfo_height()}

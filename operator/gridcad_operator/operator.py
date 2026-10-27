@@ -213,6 +213,50 @@ def matches_mixer(material, requested):
         return False
 
 
+def same_material_definition(left, right):
+    """Exact complete native assignment, allowing only per-target identity to differ."""
+    return {k:v for k,v in left.items() if k != 'id'} == {k:v for k,v in right.items() if k != 'id'}
+
+
+def native_reference_material(nodes, bodies, leaves, reference):
+    if reference not in leaves or reference not in bodies:
+        fail('Choose an existing reference object in this project; the selected reference is missing.')
+    node, body = nodes[reference], bodies[reference]
+    def reference_fail(message):
+        fail('Reference object "'+str(node.get('name') or reference)+'": '+message)
+    material = node.get('material')
+    if not isinstance(material, dict) or material != body.get('material') or not appearance_matches(body, material):
+        reference_fail('The reference object has conflicting material settings. Reassign and save it in GrabCAD before using it.')
+    if (material.get('printerFamily') != 'PolyJet' or not isinstance(material.get('id'), str)
+            or not material['id'] or not isinstance(material.get('properties'), dict)
+            or not isinstance(material.get('metadata'), dict) or not isinstance(material.get('uiColor'), str)):
+        reference_fail('The reference material is incomplete or from an unsupported printer family. Choose a saved PolyJet EcoFlex material.')
+    rgba = material.get('threeDAppearance', {})
+    if any(type(rgba.get(k)) not in (int, D) or not D(rgba[k]).is_finite() or not 0 <= rgba[k] <= 255 for k in ('r','g','b','a')):
+        reference_fail('The reference material has invalid preview colors. Reassign and save it in GrabCAD.')
+    for other in list(nodes.values()) + list(bodies.values()):
+        assigned = other.get('material')
+        if isinstance(assigned, dict) and assigned.get('id') == material['id'] and assigned != material:
+            reference_fail('The same material identity has conflicting saved definitions. Resolve the assignment in GrabCAD before copying it.')
+    meta = material['metadata']; mode = meta.get('materialType')
+    if mode == 'base_material':
+        valid = (type(meta.get('resinId')) is int and
+                 (meta.get('resinId'), material.get('name')) in zip(RESIN_IDS, RESIN_NAMES) and
+                 material.get('name') == material.get('vendorMaterialId') and
+                 not any(k.startswith('cmykwt_dm_') for k in meta))
+    elif mode == 'cmykwt_dm_mixer':
+        try:
+            requested = validate_recipe([meta['cmykwt_dm_'+f] for f in FIELDS])
+            valid = matches_mixer(material, requested)
+        except (KeyError, ValueError, TypeError, ValidationError):
+            valid = False
+    else:
+        valid = False
+    if not valid:
+        reference_fail('This reference is not a supported saved EcoFlex direct material or six-channel mixer. Choose a compatible assigned object, not a color-picker placeholder.')
+    return copy.deepcopy(material)
+
+
 def appearance_matches(body, material):
     appearance = body.get('properties', {}).get('threeDAppearance', {}).get('value', {})
     return all(k in material.get('threeDAppearance', {}) and appearance.get(k) == material['threeDAppearance'][k]
@@ -320,7 +364,7 @@ def mapping_digest(plan):
     A hash proves binding, not that label/geometry review occurred. The operator
     must independently establish the expected recipes and IDs before using it.
     """
-    return fingerprint({
+    binding = {
         'archive_sha256':plan['archive_sha256'], 'workbook_sha256':plan['workbook_sha256'],
         'sheet':plan['sheet'], 'range':plan['range'],
         'samples':[{'cell':s['cell'], 'occurrence_id':s['occurrence_id'], 'tray_body_id':s['tray_body_id'],
@@ -329,7 +373,15 @@ def mapping_digest(plan):
         'labels':[{'occurrence_id':s['occurrence_id'], 'tray_body_id':s['tray_body_id']}
                   for s in sorted(plan['labels'], key=lambda s:s['occurrence_id'])],
         'preserve_occurrence_ids':sorted(plan['preserve_occurrence_ids']),
-    })
+    }
+    # Preserve historical black-plan digests, but bind every new reference
+    # policy decision to review, not merely the target membership.
+    if any(s.get('action') in ('copy_native_reference','preserve_reference_material') for s in plan['labels']):
+        binding['label_material_bindings'] = [
+            {k:s.get(k) for k in ('occurrence_id','tray_body_id','source_material_sha256','action',
+                                 'reference_occurrence_id','reference_material_sha256','replacement_confirmed')}
+            for s in sorted(plan['labels'],key=lambda s:s['occurrence_id'])]
+    return fingerprint(binding)
 
 
 def prepare(project, xlsx, plan):
@@ -427,12 +479,29 @@ def prepare(project, xlsx, plan):
                          'tray_body_id':body['id'], 'recipe':requested, 'action':action})
     if len(uniform) > 1: fail('Heterogeneous color-picker assignments need explicit external resolution.')
     for entry in plan['labels']:
-        keys(entry, ('occurrence_id','tray_body_id','source_material_sha256','action'), ('reference_occurrence_id',))
-        minimal = {k:v for k,v in entry.items() if k != 'reference_occurrence_id'}
+        keys(entry, ('occurrence_id','tray_body_id','source_material_sha256','action'), ('reference_occurrence_id','reference_material_sha256','replacement_confirmed'))
+        minimal = {k:v for k,v in entry.items() if k not in ('reference_occurrence_id','reference_material_sha256','replacement_confirmed')}
         oid, node, body = target(minimal, ('occurrence_id','tray_body_id','source_material_sha256','action'))
         action = entry['action']
         item = {'role':'label','occurrence_id':oid,'tray_body_id':body['id'],'action':action}
-        if action == 'preserve_native_black':
+        if action in ('copy_native_reference','preserve_reference_material'):
+            reference = entry.get('reference_occurrence_id')
+            material = native_reference_material(nodes, bodies, leaves, reference)
+            if entry.get('reference_material_sha256') != fingerprint(material):
+                fail('The reference material changed after review. Rebuild the preview and review the selected reference again.')
+            item.update(reference_material=material, reference_occurrence_id=reference,
+                        reference_material_sha256=fingerprint(material),
+                        replacement_confirmed=entry.get('replacement_confirmed') is True)
+            if action == 'preserve_reference_material':
+                if not same_material_definition(node['material'], material) or not appearance_matches(body, material):
+                    fail('A label marked unchanged does not match the chosen reference material. Rebuild the preview.')
+            else:
+                if not appearance_matches(body, node['material']):
+                    fail('A label has conflicting material appearance. Resolve its saved assignment in GrabCAD before replacing it.')
+                if node['material'].get('metadata', {}).get('materialType') != 'color_picker' and entry.get('replacement_confirmed') is not True:
+                    fail('Some labels already have assigned materials. Review those objects and explicitly confirm replacing their assignments.')
+                changed.add(oid)
+        elif action == 'preserve_native_black':
             if not black(node['material']) or not appearance_matches(body, node['material']):
                 fail('Planned preserved label is not consistent direct EcoFlex Black.')
         elif action in ('assign_from_picker_using_native_black','assign_from_picker_using_unverified_black'):
@@ -447,6 +516,9 @@ def prepare(project, xlsx, plan):
             changed.add(oid)
         else: fail('Unknown label action.')
         prepared.append(item)
+    for item in prepared:
+        if item.get('reference_occurrence_id') in changed:
+            fail('The chosen reference object would also change in this conversion. Choose a reference whose material will stay unchanged.')
     preserved = plan['preserve_occurrence_ids']
     if len(set(preserved)) != len(preserved) or set(preserved)&seen or seen|set(preserved) != leaves:
         fail('Plan must explicitly cover every leaf as sample, label, or preserved unrelated object.')
@@ -534,7 +606,11 @@ def apply(project, xlsx, plan, out_dir):
             oid = item['occurrence_id']
             if saved_nodes[oid]['material'] != saved_bodies[oid]['material']: fail('Saved desired/actual mismatch.')
             if item['role']=='sample' and not matches_mixer(saved_nodes[oid]['material'], item['recipe']): fail('Saved recipe mismatch.')
-            if item['role']=='label' and not black(saved_nodes[oid]['material']): fail('Saved label is not direct black.')
+            if item['role']=='label':
+                if item['action'] in ('copy_native_reference','preserve_reference_material'):
+                    if not same_material_definition(saved_nodes[oid]['material'], item['reference_material']):
+                        fail('Saved label does not exactly match the complete chosen reference material.')
+                elif not black(saved_nodes[oid]['material']): fail('Saved label is not direct black.')
             if not appearance_matches(saved_bodies[oid], saved_nodes[oid]['material']): fail('Saved material/appearance mismatch.')
         if digest(project)!=plan['archive_sha256'] or digest(xlsx)!=plan['workbook_sha256']: fail('Input changed during conversion.')
         audit = {'status':'UNVERIFIED_CANDIDATE', 'source_sha256':plan['archive_sha256'],

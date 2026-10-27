@@ -18,6 +18,9 @@ def main():
         c.add_argument('--samples',required=True);c.add_argument('--labels',required=True,help='Exact unique label-container name')
         c.add_argument('--orientation',required=True,choices=list(core.ORIENTATIONS));c.add_argument('--transpose',action='store_true')
         c.add_argument('--confirm-current-formula-caches',action='store_true')
+        c.add_argument('--label-mode',choices=['black','reference'],default='black')
+        c.add_argument('--label-reference',help='Exact reference leaf ID from inspect; its material must remain unchanged')
+        c.add_argument('--confirm-label-replacement',action='store_true',help='Explicitly approve replacing existing intentional label assignments after review')
         if name=='convert':
             c.add_argument('--out-dir',required=True);c.add_argument('--review-notes',required=True)
             c.add_argument('--confirm-mapping',action='store_true',required=True)
@@ -31,16 +34,21 @@ def main():
                     'sheets':{k:{'stored_cells':len(v),'suggested_range':core.suggest_range(v)} for k,v in book.items()},
                     'sample_groups':{k:len(v) for k,v in project['groups'].items()},
                     'label_containers':{k:{'name':v['name'],'leaves':len(v['leaves'])} for k,v in project['containers'].items()},
+                    'material_references': [{'id': oid, 'name': project['nodes'][oid].get('name',''), 'material_name': project['nodes'][oid]['material'].get('name','')} for oid in sorted(project['leaves'])],
                     'native_acceptance_verified':False}
         else:
             labels=[oid for oid,v in project['containers'].items() if v['name']==a.labels]
             if len(labels)!=1:core.op.fail('Label container name must identify exactly one container; inspect IDs or use the operator API for ambiguous names.')
             result=core.propose(project,a.workbook,book,a.sheet,a.selected_range,a.samples,labels[0],a.orientation,
-                                transpose=a.transpose,cache_confirmed=a.confirm_current_formula_caches)
+                                transpose=a.transpose,cache_confirmed=a.confirm_current_formula_caches,
+                                label_mode=a.label_mode,label_reference=a.label_reference,
+                                confirm_label_replacement=a.confirm_label_replacement)
             if a.command=='convert':result=core.save(a.project,a.workbook,result,a.out_dir,a.review_notes)
         print(core.op.report_json(result));return 0
     except (core.op.ValidationError,OSError,ValueError,KeyError) as exc:
-        print('Cannot complete: '+str(exc),file=sys.stderr);return 2
+        from diagnostics import describe
+        context={'project':a.project,'workbook':a.workbook,'sheet':getattr(a,'sheet',None),'range':getattr(a,'selected_range',None)}
+        print(describe(exc,context).text(details=True),file=sys.stderr);return 2
 
 
 if __name__=='__main__':raise SystemExit(main())

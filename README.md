@@ -15,6 +15,17 @@
 
 [Short manual](https://github.com/kevinsullivan0/gridcad/blob/v0.2.0-rc.1/docs/DESKTOP_MANUAL.md) · [Windows screenshots and GUI-test evidence](https://github.com/kevinsullivan0/gridcad/releases/download/v0.2.0-rc.1/GridCAD-Windows-GUI-evidence.zip)
 
+### Verify the download
+
+SHA256 values from the release's [SHA256SUMS.txt](https://github.com/kevinsullivan0/gridcad/releases/download/v0.2.0-rc.1/SHA256SUMS.txt):
+
+```text
+a89578905240bb119958f10565b5f386f5e1bfdcb47fb9d9e144e3fbdac9b89b  GridCAD-Windows-x64-v0.2.0-rc.1.zip
+4fab12010c9423995671b2d102930262086a0a55222a6cfd19a8f2b22008aafd  GridCAD-portable-core-v0.2.0-rc.1.zip
+```
+
+On Windows, run `Get-FileHash .\GridCAD-Windows-x64-v0.2.0-rc.1.zip -Algorithm SHA256` in PowerShell and compare the value above. Matching hashes establish file integrity, not a signed publisher or native print compatibility.
+
 ## Supported workflow
 
 The desktop supports the documented **rectangular 2170 source profile**, not arbitrary `.PRINT` files. It derives a uniform lattice from embedded mesh geometry, checks occurrence/geometry agreement, and proposes cell-to-body assignments. Orientation and transpose are explicit choices. Users must check actual printed labels: a plausible grid or matching digest does not prove physical correspondence, and the app does not perform OCR.

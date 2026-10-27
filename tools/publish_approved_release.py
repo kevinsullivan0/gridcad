@@ -5,7 +5,7 @@ def gh(*args):return subprocess.check_output(['gh',*args],text=True)
 a=json.loads(pathlib.Path('.github/release-approved.json').read_text())
 repo=os.environ['GH_REPO']
 assert repo=='kevinsullivan0/gridcad'
-assert a['tag']=='v0.2.0-rc.3' and a['independent_audit_approved'] is True
+assert a['tag']=='v0.2.0-rc.4' and a['independent_audit_approved'] is True
 run=json.loads(gh('api',f'repos/{repo}/actions/runs/{a["run_id"]}'))
 assert run['conclusion']=='success' and run['head_sha']==a['source_sha'] and run['head_branch']=='windows-desktop'
 pathlib.Path('release-assets').mkdir()
@@ -24,4 +24,4 @@ pathlib.Path('release-notes.txt').write_text(notes)
 # Never reuse or move a preexisting tag or replace a release.
 refs=json.loads(gh('api',f'repos/{repo}/git/matching-refs/tags/{a["tag"]}'))
 assert not any(r['ref']=='refs/tags/'+a['tag'] for r in refs), 'Tag already exists; inspect rather than overwrite'
-gh('release','create',a['tag'],'--repo',repo,'--target',a['source_sha'],'--prerelease','--title','GridCAD 0.2.0-rc.3 — Windows desktop candidate','--notes-file','release-notes.txt',*[str(folder/n) for n in a['assets']],str(folder/'SHA256SUMS.txt'))
+gh('release','create',a['tag'],'--repo',repo,'--target',a['source_sha'],'--prerelease','--title','GridCAD 0.2.0-rc.4 — Windows desktop candidate','--notes-file','release-notes.txt',*[str(folder/n) for n in a['assets']],str(folder/'SHA256SUMS.txt'))

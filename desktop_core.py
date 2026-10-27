@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import copy
 from array import array
+from bisect import bisect_left
 import hashlib
 import itertools
 import math
@@ -17,7 +18,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parent / 'operator'))
 from gridcad_operator import operator as op
 
-VERSION = '0.2.0rc2'
+VERSION = '0.2.0-rc.4'
 PROFILE = 'rectangular-2170-mesh-review-v1'
 TOLERANCE = 0.0001  # mm, fixed; never enlarged to make an input fit.
 ORIENTATIONS = {
@@ -52,6 +53,7 @@ def read_rectangle(book, sheet, selected_range, *, cache_confirmed=False):
     if sheet not in book:
         op.fail('Choose an existing worksheet.')
     cells = []
+    provider = None
     for row in range(lo[0], hi[0] + 1):
         for col in range(lo[1], hi[1] + 1):
             addr = address(row, col)
@@ -62,7 +64,9 @@ def read_rectangle(book, sheet, selected_range, *, cache_confirmed=False):
                 op.fail(addr + ': formula uses a saved result. Recalculate in Excel, save, and confirm the cache, or use values only.')
             try:
                 recipe = op.recipe(value['value'])
-                op.EcoFlexMaterialProvider().sample(recipe)  # Admit serializer precision domain now.
+                if provider is None:
+                    provider = op.EcoFlexMaterialProvider()
+                provider.sample(recipe)  # Keep per-cell precision and source-integrity checks.
             except op.ValidationError as exc:
                 op.fail(addr + ': ' + str(exc))
             cells.append({'cell': addr, 'row': row - lo[0], 'column': col - lo[1],
@@ -98,17 +102,25 @@ def _mesh(raw):
     if not 0 < count <= 600000 or len(raw) != 84 + 50 * count:
         op.fail('Unsupported or corrupt binary STL. ASCII and other geometry need an explicit adapter.')
     lo, hi = [math.inf] * 3, [-math.inf] * 3
-    for values in struct.iter_unpack('<12fH', raw[84:]):
+    for values in struct.iter_unpack('<12fH', memoryview(raw)[84:]):
         if any(not math.isfinite(v) or abs(v) > 1e6 for v in values[:12]):
             op.fail('Nonfinite or excessive STL coordinate.')
         for k in range(3):
-            lo[k] = min(lo[k], *values[3+k:12:3])
-            hi[k] = max(hi[k], *values[3+k:12:3])
+            # All coordinates were checked finite above. Scalar comparisons
+            # avoid six temporary tuple slices and min/max calls per triangle.
+            low, high = lo[k], hi[k]
+            for offset in (3, 6, 9):
+                coordinate = values[offset + k]
+                if coordinate < low:
+                    low = coordinate
+                if coordinate > high:
+                    high = coordinate
+            lo[k], hi[k] = low, high
     if any(hi[k] - lo[k] <= 1e-8 for k in range(3)):
         op.fail('STL must describe a nonflat bounded 3D body.')
     # Surface triangles render real label geometry; do not replace it with names.
     top = array('f')
-    for v in struct.iter_unpack('<12fH', raw[84:]):
+    for v in struct.iter_unpack('<12fH', memoryview(raw)[84:]):
         if min(v[5], v[8], v[11]) >= hi[2] - 0.0001:
             top.extend((v[3],v[4],v[6],v[7],v[9],v[10]))
     return {'bounds': [lo, hi], 'top': top, 'triangles': count,
@@ -195,6 +207,29 @@ def _clusters(values):
 
 
 
+def _nearest_rank(axis, value, *, finite_axis=True):
+    """Sorted-axis nearest index, preserving the original first-minimum tie rule."""
+    if not finite_axis or not math.isfinite(value):
+        return min(range(len(axis)), key=lambda j: abs(axis[j] - value))
+    if not axis:
+        raise ValueError('min() arg is an empty sequence')
+    i = bisect_left(axis, value)
+    if i == len(axis) or (i and abs(axis[i-1] - value) <= abs(axis[i] - value)):
+        i -= 1
+    distance = abs(axis[i] - value)
+    # Floating subtraction can round several distances to the same value,
+    # even away from a midpoint. Find the earliest equal minimum, not just
+    # the immediate lower neighbor. This also handles overflow to infinity.
+    lo, hi = 0, i
+    while lo < hi:
+        mid = (lo + hi) // 2
+        if abs(axis[mid] - value) > distance:
+            lo = mid + 1
+        else:
+            hi = mid
+    return lo
+
+
 def _shape_grid(records, bodies):
     """Resolve positions from geometry, with a strictly contained anchor fallback.
 
@@ -215,10 +250,11 @@ def _shape_grid(records, bodies):
         axes=[_clusters([p[i] for p in points.values()]) for i in (0,1)]
         if len(axes[0])*len(axes[1])!=len(records):
             op.fail('The samples do not fill a complete rectangular grid. Check for missing samples, duplicates, or a wrong sample group.')
+        finite_axes = [all(math.isfinite(c) for c in axis) for axis in axes]
         ranks={}; occupied=set()
         for r in records:
             point=points[r['id']]
-            rank=tuple(min(range(len(axes[i])),key=lambda j:abs(axes[i][j]-point[i])) for i in (0,1))
+            rank=tuple(_nearest_rank(axes[i], point[i], finite_axis=finite_axes[i]) for i in (0,1))
             if rank in occupied:op.fail('Two samples occupy the same grid position. Separate them or select the correct sample group.')
             occupied.add(rank);ranks[r['id']]=rank
             if anchors:

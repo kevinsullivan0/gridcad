@@ -478,6 +478,10 @@ def prepare(project, xlsx, plan):
         prepared.append({'role':'sample', 'cell':entry['cell'], 'occurrence_id':oid,
                          'tray_body_id':body['id'], 'recipe':requested, 'action':action})
     if len(uniform) > 1: fail('Heterogeneous color-picker assignments need explicit external resolution.')
+    # Preparation does not mutate the source document. Validate each reference
+    # once per call, retaining per-label checks and independent returned copies.
+    reference_cache = {}
+    native_black_available = None
     for entry in plan['labels']:
         keys(entry, ('occurrence_id','tray_body_id','source_material_sha256','action'), ('reference_occurrence_id','reference_material_sha256','replacement_confirmed'))
         minimal = {k:v for k,v in entry.items() if k not in ('reference_occurrence_id','reference_material_sha256','replacement_confirmed')}
@@ -486,11 +490,15 @@ def prepare(project, xlsx, plan):
         item = {'role':'label','occurrence_id':oid,'tray_body_id':body['id'],'action':action}
         if action in ('copy_native_reference','preserve_reference_material'):
             reference = entry.get('reference_occurrence_id')
-            material = native_reference_material(nodes, bodies, leaves, reference)
-            if entry.get('reference_material_sha256') != fingerprint(material):
+            if reference not in reference_cache:
+                validated = native_reference_material(nodes, bodies, leaves, reference)
+                reference_cache[reference] = (validated, fingerprint(validated))
+            validated, reference_sha256 = reference_cache[reference]
+            material = copy.deepcopy(validated)
+            if entry.get('reference_material_sha256') != reference_sha256:
                 fail('The reference material changed after review. Rebuild the preview and review the selected reference again.')
             item.update(reference_material=material, reference_occurrence_id=reference,
-                        reference_material_sha256=fingerprint(material),
+                        reference_material_sha256=reference_sha256,
                         replacement_confirmed=entry.get('replacement_confirmed') is True)
             if action == 'preserve_reference_material':
                 if not same_material_definition(node['material'], material) or not appearance_matches(body, material):
@@ -511,8 +519,11 @@ def prepare(project, xlsx, plan):
                 if reference not in leaves or nodes[reference]['material'] != bodies[reference]['material'] or not black(nodes[reference]['material']):
                     fail('Native black reference must be an existing matching direct-black leaf.')
                 item['reference_material'] = copy.deepcopy(nodes[reference]['material'])
-            elif any(black(nodes[reference]['material']) for reference in leaves):
-                fail('Native black is available: reference its complete object instead of the minimal converter.')
+            else:
+                if native_black_available is None:
+                    native_black_available = any(black(nodes[ref]['material']) for ref in leaves)
+                if native_black_available:
+                    fail('Native black is available: reference its complete object instead of the minimal converter.')
             changed.add(oid)
         else: fail('Unknown label action.')
         prepared.append(item)
@@ -593,15 +604,29 @@ def apply(project, xlsx, plan, out_dir):
         with archive(project) as src, zipfile.ZipFile(candidate, 'x') as dst:
             dst.comment = src.comment
             for info in src.infolist():
-                raw = exact_json(after).encode() if info.filename=='project.json' else src.read(info)
-                dst.writestr(info, raw)
-                if info.filename!='project.json': payloads.append({'name':info.filename,'sha256':hashlib.sha256(raw).hexdigest()})
-        if project_document(candidate) != after: fail('Saved project readback mismatch.')
+                if info.filename == 'project.json':
+                    dst.writestr(info, exact_json(after).encode())
+                else:
+                    # Preserve metadata and payload bytes without holding a
+                    # potentially 512 MiB member in memory. Reading to EOF still
+                    # checks its source CRC; destination is independently read below.
+                    h = hashlib.sha256()
+                    with src.open(info) as reader, dst.open(info, 'w') as writer:
+                        for block in iter(lambda: reader.read(1024 * 1024), b''):
+                            writer.write(block)
+                            h.update(block)
+                    payloads.append({'name':info.filename,'sha256':h.hexdigest()})
+        saved_document = project_document(candidate)
+        if saved_document != after: fail('Saved project readback mismatch.')
         with archive(project) as src, archive(candidate) as dst:
             if src.namelist()!=dst.namelist() or src.comment!=dst.comment or dst.testzip() is not None: fail('Archive structure/CRC differs.')
             for p in payloads:
-                if hashlib.sha256(dst.read(p['name'])).hexdigest()!=p['sha256']: fail('Non-project payload changed.')
-        saved_nodes, _, saved_bodies = index(project_document(candidate))
+                h = hashlib.sha256()
+                with dst.open(p['name']) as reader:
+                    for block in iter(lambda: reader.read(1024 * 1024), b''):
+                        h.update(block)
+                if h.hexdigest()!=p['sha256']: fail('Non-project payload changed.')
+        saved_nodes, _, saved_bodies = index(saved_document)
         for item in assignments:
             oid = item['occurrence_id']
             if saved_nodes[oid]['material'] != saved_bodies[oid]['material']: fail('Saved desired/actual mismatch.')

@@ -1,8 +1,15 @@
-## GridCAD 0.2.0-rc.3 — Windows desktop candidate
+## GridCAD 0.2.0-rc.4 — Windows desktop candidate
 
-Download **GridCAD-Windows-x64-v0.2.0-rc.3.zip**, extract the complete folder and open `GridCAD.exe`. Keep `_internal` and `advanced` beside it. No Python installation, LLM, account, administrator rights or first-run downloads are required. This unsigned build follows your normal application-trust policy; it does not change security settings.
+Download **GridCAD-Windows-x64-v0.2.0-rc.4.zip**, extract the complete folder and open `GridCAD.exe`. Keep `_internal` and `advanced` beside it. No Python installation, LLM, account, administrator rights or first-run downloads are required. This unsigned build follows your normal application-trust policy; it does not change security settings.
 
-### New in RC3
+### New in RC4
+
+- Lower transient memory for large preserved archive payloads through bounded streaming, with independent CRC/hash readback and original-file protection retained.
+- Faster shared-reference label validation, recipe preparation and sorted-grid ranking, retaining all per-object safety and precision checks.
+- Lower STL allocation overhead and more efficient finite-coordinate bound scanning. No geometry is changed.
+- Measured synthetic Linux comparisons and exact-output equivalence tests are documented in `docs/PERFORMANCE.md`. Improvements depend on input size/layout and are not native GrabCAD performance claims.
+
+### Retained from RC3
 
 - Original geometric GridCAD mark, with editable SVG and crisp multi-size Windows icons embedded in both executables.
 
@@ -18,7 +25,7 @@ Download **GridCAD-Windows-x64-v0.2.0-rc.3.zip**, extract the complete folder an
 - Plain-language errors with practical manual fixes and optional technical details. A local report and copyable debugging prompt can help an external agent; nothing is automatically uploaded or launched. Ordinary conversion needs no agent. Reports contain selected paths/names and traceback frames, not input file contents or Python locals.
 - About/version and bundled third-party-license views. Original GridCAD code is now MIT licensed, copyright 2026 Kevin Sullivan. Third-party runtime licenses remain separate, including explicit OpenSSL notices.
 
-Includes the portable Python core, offline Windows CLI, Excel templates, synthetic examples and ordinary STL geometry companions. Prior RC1 and RC2 remain available.
+Includes the portable Python core, offline Windows CLI, Excel templates, synthetic examples and ordinary STL geometry companions. Prior RC1, RC2 and RC3 remain available.
 
 **Still a candidate, not native-print certification:** unsigned; native GrabCAD open/recompose/save and physical printing remain unverified. Synthetic `.PRINT` examples are software demonstrations, not native-generated print jobs, and must not be printed. STL companions are geometry starting points whose native import/profile compatibility needs checking. Every output retains `print_ready=false`; inspect in native GrabCAD before printing.
 

@@ -4,11 +4,11 @@
 
 ## Download and start
 
-**[Download GridCAD 0.2.0-rc.3 for Windows x64](https://github.com/kevinsullivan0/gridcad/releases/download/v0.2.0-rc.3/GridCAD-Windows-x64-v0.2.0-rc.3.zip)** · [Release notes and checksums](https://github.com/kevinsullivan0/gridcad/releases/tag/v0.2.0-rc.3)
+**[Download GridCAD 0.2.0-rc.4 for Windows x64](https://github.com/kevinsullivan0/gridcad/releases/download/v0.2.0-rc.4/GridCAD-Windows-x64-v0.2.0-rc.4.zip)** · [Release notes and checksums](https://github.com/kevinsullivan0/gridcad/releases/tag/v0.2.0-rc.4)
 
 **No installer, Python, terminal commands or agent required.**
 
-1. **Download the Windows ZIP using the button above.** On the release page, choose `GridCAD-Windows-x64-v0.2.0-rc.3.zip`—**not** “Source code (zip)” or the portable-core ZIP.
+1. **Download the Windows ZIP using the button above.** On the release page, choose `GridCAD-Windows-x64-v0.2.0-rc.4.zip`—**not** “Source code (zip)” or the portable-core ZIP.
 2. In File Explorer, right-click the downloaded ZIP and choose **Extract All…**, then **Extract**. **Do not run the app from inside the ZIP.**
 3. Open the extracted **GridCAD** folder and double-click **`GridCAD.exe`** (it may display as **GridCAD** if file extensions are hidden). Keep the whole folder together, including `_internal` and `advanced`; do not move the EXE out by itself.
 4. Click **Load example**, then **Build mapping preview** for a first try. **The synthetic example is a software demonstration—do not print it.**
@@ -18,27 +18,27 @@
 
 **Before printing:** native GrabCAD open/recompose/save and physical printing remain unverified. Every converted audit retains `print_ready=false`; inspect candidates in native GrabCAD first. GridCAD never submits printer jobs.
 
-[Short manual](https://github.com/kevinsullivan0/gridcad/blob/v0.2.0-rc.3/docs/DESKTOP_MANUAL.md) · [Windows screenshots and GUI-test evidence](https://github.com/kevinsullivan0/gridcad/releases/download/v0.2.0-rc.3/GridCAD-Windows-GUI-evidence.zip)
+[Short manual](https://github.com/kevinsullivan0/gridcad/blob/v0.2.0-rc.4/docs/DESKTOP_MANUAL.md) · [Windows screenshots and GUI-test evidence](https://github.com/kevinsullivan0/gridcad/releases/download/v0.2.0-rc.4/GridCAD-Windows-GUI-evidence.zip)
 
 ### Verify the download
 
-SHA256 values from the release's [SHA256SUMS.txt](https://github.com/kevinsullivan0/gridcad/releases/download/v0.2.0-rc.3/SHA256SUMS.txt):
+SHA256 values from the release's [SHA256SUMS.txt](https://github.com/kevinsullivan0/gridcad/releases/download/v0.2.0-rc.4/SHA256SUMS.txt):
 
 The exact ZIP hashes are published in that checksum file alongside the release assets. Compare the complete value for your exact filename.
 
-**Optional integrity check—not an installation step:** on Windows, run `Get-FileHash ".\GridCAD-Windows-x64-v0.2.0-rc.3.zip" -Algorithm SHA256` in PowerShell and compare the value above. Matching hashes establish file integrity, not a signed publisher or native print compatibility.
+**Optional integrity check—not an installation step:** on Windows, run `Get-FileHash ".\GridCAD-Windows-x64-v0.2.0-rc.4.zip" -Algorithm SHA256` in PowerShell and compare it with the entry for that exact filename in SHA256SUMS.txt. Matching hashes establish file integrity, not a signed publisher or native print compatibility.
 
-**Prefer an agent to download and verify it?** Give it the [short installation and checksum guide](https://github.com/kevinsullivan0/gridcad/blob/v0.2.0-rc.3/docs/AGENT_INSTALL.md). Nothing should launch automatically.
+**Prefer an agent to download and verify it?** Give it the [short installation and checksum guide](https://github.com/kevinsullivan0/gridcad/blob/v0.2.0-rc.4/docs/AGENT_INSTALL.md). Nothing should launch automatically.
 
 ## Compatibility and prerequisites
 
-**What is tested, and what is not:** RC3's file conversion and extracted Windows app were tested. Opening, recomposing and saving its output in native GrabCAD—and physical printing—remain **unverified**. A successful conversion is not a promise that every GrabCAD version or printer will accept the result.
+**What is tested, and what is not:** RC4 publication requires passing file-conversion tests and extracted Windows app acceptance. Check the release's attached evidence for the exact tested commit and run; an unpublished source branch is not a tested release. Opening, recomposing and saving its output in native GrabCAD—and physical printing—remain **unverified**. A successful conversion is not a promise that every GrabCAD version or printer will accept the result.
 
 | Component | Intended support and evidence |
 | --- | --- |
-| GridCAD desktop | **Windows x64** portable app. Packaged with Python 3.13.16; actual GUI acceptance ran on GitHub's **Windows Server 2025** runner, including a 1024 × 768 desktop. That is not testing across every Windows desktop version. No 32-bit, ARM-native, macOS or Linux GUI build is supplied. |
+| GridCAD desktop | **Windows x64** portable app. Packaged with Python 3.13.16; the release acceptance workflow exercises GitHub's **Windows Server 2025** runner, including a 1024 × 768 desktop. See the released evidence for the actual run. That is not testing across every Windows desktop version. No 32-bit, ARM-native, macOS or Linux GUI build is supplied. |
 | Input `.PRINT` files | The strict reviewed source profile is **GrabCAD Print 1.117.12.3985**, with internal schema **2170** for all five stored providers. Matching that header alone is insufficient: geometry, transforms, identities and materials must also pass the documented checks. |
-| Other GrabCAD file versions | **Not automatically supported or claimed likely to work.** RC3 checks the saved file's profile, not whichever GrabCAD application you have installed. Different saved versions are refused; they need a tested adapter, not edited version numbers or a forced import. |
+| Other GrabCAD file versions | **Not automatically supported or claimed likely to work.** RC4 checks the saved file's profile, not whichever GrabCAD application you have installed. Different saved versions are refused; they need a tested adapter, not edited version numbers or a forced import. |
 | Generated material serialization | Based on a separately observed **5.119.0** material profile: Print schema **2191**, PJ schema **2190**. These numbers describe material serialization—not extra accepted input versions, a recommendation to install that version, or proof of native compatibility with the older source format. |
 | Workbook | `.xlsx` with the documented six-channel recipes. Excel is not needed to read saved values. For formula cells, recalculate and save current results in Excel or supply a values-only copy; GridCAD does not calculate formulas. |
 | Portable source core | Python **3.10+**, standard library. The downloaded core CLI was exercised on **Linux with Python 3.12**. This is a source/CLI option, not a macOS or Linux desktop-app claim. |
@@ -47,7 +47,7 @@ The exact ZIP hashes are published in that checksum file alongside the release a
 
 GrabCAD has its own requirements, separate from GridCAD's tests. The [official Stratasys English requirements page](https://support.stratasys.com/en/software/grabcad-print/about/system-requirements-for-grabcad-print), checked October 27, 2026, specifies 64-bit Windows 11 or newer, or Windows Server 2016 or newer, with an Intel/AMD AVX-capable processor; ARM is excluded. Consult that page for current installation, graphics and printer-network requirements.
 
-See the [exact supported schema](https://github.com/kevinsullivan0/gridcad/blob/v0.2.0-rc.3/docs/RECTANGULAR_SCHEMA.md) and [user manual](https://github.com/kevinsullivan0/gridcad/blob/v0.2.0-rc.3/docs/DESKTOP_MANUAL.md). If a file is refused, follow the specific correction shown; keep the original and use the optional diagnostic report for a compatibility investigation rather than bypassing the guard.
+See the [exact supported schema](https://github.com/kevinsullivan0/gridcad/blob/v0.2.0-rc.4/docs/RECTANGULAR_SCHEMA.md) and [user manual](https://github.com/kevinsullivan0/gridcad/blob/v0.2.0-rc.4/docs/DESKTOP_MANUAL.md). If a file is refused, follow the specific correction shown; keep the original and use the optional diagnostic report for a compatibility investigation rather than bypassing the guard.
 
 ## Supported workflow
 
@@ -57,7 +57,7 @@ Recipes contain six slash-separated **C/M/Y/K/W/T percentages**, including expli
 
 The guarded writer preserves nonmaterial geometry, transforms, identities, unrelated bodies and archive payloads. Originals and previous results are never overwritten. Each new result includes the candidate, exact assignments, reviewed plan and audit.
 
-[Supported schema and adaptable examples](https://github.com/kevinsullivan0/gridcad/blob/v0.2.0-rc.3/docs/RECTANGULAR_SCHEMA.md)
+[Supported schema and adaptable examples](https://github.com/kevinsullivan0/gridcad/blob/v0.2.0-rc.4/docs/RECTANGULAR_SCHEMA.md)
 
 
 **Label materials:** keep the default direct-black policy or copy a complete compatible saved assignment from an unchanged reference body. Supported references are existing PolyJet EcoFlex direct materials or validated CMYKWT mixers—not arbitrary printer families or newly invented materials. Replacing an existing different label assignment requires reviewing the complete list, explicit confirmation and a rebuilt preview; shared or inconsistent identities remain refused.
@@ -80,11 +80,11 @@ The small desktop UI sits on a reusable core:
 | `desktop_cli.py` | Scriptable interface to the same core, bundled as `advanced/GridCAD-core.exe` on Windows. |
 | `AGENTS.md`, `docs/`, `tools/` | Agent contract, schema/API/manual, example generator, packaging and acceptance tests. |
 
-**Help** opens the offline quick start; **Help & optional tools** provides documentation and a copyable prompt pointing an external agent at installed files or exact release source. The [portable core download](https://github.com/kevinsullivan0/gridcad/releases/download/v0.2.0-rc.3/GridCAD-portable-core-v0.2.0-rc.3.zip) runs on Python 3.10+ with the standard library; its CLI was also checked on Linux.
+**Help** opens the offline quick start; **Help & optional tools** provides documentation and a copyable prompt pointing an external agent at installed files or exact release source. The [portable core download](https://github.com/kevinsullivan0/gridcad/releases/download/v0.2.0-rc.4/GridCAD-portable-core-v0.2.0-rc.4.zip) runs on Python 3.10+ with the standard library; its CLI was also checked on Linux.
 
 Nonrectangular lattice layouts (such as triangular or hexagonal layouts), grids stacked in 3D and unsupported transforms are **not implemented**. That restriction concerns layout, not whether an individual sample is a pyramid or another 3D shape. Extensions need explicit adapters and evidence, not relaxed safety guards.
 
-[Release source](https://github.com/kevinsullivan0/gridcad/tree/v0.2.0-rc.3) · [API and CLI](https://github.com/kevinsullivan0/gridcad/blob/v0.2.0-rc.3/docs/DESKTOP_API.md) · [Agent instructions](https://github.com/kevinsullivan0/gridcad/blob/v0.2.0-rc.3/AGENTS.md)
+[Release source](https://github.com/kevinsullivan0/gridcad/tree/v0.2.0-rc.4) · [API and CLI](https://github.com/kevinsullivan0/gridcad/blob/v0.2.0-rc.4/docs/DESKTOP_API.md) · [Agent instructions](https://github.com/kevinsullivan0/gridcad/blob/v0.2.0-rc.4/AGENTS.md)
 
 **Source layout:** the desktop implementation is at the release tag above. The default branch still contains the earlier browser implementation and operator; this README update does not merge the desktop branch.
 
@@ -97,7 +97,7 @@ Choose an agent you already use, or none. **Agent help & settings** lets you inc
 
 Errors explain the problem and a practical manual correction first. Optional controls reveal technical details, open a local diagnostic report, or copy a prompt to paste into an agent you already use. Nothing is automatically uploaded or launched; an external agent needs deliberate file access or an attachment. Reports contain selected paths/names and traceback frames, not project/workbook contents or Python locals. Ordinary conversion needs no agent.
 
-**Help & optional tools** also includes About/version and an offline view of bundled third-party licenses. See [licensing scope](https://github.com/kevinsullivan0/gridcad/blob/v0.2.0-rc.3/docs/LICENSING.md).
+**Help & optional tools** also includes About/version and an offline view of bundled third-party licenses. See [licensing scope](https://github.com/kevinsullivan0/gridcad/blob/v0.2.0-rc.4/docs/LICENSING.md).
 
 ## Verification and earlier work
 

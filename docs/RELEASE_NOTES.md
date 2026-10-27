@@ -14,6 +14,10 @@ Download **GridCAD-Windows-x64-v0.2.0-rc.4.zip**, extract the complete folder an
 - Parallelism was measured rather than enabled by default: processes can help very large multi-mesh workloads but add memory and startup overhead; threads showed no consistent scalable gain. Ordinary conversion remains deterministic and sequential within its existing background worker.
 - Measured synthetic Linux comparisons and exact-output equivalence tests are documented in `docs/PERFORMANCE.md`. Improvements depend on input size/layout and are not native GrabCAD performance claims.
 
+### Security review status
+
+The original official Codex Security scan reported two low-severity local input-resource issues (repeated-mesh preview allocation and workbook loading). Resource guards were implemented and regression-tested. Independent Codex Security post-fix verification was unavailable because of a platform restriction; this release does not claim a clean security certification.
+
 ### Retained from RC3
 
 - Original geometric GridCAD mark, with editable SVG and crisp multi-size Windows icons embedded in both executables.

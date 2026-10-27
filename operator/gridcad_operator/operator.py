@@ -555,7 +555,9 @@ def apply(project, xlsx, plan, out_dir):
         (temp/'reviewed_plan.json').write_text(exact_json(plan)+'\n')
         (temp/'UNVERIFIED.txt').write_text('DO NOT PRINT YET. File-level audit passed; native material semantics and GrabCAD open/recompose/save acceptance remain unverified. See audit.json and operator instructions.\n')
         for path in temp.iterdir():
-            with path.open('rb') as f: os.fsync(f.fileno())
+            # Windows FlushFileBuffers requires a writable handle. The staged
+            # files are ours; opening r+b preserves their bytes and fsync guard.
+            with path.open('r+b') as f: os.fsync(f.fileno())
         out_dir.mkdir()  # Exclusive directory reservation; even an empty existing directory is refused.
         owns_dir = True
         for path in sorted(temp.iterdir()):

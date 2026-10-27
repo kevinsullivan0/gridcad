@@ -1,5 +1,7 @@
 # GridCAD operator
 
+Desktop portability revision: staged files now use a writable handle for Windows `fsync`; frozen packages include the exact material-converter source so its integrity/provenance check remains active. Mapping/material/source guards are retained. The older review documents describe the original source-review snapshot; current Windows package acceptance evidence is published separately.
+
 A small assistant-operated CLI for inspecting an XLSX and a GrabCAD `.PRINT`, checking an explicit mapping plan, and writing a separate **unverified** candidate with preservation evidence. Python 3.10+ standard library only. No installer, browser, LLM API, network access, or end-user dashboard.
 
 This is a cleanup of an actual-file conversion method, not a universal importer. The source/storage profiles are narrowly limited to the observed GrabCAD 1.117.12.3985 / internal 2170 serialization described below. The material-only route consumes externally reviewed exact IDs rather than inferring their physical mapping. Two successful file-level conversions do not establish compatibility with all 2170 projects or native print readiness.

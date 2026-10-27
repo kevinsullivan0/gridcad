@@ -2,18 +2,45 @@ name: Windows desktop
 on:
   push:
     branches: [windows-desktop, main]
-    tags: ['v*']
   workflow_dispatch:
 permissions:
   contents: read
+concurrency:
+  group: windows-desktop-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   windows:
     runs-on: windows-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.13'
-      - name: Reviewed operator regression baseline
-        working-directory: operator
-        run: python -m unittest discover -s tests -v
+          python-version: '3.13.16'
+      - name: Install pinned build and GUI-test tooling
+        run: python -m pip install --disable-pip-version-check -r requirements-desktop-build.txt
+      - name: Reviewed operator regression
+        run: python -m unittest discover -s operator/tests -v
+      - name: Rectangular desktop core regression
+        run: python -m unittest discover -s tests -p test_desktop_core.py -v
+      - name: Build offline Windows portable distribution
+        run: python tools/build_windows.py
+      - name: Real extracted-package Windows GUI acceptance
+        run: python tools/windows_gui_acceptance.py --zip dist/GridCAD-Windows-x64-v0.2.0-rc.1.zip --out desktop-qa
+      - name: Archive GUI evidence
+        if: always()
+        shell: pwsh
+        run: |
+          if (Test-Path desktop-qa) {
+            New-Item -ItemType Directory -Force dist | Out-Null
+            Compress-Archive -Path desktop-qa/*.png,desktop-qa/acceptance.json -DestinationPath dist/GridCAD-Windows-GUI-evidence.zip -Force
+          }
+      - name: Upload package and evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: GridCAD-Windows-desktop-candidate
+          path: |
+            dist/*.zip
+            dist/SHA256SUMS.txt
+          if-no-files-found: warn

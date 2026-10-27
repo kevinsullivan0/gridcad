@@ -1,12 +1,16 @@
-## GridCAD Windows desktop — release candidate
+## GridCAD 0.2.0-rc.2 — Windows desktop candidate
 
-Download **GridCAD-Windows-x64-v0.2.0-rc.1.zip**, extract the complete folder and open `GridCAD.exe`. No Python installation, LLM, account, administrator rights or first-run downloads are required. Keep `_internal` and `advanced` beside the executable. This build is unsigned; follow your organization's normal application trust policy.
+Download **GridCAD-Windows-x64-v0.2.0-rc.2.zip**, extract the complete folder and open `GridCAD.exe`. Keep `_internal` and `advanced` beside it. No Python installation, LLM, account, administrator rights or first-run downloads are required. This unsigned build follows your normal application-trust policy; it does not change security settings.
 
-- Deterministic Excel recipe selection, physical XY mesh preview, explicit orientation/transpose and reviewed sample/label mapping.
-- Separate audited outputs; original geometry, IDs, transforms and unrelated payloads are preserved. Existing results are never overwritten.
-- Bundled synthetic demonstration, editable Excel template, ordinary STL geometry companion and short guide.
-- Discoverable agent instructions, documented portable core and offline Windows CLI. The source-only portable bundle runs on Python 3.10+.
+### New in this candidate
 
-**Candidate, not native-print certification.** Native GrabCAD open/recompose/save and physical printing remain unverified. The synthetic archive demonstrates software behavior and is not a native-generated print job; do not print it. The STL import guide is a geometry starting point, not evidence that a newly exported native project matches the supported bounded profile. Every converted audit retains `print_ready=false`. Review the candidate in native GrabCAD before any print use.
+- Shape-agnostic samples on unambiguous rectangular layouts: generated pyramid and mixed-shape/size/height cases are tested. Meshes remain untouched; the UI displays sample footprints, not shaded 3D models. Overlaps, missing/duplicate positions, unsupported transforms and ambiguous correspondence are refused.
+- Copy a compatible saved material from an unchanged reference body to selected labels. Existing different assignments require explicit review of the full replacement list, confirmation and a rebuilt preview. Full material metadata and target identities are preserved. Scope is existing PolyJet EcoFlex direct materials or validated CMYKWT mixers, not arbitrary printer families or new material synthesis.
+- Plain-language errors with practical manual fixes and optional technical details. A local report and copyable debugging prompt can help an external agent; nothing is automatically uploaded or launched. Ordinary conversion needs no agent. Reports contain selected paths/names and traceback frames, not input file contents or Python locals.
+- About/version and bundled third-party-license views. Original GridCAD code is now MIT licensed, copyright 2026 Kevin Sullivan. Third-party runtime licenses remain separate, including explicit OpenSSL notices.
 
-See the attached Windows GUI acceptance evidence and SHA256SUMS. Scope is the documented rectangular 2170 profile; general triangular, hexagonal and arbitrary 3D conversion is not implemented. Private source files and vendor software are not bundled.
+Includes the portable Python core, offline Windows CLI, Excel templates, synthetic examples and ordinary STL geometry companions. Prior rc.1 remains available.
+
+**Still a candidate, not native-print certification:** unsigned; native GrabCAD open/recompose/save and physical printing remain unverified. Synthetic `.PRINT` examples are software demonstrations, not native-generated print jobs, and must not be printed. STL companions are geometry starting points whose native import/profile compatibility needs checking. Every output retains `print_ready=false`; inspect in native GrabCAD before printing.
+
+See the attached Windows GUI acceptance evidence and SHA256SUMS. Private customer files and proprietary vendor software are not bundled.

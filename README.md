@@ -4,7 +4,7 @@
 
 ## Download and start
 
-**[Download GridCAD 0.2.0-rc.1 for Windows x64](https://github.com/kevinsullivan0/gridcad/releases/download/v0.2.0-rc.1/GridCAD-Windows-x64-v0.2.0-rc.1.zip)** · [Release notes and checksums](https://github.com/kevinsullivan0/gridcad/releases/tag/v0.2.0-rc.1)
+**[Download GridCAD 0.2.0-rc.2 for Windows x64](https://github.com/kevinsullivan0/gridcad/releases/download/v0.2.0-rc.2/GridCAD-Windows-x64-v0.2.0-rc.2.zip)** · [Release notes and checksums](https://github.com/kevinsullivan0/gridcad/releases/tag/v0.2.0-rc.2)
 
 1. Extract the **entire ZIP** into a fresh folder.
 2. Open **`GridCAD.exe`**. Keep `_internal` and `advanced` beside it. Python and dependencies are bundled; no installation, administrator rights or first-launch download is required.
@@ -13,28 +13,31 @@
 
 **Unsigned release candidate: native GrabCAD open/recompose/save and physical printing remain unverified.** Follow your organization's normal application-trust policy; do not disable security protections. Every converted audit retains `print_ready=false`. Inspect candidates in native GrabCAD before printing. GridCAD never submits printer jobs.
 
-[Short manual](https://github.com/kevinsullivan0/gridcad/blob/v0.2.0-rc.1/docs/DESKTOP_MANUAL.md) · [Windows screenshots and GUI-test evidence](https://github.com/kevinsullivan0/gridcad/releases/download/v0.2.0-rc.1/GridCAD-Windows-GUI-evidence.zip)
+[Short manual](https://github.com/kevinsullivan0/gridcad/blob/v0.2.0-rc.2/docs/DESKTOP_MANUAL.md) · [Windows screenshots and GUI-test evidence](https://github.com/kevinsullivan0/gridcad/releases/download/v0.2.0-rc.2/GridCAD-Windows-GUI-evidence.zip)
 
 ### Verify the download
 
-SHA256 values from the release's [SHA256SUMS.txt](https://github.com/kevinsullivan0/gridcad/releases/download/v0.2.0-rc.1/SHA256SUMS.txt):
+SHA256 values from the release's [SHA256SUMS.txt](https://github.com/kevinsullivan0/gridcad/releases/download/v0.2.0-rc.2/SHA256SUMS.txt):
 
 ```text
-a89578905240bb119958f10565b5f386f5e1bfdcb47fb9d9e144e3fbdac9b89b  GridCAD-Windows-x64-v0.2.0-rc.1.zip
-4fab12010c9423995671b2d102930262086a0a55222a6cfd19a8f2b22008aafd  GridCAD-portable-core-v0.2.0-rc.1.zip
+a22f1a36216ae6a24722afb39164d1871770dae129c2cb9c4e221215c9cca435  GridCAD-Windows-x64-v0.2.0-rc.2.zip
+3ac6b4a0934d08c1fc5f8d83d96ee6a0a82a3ff4a91da86980ad91c85430fdaf  GridCAD-portable-core-v0.2.0-rc.2.zip
 ```
 
-On Windows, run `Get-FileHash .\GridCAD-Windows-x64-v0.2.0-rc.1.zip -Algorithm SHA256` in PowerShell and compare the value above. Matching hashes establish file integrity, not a signed publisher or native print compatibility.
+On Windows, run `Get-FileHash .\GridCAD-Windows-x64-v0.2.0-rc.2.zip -Algorithm SHA256` in PowerShell and compare the value above. Matching hashes establish file integrity, not a signed publisher or native print compatibility.
 
 ## Supported workflow
 
-The desktop supports the documented **rectangular 2170 source profile**, not arbitrary `.PRINT` files. It derives a uniform lattice from embedded mesh geometry, checks occurrence/geometry agreement, and proposes cell-to-body assignments. Orientation and transpose are explicit choices. Users must check actual printed labels: a plausible grid or matching digest does not prove physical correspondence, and the app does not perform OCR.
+The desktop supports the documented **rectangular 2170 source profile**, not arbitrary `.PRINT` files. It supports different sample shapes, sizes and heights on a common base plane—including tested pyramids and mixed shapes—when separated footprints and corroborated placements define an unambiguous rectangular grid. It proposes cell-to-body assignments without replacing the source meshes. Orientation and transpose are explicit choices. Users must check actual printed labels: a plausible grid or matching digest does not prove physical correspondence, and the app does not perform OCR.
 
 Recipes contain six slash-separated **C/M/Y/K/W/T percentages**, including explicit zeros, totaling exactly 100. Saved formula results require confirmation; missing caches and invalid values are refused. GridCAD does not calculate Excel formulas, run macros, normalize percentages, repair unknown versions or force unsupported geometry through.
 
 The guarded writer preserves nonmaterial geometry, transforms, identities, unrelated bodies and archive payloads. Originals and previous results are never overwritten. Each new result includes the candidate, exact assignments, reviewed plan and audit.
 
-[Supported schema and adaptable examples](https://github.com/kevinsullivan0/gridcad/blob/v0.2.0-rc.1/docs/RECTANGULAR_SCHEMA.md)
+[Supported schema and adaptable examples](https://github.com/kevinsullivan0/gridcad/blob/v0.2.0-rc.2/docs/RECTANGULAR_SCHEMA.md)
+
+
+**Label materials:** keep the default direct-black policy or copy a complete compatible saved assignment from an unchanged reference body. Supported references are existing PolyJet EcoFlex direct materials or validated CMYKWT mixers—not arbitrary printer families or newly invented materials. Replacing an existing different label assignment requires reviewing the complete list, explicit confirmation and a rebuilt preview; shared or inconsistent identities remain refused.
 
 ## Examples
 
@@ -54,18 +57,25 @@ The small desktop UI sits on a reusable core:
 | `desktop_cli.py` | Scriptable interface to the same core, bundled as `advanced/GridCAD-core.exe` on Windows. |
 | `AGENTS.md`, `docs/`, `tools/` | Agent contract, schema/API/manual, example generator, packaging and acceptance tests. |
 
-**Advanced / Agent & help** provides documentation and a copyable prompt pointing an external agent at installed files or exact release source. The [portable core download](https://github.com/kevinsullivan0/gridcad/releases/download/v0.2.0-rc.1/GridCAD-portable-core-v0.2.0-rc.1.zip) runs on Python 3.10+ with the standard library; its CLI was also checked on Linux.
+**Advanced / Agent & help** provides documentation and a copyable prompt pointing an external agent at installed files or exact release source. The [portable core download](https://github.com/kevinsullivan0/gridcad/releases/download/v0.2.0-rc.2/GridCAD-portable-core-v0.2.0-rc.2.zip) runs on Python 3.10+ with the standard library; its CLI was also checked on Linux.
 
-Triangular, hexagonal and arbitrary 3D conversion are **not implemented**. Extensions need explicit adapters and evidence, not relaxed safety guards.
+Nonrectangular lattice layouts (such as triangular or hexagonal layouts), grids stacked in 3D and unsupported transforms are **not implemented**. That restriction concerns layout, not whether an individual sample is a pyramid or another 3D shape. Extensions need explicit adapters and evidence, not relaxed safety guards.
 
-[Release source](https://github.com/kevinsullivan0/gridcad/tree/v0.2.0-rc.1) · [API and CLI](https://github.com/kevinsullivan0/gridcad/blob/v0.2.0-rc.1/docs/DESKTOP_API.md) · [Agent instructions](https://github.com/kevinsullivan0/gridcad/blob/v0.2.0-rc.1/AGENTS.md)
+[Release source](https://github.com/kevinsullivan0/gridcad/tree/v0.2.0-rc.2) · [API and CLI](https://github.com/kevinsullivan0/gridcad/blob/v0.2.0-rc.2/docs/DESKTOP_API.md) · [Agent instructions](https://github.com/kevinsullivan0/gridcad/blob/v0.2.0-rc.2/AGENTS.md)
 
 **Source layout:** the desktop implementation is at the release tag above. The default branch still contains the earlier browser implementation and operator; this README update does not merge the desktop branch.
 
+
+### Helpful errors, with optional agent assistance
+
+Errors explain the problem and a practical manual correction first. Optional controls reveal technical details, open a local diagnostic report, or copy a prompt to paste into an agent you already use. Nothing is automatically uploaded or launched; an external agent needs deliberate file access or an attachment. Reports contain selected paths/names and traceback frames, not project/workbook contents or Python locals. Ordinary conversion needs no agent.
+
+**Advanced / Agent & help** also includes About/version and an offline view of bundled third-party licenses. See [licensing scope](https://github.com/kevinsullivan0/gridcad/blob/v0.2.0-rc.2/docs/LICENSING.md).
+
 ## Verification and earlier work
 
-The release passed **61 operator tests, 13 desktop-core tests and real extracted-package Windows GUI acceptance**: native dialogs, long worksheets, formula-cache refusals, mapping/transpose, guarded saving, repeated example loading and the bundled CLI. Two private actual-file conversions reproduced earlier independently reviewed candidates byte for byte. Independent mapping and usability/package reviews passed, and published asset checksums were verified after download. These checks do not establish native GrabCAD or printer acceptance.
+The release passed **81 operator tests, 13 desktop-core tests, seven shape tests, seven diagnostics tests and real extracted-package Windows GUI acceptance**: native dialogs, long worksheets, formula-cache refusals, mapping/transpose, guarded saving, repeated example loading, pyramid/mixed grids, explicit label replacement review/cancel/rebuild, local diagnostic copying and recovery, About/licenses, and the bundled CLI. Two private actual-file conversions reproduced earlier independently reviewed candidates byte for byte. Independent mapping and usability/package reviews passed, and published asset checksums were verified after download. These checks do not establish native GrabCAD or printer acceptance.
 
 The earlier browser alpha uses `launch-windows.cmd`, **not** the desktop launch route. Its [historical instructions and verification limits](https://github.com/kevinsullivan0/gridcad/blob/a81ccb2ed759d5fec6d609805230f467d03f5cf6/README.md) and old releases remain available. The [assistant-operated workflow](operator/README.md) and [reviewed-ID instructions](operator/REVIEWED_ID_MODE.md) remain useful when an operator independently establishes an explicit cell-to-body mapping.
 
-Preserve third-party notices and private input boundaries. The repository adds no general project license grant. Checksums establish integrity, not signing or print readiness.
+Preserve third-party notices and private input boundaries. Original GridCAD code is licensed under the [MIT License](LICENSE), copyright 2026 Kevin Sullivan. Third-party runtime components retain their own licenses and notices; this does not relicense the entire bundled binary. Checksums establish integrity, not signing or print readiness.

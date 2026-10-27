@@ -24,6 +24,8 @@ Open the separate candidate in the ordinary Windows GrabCAD application. Check s
 
 ## If an input is refused
 
+A **too large or complex** message reports an input resource ceiling. Export a smaller project or values-only workbook with the needed sheets, keeping your original. See [the exact limits](RECTANGULAR_SCHEMA.md#input-resource-ceilings). GridCAD does not truncate data or provide a bypass switch.
+
 Read the specific message. Choose a matching recipe rectangle, sample group, label container, transpose and orientation. Recalculate formula workbooks in Excel and save a values-only copy if needed. Existing conflicting materials, unknown versions, unsupported transforms, duplicate/instanced bodies, missing embedded STLs or irregular grids need separate investigation. Do not change version/unit fields or disable guards to force a file through. A failed save leaves originals untouched and attempts to remove only its own staged files.
 
 The **Help & optional tools** tab contains the schema, API and a copyable external-agent prompt. `advanced/GridCAD-core.exe` exposes the deterministic core on a Windows machine without installing Python. The portable source bundle runs on Python 3.10+ with the standard library. Other geometries require an explicit new adapter and evidence; nonrectangular lattice layouts and grids stacked in 3D are not implemented. Sample shapes such as pyramids can be used on supported rectangular layouts.

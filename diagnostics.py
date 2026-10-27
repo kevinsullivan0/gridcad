@@ -28,6 +28,23 @@ class Diagnostic:
         if details:parts.append('Technical details ['+self.code+']\n'+self.technical)
         return '\n\n'.join(parts)
 
+# Only trusted constant descriptions may enter diagnostic/report fields. Raw
+# exceptions can contain private input values (including resource-like strings).
+RESOURCE_DESCRIPTIONS = {message: message.removeprefix('Resource limit: ') for message in (
+    'Resource limit: workbook XML exceeds 128 levels or 1,000,000 elements.',
+    'Resource limit: workbook exceeds 100,000 stored cells.',
+    'Resource limit: workbook exceeds 100,000 shared strings.',
+    'Resource limit: workbook XML text exceeds 16,777,216 characters.',
+    'Resource limit: workbook XML exceeds 128 attributes per element.',
+    'Resource limit: workbook XML name or namespace exceeds 1,024 characters.',
+    'Resource limit: workbook exceeds 64 MiB expanded. Use a smaller values-only workbook.',
+    'Resource limit: workbook XML part exceeds 16 MiB. Use a smaller values-only workbook.',
+    'Resource limit: workbook exceeds 128 worksheets.',
+    'Resource limit: workbook exceeds 100,000 stored cells. Use a smaller values-only workbook.',
+    'Resource limit: stored cell text exceeds 16,777,216 characters.',
+    'Resource limit: project preview exceeds 8,000,000 triangles across all body instances. Use a smaller project; no geometry was truncated.',
+)}
+
 def describe(exc, context=None):
     c=context or {};raw=str(exc);low=raw.lower();cell=re.match(r'^([A-Z]+[0-9]+):',raw)
     where=''
@@ -38,6 +55,9 @@ def describe(exc, context=None):
     expected=actual=''
     if isinstance(exc,PermissionError):code,title,help='GCD002','GridCAD cannot access this location.','Choose a folder you can write to, or close the file in the application holding it. Do not change security protections.'
     elif isinstance(exc,FileNotFoundError):code,title,help='GCD001','A selected file or folder is no longer available.','Choose the existing input again, or choose an existing parent folder for the new result.'
+    elif raw in RESOURCE_DESCRIPTIONS:
+        code,title,help='GCD206','This file is too large or complex to open safely.','Export a smaller project or values-only workbook containing the needed objects or sheets. Keep your original; do not bypass the limit. See Help → Supported schema for the documented ceilings.'
+        actual=RESOURCE_DESCRIPTIONS[raw]
     elif 'formula uses a saved result' in low:code,title,help='GCD101','This cell uses a saved formula result.','Recalculate and save the workbook in Excel, then confirm current formula results; alternatively use a values-only copy.'
     elif 'missing value, formula cache' in low:code,title,help='GCD102','This cell has no usable recipe value.','Fill the selected cell or fix its Excel error. For formulas, recalculate and save in Excel; confirming cannot restore a missing result.'
     elif any(x in low for x in ['input changed','source hash differs','workbook hash','archive hash','source-material hash']):

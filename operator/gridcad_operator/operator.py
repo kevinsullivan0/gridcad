@@ -15,6 +15,7 @@ import stat
 import tempfile
 from decimal import Decimal as D
 import xml.etree.ElementTree as ET
+from xml.parsers import expat
 import zipfile
 
 from .core import CHANNELS, FIELDS, ValidationError, validate_recipe
@@ -124,41 +125,164 @@ def index(document):
     return nodes, leaves, bodies
 
 
-def xml(raw):
-    if b'<!DOCTYPE' in raw.upper() or b'<!ENTITY' in raw.upper(): fail('DTD/entities refused.')
-    return ET.fromstring(raw)
+# Bounds apply while opening inputs, including the direct operator/selected-sheet
+# route. They are ceilings, never instructions to truncate or repair a workbook.
+WORKBOOK_BYTES = 64 * 1024**2
+WORKBOOK_PART_BYTES = 16 * 1024**2
+WORKBOOK_CELLS = 100000
+WORKBOOK_STRINGS = 100000
+WORKBOOK_SHEETS = 128
+WORKBOOK_TEXT = 16 * 1024**2
+WORKBOOK_XML_NODES = 1000000
+WORKBOOK_XML_DEPTH = 128
+WORKBOOK_XML_ATTRIBUTES = 128
+WORKBOOK_XML_NAME = 1024
+
+
+class _WorkbookXML(ET.TreeBuilder):
+    def __init__(self, budget):
+        super().__init__()
+        self.budget, self.depth = budget, 0
+
+    def doctype(self, name, pubid, system):
+        # Expat decodes the actual XML encoding before this callback: unlike a
+        # raw byte scan, this also refuses UTF-16 internal/external declarations.
+        fail('Workbook XML DTD/entities refused.')
+
+    def start(self, tag, attrs):
+        self.depth += 1
+        self.budget['nodes'] += 1
+        if self.depth > WORKBOOK_XML_DEPTH or self.budget['nodes'] > WORKBOOK_XML_NODES:
+            fail('Resource limit: workbook XML exceeds 128 levels or 1,000,000 elements.')
+        for local, ceiling, label in [('c', WORKBOOK_CELLS, 'stored cells'), ('si', WORKBOOK_STRINGS, 'shared strings')]:
+            if tag == '{'+NS['m']+'}'+local:
+                self.budget[local] = self.budget.get(local, 0) + 1
+                if self.budget[local] > ceiling:
+                    fail('Resource limit: workbook exceeds 100,000 '+label+'.')
+        # Namespace expansion can amplify tiny XML into very large distinct
+        # element/attribute names. Charge decoded names, not only source text.
+        self._text(len(tag) + sum(len(k) + len(v) for k, v in attrs.items()))
+        return super().start(tag, attrs)
+
+    def end(self, tag):
+        result = super().end(tag)
+        self.depth -= 1
+        return result
+
+    def _text(self, size):
+        self.budget['text'] += size
+        if self.budget['text'] > WORKBOOK_TEXT:
+            fail('Resource limit: workbook XML text exceeds 16,777,216 characters.')
+
+    def data(self, data):
+        self._text(len(data))
+        return super().data(data)
+
+
+def _preflight_xml_names(raw):
+    # Namespace expansion happens inside Expat before TreeBuilder.start receives
+    # attributes. Inspect unexpanded names first, without constructing a tree,
+    # so URI x attribute/name amplification cannot precede our budget checks.
+    parser = expat.ParserCreate()
+    def start(name, attrs):
+        if len(attrs) > WORKBOOK_XML_ATTRIBUTES:
+            fail('Resource limit: workbook XML exceeds 128 attributes per element.')
+        if (len(name) > WORKBOOK_XML_NAME or any(len(k) > WORKBOOK_XML_NAME for k in attrs)
+                or any(len(v) > WORKBOOK_XML_NAME for k, v in attrs.items()
+                       if k == 'xmlns' or k.startswith('xmlns:'))):
+            fail('Resource limit: workbook XML name or namespace exceeds 1,024 characters.')
+    def doctype(*args):
+        fail('Workbook XML DTD/entities refused.')
+    parser.StartElementHandler = start
+    parser.StartDoctypeDeclHandler = doctype
+    parser.Parse(raw, True)
+
+
+def xml(raw, budget=None):
+    budget = budget if budget is not None else {'nodes': 0, 'text': 0}
+    try:
+        _preflight_xml_names(raw)
+        return ET.fromstring(raw, parser=ET.XMLParser(target=_WorkbookXML(budget)))
+    except ValidationError:
+        raise
+    except (ET.ParseError, expat.ExpatError, ValueError) as exc:
+        raise ValidationError('Malformed or unsupported-encoding workbook XML.') from exc
 
 
 def workbook(path, selected=None):
-    """Read stored XML only; never execute macros, formulas, links, or a calculation engine."""
+    """Read bounded stored XML; never execute macros, formulas or links."""
     with archive(path) as z:
         names = z.namelist()
+        if sum(i.file_size for i in z.infolist()) > WORKBOOK_BYTES:
+            fail('Resource limit: workbook exceeds 64 MiB expanded. Use a smaller values-only workbook.')
         if any('vbaproject' in n.lower() or n.startswith('xl/externalLinks/') for n in names):
             fail('Macro/external-link workbook refused; supply a values-only copy.')
-        book = xml(z.read('xl/workbook.xml'))
+        budget = {'nodes': 0, 'text': 0}
+        def part(member):
+            if z.getinfo(member).file_size > WORKBOOK_PART_BYTES:
+                fail('Resource limit: workbook XML part exceeds 16 MiB. Use a smaller values-only workbook.')
+            return xml(z.read(member), budget)
+        book = part('xl/workbook.xml')
         tabs = book.find('m:sheets', NS)
-        rels = {r.get('Id'): r for r in xml(z.read('xl/_rels/workbook.xml.rels'))}
-        strings = [''.join(n.itertext()) for n in xml(z.read('xl/sharedStrings.xml'))] if 'xl/sharedStrings.xml' in names else []
-        result = {}
+        if tabs is None: fail('Workbook has no worksheet list.')
+        if len(tabs) > WORKBOOK_SHEETS:
+            fail('Resource limit: workbook exceeds 128 worksheets.')
+        rels = {}
+        for rel in part('xl/_rels/workbook.xml.rels'):
+            key = rel.get('Id')
+            if not key or key in rels: fail('Missing or duplicate workbook relationship ID.')
+            rels[key] = rel
+        sheets, titles, ids, targets = [], set(), set(), set()
         for tab in tabs:
-            title = tab.get('name')
-            if selected is not None and title != selected: continue
-            rel = rels[tab.get(REL)]
+            title, sheet_id = tab.get('name'), tab.get('sheetId')
+            if not title or title in titles or not sheet_id or sheet_id in ids:
+                fail('Missing or duplicate worksheet name/ID.')
+            titles.add(title); ids.add(sheet_id)
+            rel = rels.get(tab.get(REL))
+            if rel is None: fail('Missing worksheet relationship.')
             if rel.get('TargetMode') == 'External': fail('External worksheet refused.')
-            target = PurePosixPath(rel.get('Target'))
+            raw_target = rel.get('Target')
+            if not raw_target or '\\' in raw_target: fail('Invalid worksheet target.')
+            target = PurePosixPath(raw_target)
             member = str(target).lstrip('/') if target.is_absolute() else str(PurePosixPath('xl') / target)
             if '..' in PurePosixPath(member).parts: fail('Parent-relative worksheet target refused.')
+            if member in targets: fail('Duplicate worksheet target refused.')
+            targets.add(member); sheets.append((title, member))
+        strings = []
+        if 'xl/sharedStrings.xml' in names:
+            tree = part('xl/sharedStrings.xml')
+            if len(tree) > WORKBOOK_STRINGS:
+                fail('Resource limit: workbook exceeds 100,000 shared strings.')
+            strings = [''.join(n.itertext()) for n in tree]
+            del tree
+        result, cell_count, value_text = {}, 0, 0
+        for title, member in sheets:
+            if selected is not None and title != selected: continue
             cells = {}
-            for c in xml(z.read(member)).findall('m:sheetData/m:row/m:c', NS):
+            tree = part(member)
+            for c in tree.iterfind('m:sheetData/m:row/m:c', NS):
+                cell_count += 1
+                if cell_count > WORKBOOK_CELLS:
+                    fail('Resource limit: workbook exceeds 100,000 stored cells. Use a smaller values-only workbook.')
                 address = c.get('r')
                 if address in cells: fail('Duplicate worksheet address.')
                 v = c.find('m:v', NS)
                 value = v.text if v is not None else None
                 kind = c.get('t')
-                if kind == 's' and value is not None: value = strings[int(value)]
+                if kind == 's' and value is not None:
+                    try:
+                        index = int(value)
+                        if index < 0: raise ValueError()
+                        value = strings[index]
+                    except (ValueError, IndexError) as exc:
+                        raise ValidationError('Invalid workbook shared-string reference.') from exc
                 if kind == 'inlineStr': value = ''.join(c.find('m:is', NS).itertext())
+                value_text += len(value) if value is not None else 0
+                if value_text > WORKBOOK_TEXT:
+                    fail('Resource limit: stored cell text exceeds 16,777,216 characters.')
                 cells[address] = {'value': value, 'formula': c.find('m:f', NS) is not None, 'type': kind}
             result[title] = cells
+            del tree
         if selected is not None and selected not in result: fail('Exact worksheet name not found.')
         return result
 

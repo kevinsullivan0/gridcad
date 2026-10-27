@@ -21,6 +21,7 @@ from gridcad_operator import operator as op
 VERSION = '0.2.0-rc.4'
 PROFILE = 'rectangular-2170-mesh-review-v1'
 TOLERANCE = 0.0001  # mm, fixed; never enlarged to make an input fit.
+MAX_INSTANCE_TRIANGLES = 8_000_000
 ORIENTATIONS = {
     'Rows down; columns right': (1, -1, 0, 1),
     'Rows right; columns down': (0, 1, 1, -1),
@@ -146,7 +147,8 @@ def load_project(path):
     for oid, node in nodes.items():
         if node.get('children'):
             containers[oid] = {'name': node.get('name', oid), 'leaves': descendants(node)}
-    records, cache, total_triangles = {}, {}, 0
+    records, cache, body_meshes = {}, {}, {}
+    total_triangles, instance_triangles = 0, 0
     with op.archive(path) as archive:
         basenames = {}
         for member in archive.namelist():
@@ -171,6 +173,17 @@ def load_project(path):
                     op.fail('Unique embedded meshes exceed eight million triangles.')
                 cache[member] = mesh
             mesh = cache[member]
+            # Every body owns a transformed preview array, even on a mesh-cache
+            # hit. Preflight the full instance cost before transforming any body.
+            instance_triangles += mesh['triangles']
+            if instance_triangles > MAX_INSTANCE_TRIANGLES:
+                op.fail('Resource limit: project preview exceeds '
+                        f'{MAX_INSTANCE_TRIANGLES:,} triangles across all body instances. '
+                        'Use a smaller project; no geometry was truncated.')
+            body_meshes[oid] = member
+        for oid, body in bodies.items():
+            node = nodes[oid]
+            mesh = cache[body_meshes[oid]]
             m = [float(v) for v in body['transform']]
             def transform(v):
                 # Observed CM / 0.1-quarter-turn display convention: actual

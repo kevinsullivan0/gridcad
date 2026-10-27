@@ -4,6 +4,8 @@ Download **GridCAD-Windows-x64-v0.2.0-rc.4.zip**, extract the complete folder an
 
 ### New in RC4
 
+- Bounded input loading: shared meshes count toward the preview budget for every body, and workbook bytes, XML structure, cells and text are limited while opening. Oversized files get a clear smaller-input remedy, never silent truncation or a bypass switch. Workbook DTD/entity declarations and duplicate worksheet targets are refused. Exact ceilings are in the supported schema.
+
 - Lower transient memory for large preserved archive payloads through bounded streaming, with independent CRC/hash readback and original-file protection retained.
 - Faster shared-reference label validation, recipe preparation and sorted-grid ranking, retaining all per-object safety and precision checks.
 - Lower STL allocation overhead and more efficient finite-coordinate bound scanning. No geometry is changed.

@@ -44,7 +44,7 @@ class App:
         self.workbook_path = self.project_path = None
         self.controls, self.errors = {}, []
         self.last_diagnostic = {}; self.operation_context = {}
-        self.reference_ids = {}
+        self.reference_ids = {}; self.help_document = ""; self.license_files = []
         self.page_row, self.page_col = 1, 1
         self.selection_start = None
         self.container_ids = {}
@@ -215,14 +215,41 @@ class App:
         self.button(bar,'Schema',lambda:self.show_help('docs/RECTANGULAR_SCHEMA.md')).pack(side='left',padx=4)
         self.button(bar,'Portable core / API',lambda:self.show_help('docs/DESKTOP_API.md')).pack(side='left',padx=4)
         self.button(bar,'Copy external-agent prompt',self.copy_prompt,'copy_prompt').pack(side='left',padx=4)
+        self.button(bar,'About',self.show_about,'about').pack(side='left',padx=4)
+        self.button(bar,'Third-party licenses',self.show_licenses,'licenses').pack(side='left',padx=4)
         self.help_text=tk.Text(self.helptab,wrap='word',font=('Consolas',10),padx=16,pady=12,background='#f8fafc',relief='flat')
         self.help_text.pack(fill='both',expand=True)
         self.show_help('docs/DESKTOP_MANUAL.md')
 
     def show_help(self,name):
+        self.help_document=name
         try:text=resource(name).read_text(encoding='utf-8')
         except OSError:text='Documentation will be included in the release folder.\n\n'+PROMPT
         self.help_text.configure(state='normal');self.help_text.delete('1.0','end');self.help_text.insert('1.0',text);self.help_text.configure(state='disabled')
+
+    def set_help_text(self,text):
+        self.help_text.configure(state='normal');self.help_text.delete('1.0','end');self.help_text.insert('1.0',text);self.help_text.configure(state='disabled')
+
+    def show_about(self):
+        self.help_document='about'
+        self.set_help_text('GridCAD '+diagnostics.VERSION+'\n\nOffline rectangular material converter. No agent, account or network service is needed.\n\n'
+                           'Source: '+diagnostics.SOURCE_URL+'\n\n'
+                           'Unsigned candidate. Native GrabCAD open/recompose/save and physical printing remain unverified. Originals are preserved; outputs remain separate candidates.\n\n'
+                           'Original GridCAD code: MIT License, copyright 2026 Kevin Sullivan. Read LICENSE beside the application. Third-party runtime licenses remain separate; use the Third-party licenses button to read the bundled notices.')
+
+    def show_licenses(self):
+        self.help_document='licenses'
+        root=Path(sys.executable).parent if getattr(sys,'frozen',False) else Path(__file__).resolve().parent
+        folder=root/'THIRD_PARTY_NOTICES'
+        try:
+            files=sorted(p for p in folder.rglob('*') if p.is_file())
+            if not files:raise FileNotFoundError('No packaged third-party notice folder at '+str(folder))
+            self.license_files=[str(p.relative_to(folder)) for p in files]
+            text='Bundled third-party licenses and notices\n\nThese licenses cover the named runtime components, not a new license for all GridCAD code.\n\n'+ '\n'.join(self.license_files)+'\n\n'
+            for path in files:text+='\n'+'='*60+'\n'+str(path.relative_to(folder))+'\n'+'='*60+'\n'+path.read_text(encoding='utf-8',errors='replace')+'\n'
+            self.set_help_text(text)
+        except OSError as exc:
+            self.set_help_text('The packaged license notices could not be opened. Keep the full extracted application folder together.\n\n'+str(exc))
 
     def copy_prompt(self):
         self.root.clipboard_clear();self.root.clipboard_append(PROMPT);self.status.set('External-agent prompt copied. The release includes the portable core and Markdown documentation.')
@@ -545,10 +572,10 @@ class App:
                'transpose':self.transpose.get(), 'labels':self.labels.get(),
                'label_choices':list(self.container_ids), 'orientation':self.orientation.get(),
                'label_mode':self.label_mode.get(),'label_reference':self.label_reference.get(),'reference_choices':list(self.reference_ids),
-               'diagnostic':self.last_diagnostic,
+               'diagnostic':self.last_diagnostic,'help_document':self.help_document,'license_files':self.license_files,
                'controls':{}}
         for key,w in self.controls.items():
-            if w.winfo_ismapped():state['controls'][key]={'x':w.winfo_rootx(),'y':w.winfo_rooty(),'w':w.winfo_width(),'h':w.winfo_height()}
+            if w.winfo_exists() and w.winfo_ismapped():state['controls'][key]={'x':w.winfo_rootx(),'y':w.winfo_rooty(),'w':w.winfo_width(),'h':w.winfo_height(),'enabled':str(w.cget('state'))!='disabled' if 'state' in w.keys() else True}
         try:
             destination=Path(self.qa_state);temp=destination.with_suffix('.tmp');temp.write_text(json.dumps(state),encoding='utf-8');os.replace(temp,destination)
         except OSError:pass

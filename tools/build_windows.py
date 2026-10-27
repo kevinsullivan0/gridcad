@@ -35,7 +35,7 @@ def main():
     shutil.copytree(companion,folder/'advanced',dirs_exist_ok=True)
     for source in ['docs','examples/rectangular','examples/pyramid','examples/mixed','operator']:
         shutil.copytree(ROOT/source,folder/source,dirs_exist_ok=True,ignore=shutil.ignore_patterns('__pycache__','*.pyc'))
-    for name in ['README.md','AGENTS.md','desktop_core.py','desktop_cli.py','diagnostics.py','gridcad_desktop.py']:
+    for name in ['README.md','AGENTS.md','LICENSE','desktop_core.py','desktop_cli.py','diagnostics.py','gridcad_desktop.py']:
         shutil.copy2(ROOT/name,folder/name)
     shutil.copytree(ROOT/'tools',folder/'tools',ignore=shutil.ignore_patterns('__pycache__','*.pyc'))
     notices=folder/'THIRD_PARTY_NOTICES';notices.mkdir(exist_ok=True)
@@ -45,25 +45,29 @@ def main():
             if any(k in str(item).lower() for k in ('license','copying','notice')) and dist.locate_file(item).is_file():
                 target=notices/package/Path(str(item)).name;target.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(dist.locate_file(item),target)
     prefix=Path(sys.base_prefix)
-    import tkinter
+    import tkinter, ssl
+    if not ssl.OPENSSL_VERSION.startswith('OpenSSL 3.5.9 '):
+        raise RuntimeError('Review bundled OpenSSL notices for runtime version '+ssl.OPENSSL_VERSION)
     interp=tkinter.Tcl()
     tcl_version=interp.call('info','patchlevel')
     if tcl_version!='8.6.15':
         raise RuntimeError('Review bundled Tcl license for runtime version '+str(tcl_version))
     required_notices=[(prefix/'LICENSE.txt','Python-LICENSE.txt'),
                       (prefix/'tcl/tk8.6/license.terms','Tk-license.terms'),
-                      (ROOT/'resources/licenses/tcl8.6.15-license.terms','Tcl-license.terms')]
+                      (ROOT/'resources/licenses/tcl8.6.15-license.terms','Tcl-license.terms'),
+                      (ROOT/'resources/licenses/openssl-3.5.9-LICENSE.txt','OpenSSL-LICENSE.txt'),
+                      (ROOT/'resources/licenses/openssl-3.5.9-AUTHORS.md','OpenSSL-AUTHORS.md')]
     for source,target in required_notices:
         if not source.is_file():raise RuntimeError('Required runtime license missing: '+str(source))
         shutil.copy2(source,notices/target)
-    (notices/'SOURCES.txt').write_text('Tcl 8.6.15 license: https://github.com/tcltk/tcl/blob/core-8-6-15/license.terms\nPython and Tk notices copied from the pinned official Python runtime.\n',encoding='utf-8')
+    (notices/'SOURCES.txt').write_text('Tcl 8.6.15 license: https://github.com/tcltk/tcl/blob/core-8-6-15/license.terms\nPython and Tk notices copied from the pinned official Python runtime.\nOpenSSL 3.5.9: https://github.com/openssl/openssl/tree/openssl-3.5.9 (LICENSE.txt and AUTHORS.md; no NOTICE file in this tagged source root).\n',encoding='utf-8')
     packages={d.metadata['Name']:d.version for d in importlib.metadata.distributions() if d.metadata['Name']}
     (folder/'BUILD_PROVENANCE.json').write_text(json.dumps({'python':sys.version,'platform':sys.platform,'packages':packages,'runtime_download_at_first_launch':False,'signed':False},indent=2),encoding='utf-8')
     entries=[{'path':str(p.relative_to(folder)).replace('\\','/'),'size':p.stat().st_size,'sha256':digest(p)} for p in sorted(folder.rglob('*')) if p.is_file()]
     (folder/'PACKAGE_MANIFEST.json').write_text(json.dumps(entries,indent=2),encoding='utf-8')
     destination=ROOT/f'dist/GridCAD-Windows-x64-v{VERSION}.zip';zip_folder(folder,destination)
     portable=ROOT/'dist/GridCAD-portable-core';portable.mkdir(exist_ok=True)
-    for name in ['desktop_core.py','desktop_cli.py','diagnostics.py','AGENTS.md']:
+    for name in ['desktop_core.py','desktop_cli.py','diagnostics.py','AGENTS.md','LICENSE']:
         shutil.copy2(ROOT/name,portable/name)
     for source in ['operator','docs','examples/rectangular','examples/pyramid','examples/mixed']:
         shutil.copytree(ROOT/source,portable/source,dirs_exist_ok=True,ignore=shutil.ignore_patterns('__pycache__','*.pyc'))

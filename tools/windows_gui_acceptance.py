@@ -29,6 +29,8 @@ def main():
     with zipfile.ZipFile(a.zip) as archive:archive.extractall(extracted)
     folder=extracted/'GridCAD';exe=folder/'GridCAD.exe';example=folder/'examples/rectangular'
     statepath=out/'gui-state.json';checks=[];process=None
+    assert 'Copyright (c) 2026 Kevin Sullivan' in (folder/'LICENSE').read_text()
+    assert 'Permission is hereby granted' in (folder/'LICENSE').read_text()
     def state():
         try:return json.loads(statepath.read_text(encoding='utf-8'))
         except (OSError,ValueError):return {}
@@ -53,7 +55,10 @@ def main():
     def dialog_path(path):
         time.sleep(.7);keyboard.send_keys('%n');keyboard.send_keys('^a');keyboard.send_keys(str(path),with_spaces=True,vk_packet=True);keyboard.send_keys('{ENTER}');time.sleep(.5)
     def dismiss():
-        time.sleep(.3);keyboard.send_keys('{ENTER}');time.sleep(.3)
+        time.sleep(.3)
+        if 'diagnostic_close' in state().get('controls',{}):
+            click('diagnostic_close');wait(lambda s:'diagnostic_close' not in s.get('controls',{}),'Diagnostic dialog closes and ordinary workflow resumes')
+        else:keyboard.send_keys('{ENTER}');time.sleep(.3)
     def screenshot(name):ImageGrab.grab().save(out/name)
     def load_book(path):
         click('open_workbook');dialog_path(path)
@@ -64,6 +69,12 @@ def main():
         app=Application(backend='win32').connect(process=process.pid)
         app.top_window().maximize();time.sleep(.7)
         screenshot('01-launched.png')
+        p=state()['controls']['tabs'];mouse.click(coords=(p['x']+460,p['y']+12));time.sleep(.3)
+        click('about');wait(lambda s:s.get('help_document')=='about','About/version view opens in extracted app')
+        screenshot('01b-about.png');click('licenses')
+        wait(lambda s:'Tcl-license.terms' in s.get('license_files',[]) and 'Python-LICENSE.txt' in s.get('license_files',[]) and 'OpenSSL-LICENSE.txt' in s.get('license_files',[]),'Bundled third-party license text opens without network')
+        screenshot('01c-licenses.png')
+        p=state()['controls']['tabs'];mouse.click(coords=(p['x']+70,p['y']+12));time.sleep(.3)
         source_hash=core.op.digest(example/'DO_NOT_PRINT.PRINT');workbook_hash=core.op.digest(example/'DO_NOT_PRINT.xlsx')
         load_book(example/'DO_NOT_PRINT.xlsx')
         assert state()['range']=='D4:I7';checks.append('Suggested exact recipe range excludes sidebars')
@@ -168,6 +179,22 @@ def main():
         command=[str(folder/'advanced/GridCAD-core.exe'),'inspect','--project',str(example/'DO_NOT_PRINT.PRINT'),'--workbook',str(example/'DO_NOT_PRINT.xlsx')]
         inspected=subprocess.run(command,cwd=out,capture_output=True,text=True,check=True)
         assert json.loads(inspected.stdout)['profile']==core.PROFILE;checks.append('Bundled agent CLI executes outside source tree')
+        # A genuinely unwritable report root must not mask the original error.
+        Application(backend='win32').connect(process=process.pid).top_window().close();process.wait(timeout=10)
+        blocked_root=out/'not-a-report-directory';blocked_root.write_text('keep this file')
+        statepath.unlink(missing_ok=True)
+        environment=dict(os.environ,LOCALAPPDATA=str(blocked_root))
+        process=subprocess.Popen([str(exe),'--qa-state',str(statepath)],cwd=out,env=environment)
+        wait(lambda s:'open_workbook' in s.get('controls',{}),'App relaunch with unwritable diagnostics location')
+        Application(backend='win32').connect(process=process.pid).top_window().maximize();time.sleep(.4)
+        load_book(cached);enter('range','D4:D4');click('check_recipes')
+        wait(lambda s:s.get('diagnostic',{}).get('code')=='GCD101','Original formula error remains visible when report writing fails')
+        assert state()['diagnostic']['report'] is None
+        assert not state()['controls']['diagnostic_copy']['enabled']
+        screenshot('11-report-location-unwritable.png');dismiss()
+        load_book(example/'DO_NOT_PRINT.xlsx');click('check_recipes')
+        wait(lambda s:'24 recipes valid' in s.get('status',''),'Manual correction works without agent or writable report directory')
+        assert blocked_root.read_text()=='keep this file' and not state()['errors']
         result_json={'status':'passed','platform':'GitHub-hosted Windows','artifact':a.zip.name,'checks':checks,
                      'native_grabcad_open_recompose_save_verified':False,'signed':False}
         (out/'acceptance.json').write_text(json.dumps(result_json,indent=2),encoding='utf-8');print(json.dumps(result_json,indent=2))

@@ -19,7 +19,7 @@ The new mesh-derived rectangular mapping was independently compared against two 
 
 **Native GrabCAD open/recompose/save and physical print acceptance remain unverified.** The bounded source uses older 2170 serialization with a newer observed material serializer. Geometry display conventions and a source-bound digest do not establish native compose semantics or independently recognize glyph text. User physical-label review remains required. Every candidate audit retains `print_ready=false`; inspect exact channels, direct-black labels, geometry and process settings in native GrabCAD before printing. GridCAD never submits printer jobs.
 
-The previous browser-based alpha source and releases remain available for history. The desktop package starts with `GridCAD.exe`; its launch route is different from the archived browser launcher. Preserve third-party notices. The repository adds no general project license grant and bundles no proprietary vendor software or private customer files.
+The previous browser-based alpha source and releases remain available for history. The desktop package starts with `GridCAD.exe`; its launch route is different from the archived browser launcher. Preserve third-party notices. Original GridCAD code is MIT licensed (see LICENSE); third-party components retain their own licenses and bundles no proprietary vendor software or private customer files.
 
 Build and test the Windows distribution with `.github/workflows/windows-desktop.yml`. Core checks:
 

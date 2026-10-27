@@ -220,9 +220,11 @@ def main():
         wait(lambda s:'open_workbook' in s.get('controls',{}),'App relaunch with unwritable diagnostics location')
         Application(backend='win32').connect(process=process.pid).top_window().maximize();time.sleep(.4)
         load_book(cached);enter('range','D4:D4');click('check_recipes')
-        wait(lambda s:s.get('diagnostic',{}).get('code')=='GCD101','Original formula error remains visible when report writing fails')
-        assert state()['diagnostic']['report'] is None
-        assert not state()['controls']['diagnostic_copy']['enabled']
+        # Keep one complete observed snapshot: a second read may transiently
+        # return {} while the optional state file is atomically replaced.
+        diagnostic_state=wait(lambda s:s.get('diagnostic',{}).get('code')=='GCD101' and 'diagnostic_copy' in s.get('controls',{}),'Original formula error remains visible when report writing fails')
+        assert diagnostic_state['diagnostic']['report'] is None
+        assert not diagnostic_state['controls']['diagnostic_copy']['enabled']
         screenshot('11-report-location-unwritable.png');dismiss()
         load_book(example/'DO_NOT_PRINT.xlsx');click('check_recipes')
         wait(lambda s:'24 recipes valid' in s.get('status',''),'Manual correction works without agent or writable report directory')

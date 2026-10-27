@@ -1,0 +1,95 @@
+{
+  "source_commit": "b9e1c009a0a9dc0aba44007a35598bf6230c7a67",
+  "method": "Isolated parser only; ordered exact outputs; startup and serialization included. Initial potentially contended large trials excluded from conclusions. No Windows/frozen validation. RSS marks are separate, not simultaneous aggregate.",
+  "large_confirmation": {
+    "triangles_total": 600000,
+    "trials": [
+      {
+        "mode": "sequential",
+        "wall_seconds": 1.948288206000143,
+        "parent_peak_rss_kib_before_timing": 45184,
+        "parent_peak_rss_kib_through_timing": 47488,
+        "largest_terminated_child_peak_rss_kib": 0,
+        "ordered_exact_equal_to_sequential": true
+      },
+      {
+        "mode": "threads2",
+        "wall_seconds": 2.074513986997772,
+        "parent_peak_rss_kib_before_timing": 45184,
+        "parent_peak_rss_kib_through_timing": 48000,
+        "largest_terminated_child_peak_rss_kib": 0,
+        "ordered_exact_equal_to_sequential": true
+      },
+      {
+        "mode": "threads4",
+        "wall_seconds": 1.781940652999765,
+        "parent_peak_rss_kib_before_timing": 45184,
+        "parent_peak_rss_kib_through_timing": 48128,
+        "largest_terminated_child_peak_rss_kib": 0,
+        "ordered_exact_equal_to_sequential": true
+      },
+      {
+        "mode": "spawn2",
+        "wall_seconds": 0.9450508150002861,
+        "parent_peak_rss_kib_before_timing": 45184,
+        "parent_peak_rss_kib_through_timing": 56472,
+        "largest_terminated_child_peak_rss_kib": 46080,
+        "ordered_exact_equal_to_sequential": true
+      }
+    ]
+  },
+  "small_workload": {
+    "triangles_total": 7968,
+    "repeats": 3,
+    "trials": [
+      {
+        "mode": "sequential",
+        "wall_seconds": 0.03182773800290306,
+        "parent_peak_rss_kib_before_timing": 18944,
+        "parent_peak_rss_kib_through_timing": 18944,
+        "largest_terminated_child_peak_rss_kib": 0,
+        "ordered_exact_equal_to_sequential": true
+      },
+      {
+        "mode": "spawn2",
+        "wall_seconds": 0.18091018600171083,
+        "parent_peak_rss_kib_before_timing": 18944,
+        "parent_peak_rss_kib_through_timing": 18944,
+        "largest_terminated_child_peak_rss_kib": 17280,
+        "ordered_exact_equal_to_sequential": true
+      },
+      {
+        "mode": "spawn2",
+        "wall_seconds": 0.20746843700180762,
+        "parent_peak_rss_kib_before_timing": 18944,
+        "parent_peak_rss_kib_through_timing": 18944,
+        "largest_terminated_child_peak_rss_kib": 17280,
+        "ordered_exact_equal_to_sequential": true
+      },
+      {
+        "mode": "sequential",
+        "wall_seconds": 0.018024840999714797,
+        "parent_peak_rss_kib_before_timing": 18944,
+        "parent_peak_rss_kib_through_timing": 18944,
+        "largest_terminated_child_peak_rss_kib": 0,
+        "ordered_exact_equal_to_sequential": true
+      },
+      {
+        "mode": "sequential",
+        "wall_seconds": 0.030014037001819815,
+        "parent_peak_rss_kib_before_timing": 18944,
+        "parent_peak_rss_kib_through_timing": 18944,
+        "largest_terminated_child_peak_rss_kib": 0,
+        "ordered_exact_equal_to_sequential": true
+      },
+      {
+        "mode": "spawn2",
+        "wall_seconds": 0.3829743989990675,
+        "parent_peak_rss_kib_before_timing": 19004,
+        "parent_peak_rss_kib_through_timing": 19004,
+        "largest_terminated_child_peak_rss_kib": 17280,
+        "ordered_exact_equal_to_sequential": true
+      }
+    ]
+  }
+}

@@ -26,6 +26,16 @@ A final STL-only pass replaces temporary three-value slices and generic min/max 
 
 Raw samples: [second-pass Linux measurements](../qa/performance/2026-10-27-second-pass-linux.json). The benchmark now records process CPU time as well as wall time to distinguish computation from scheduling noise. Other full-workflow timings in the second exploratory run were noisy, so no additional whole-workflow speed claim is made beyond the first-pass table.
 
+## Final bounded pass: memory, package size and parallelism
+
+The final change compares validated project JSON without making two temporary full-project copies. It ignores exactly the same changed-object material fields and appearance RGBA fields as the old `stripped()` comparison. The original independent-copy helper remains available. Differential tests cover unchanged fields, added keys, list order, missing required fields, shared aliases and 180 seeded mutations.
+
+Five alternating runs against second-pass commit `b9e1c009a0a9dc0aba44007a35598bf6230c7a67` measured the 693-sample workflow at **1.282 → 1.138 seconds** and **54.89 → 48.81 MiB peak RSS** (roughly 11% less in each case). Earlier repeats varied, so these are bounded workload observations rather than a promised whole-app percentage. Exact candidate archive and mapping hashes still match. [Raw final samples](../qa/performance/2026-10-27-third-pass-linux.json).
+
+Parallelism was evaluated, not enabled by default. Threads showed no consistent scalable gain. A two-process spawn pool helped one clean 600,000-triangle confirmation (1.948 → 0.945 seconds), but made a 7,968-triangle workload substantially slower (three-run median 0.030 → 0.207 seconds), with startup, imports, serialization and shutdown included. Spawn workers also had their own roughly 45 MiB peak RSS, separate from the parent; these high-water marks are not simultaneous aggregate memory. All 22 ordered exact-output comparisons passed. A thresholded process implementation still needs cancellation, memory and frozen-Windows validation; adding it here would trade a small-input regression and complexity for a large-input benefit. [Bounded experiment measurements](../qa/performance/2026-10-27-parallelism.json).
+
+Package trimming excludes only the unused Pillow AVIF decoder/plugin. The app opens bundled PNG resources and draws previews; it has no AVIF import feature. PNG previews, icons, offline documentation, all license notices, examples and the agent toolkit remain. The independent GUI and CLI Python runtimes are retained. RC3 measured **30,856,955 bytes downloaded** and **67,558,475 bytes extracted**. Exact final package sizes are measured from the final release artifact; no executable packer or global runtime-layout change is used.
+
 ## Changes and retained safeguards
 
 - Stream untouched archive payloads through 1 MiB chunks instead of allocating entire members twice. ZIP metadata, order, comments, payload hashes, source CRC checks, independent destination CRC/hash readback, final input hashes and atomic no-overwrite publication remain.
@@ -37,7 +47,7 @@ Raw samples: [second-pass Linux measurements](../qa/performance/2026-10-27-secon
 
 ## Regression checks and limits
 
-New tests cover per-call cache lifetime, independent material copies, every-label fingerprint refusal, per-cell provider checks, streamed metadata/payload preservation, corrupt stored-member CRC refusal and staged-file cleanup, STL refusal behavior, exact floating-point ranking equivalence, nonfinite fallback, logarithmic lookup work and skinny-grid mappings. All 81 operator and 145 desktop/legacy Python tests passed after the second pass, together with the legacy JS DOM-contract/HTTP integration checks from the first pass. Existing tests remain in the suite. The Windows workflow includes both new test modules.
+New tests cover per-call cache lifetime, independent material copies, every-label fingerprint refusal, per-cell provider checks, streamed metadata/payload preservation, corrupt stored-member CRC refusal and staged-file cleanup, STL refusal behavior, exact floating-point ranking equivalence, nonfinite fallback, logarithmic lookup work and skinny-grid mappings. All 81 operator and 151 desktop/legacy Python tests passed after the final pass, together with the legacy JS DOM-contract/HTTP integration checks from the first pass. Existing tests remain in the suite. The Windows workflow includes both new test modules.
 
 This Linux pass does not rerun the previous private source files, which are not present on this executor. It does not claim Windows packaged-GUI validation, native GrabCAD reopen/recompose/save, printer compatibility or print readiness. Those remain separate gates. No guard is removed to obtain a timing improvement.
 

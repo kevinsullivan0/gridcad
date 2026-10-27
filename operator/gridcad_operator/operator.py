@@ -579,6 +579,50 @@ def stripped(document, changed):
     return d
 
 
+
+def _same_nonmaterial(before, after, changed):
+    """For validated project JSON, compare exactly the fields retained by stripped().
+
+    Ignore only the same validated target objects' material fields and their
+    exact tray appearance RGBA fields. Other keys, list order, identities and
+    values remain compared. Keep stripped()'s independent-copy API unchanged.
+    """
+    ignored = []
+    for document in (before, after):
+        nodes, _, bodies = index(document)
+        skip = {}
+        def ignore(target, keys):
+            removed = skip.setdefault(id(target), set())
+            for key in keys:
+                target[key]  # Match stripped()'s required-field refusal.
+                if key in removed:
+                    # A shared alias would encounter a second pop of the same
+                    # field in stripped(); retain that fail-closed behavior.
+                    raise KeyError(key)
+                removed.add(key)
+        for oid in changed:
+            ignore(nodes[oid], ('material',))
+            ignore(bodies[oid], ('material',))
+            appearance = bodies[oid]['properties']['threeDAppearance']['value']
+            ignore(appearance, ('r', 'g', 'b', 'a'))
+        ignored.append(skip)
+
+    def equal(left, right):
+        if isinstance(left, dict) and isinstance(right, dict):
+            left_skip, right_skip = ignored[0].get(id(left)), ignored[1].get(id(right))
+            if left_skip or right_skip:
+                left_keys = left.keys() - (left_skip or ())
+                right_keys = right.keys() - (right_skip or ())
+            else:
+                left_keys, right_keys = left.keys(), right.keys()
+            return left_keys == right_keys and all(equal(left[key], right[key]) for key in left_keys)
+        if isinstance(left, list) and isinstance(right, list):
+            return len(left) == len(right) and all(equal(a, b) for a, b in zip(left, right))
+        return left == right
+
+    return equal(before, after)
+
+
 def apply(project, xlsx, plan, out_dir):
     out_dir = Path(out_dir)
     if out_dir.exists() or out_dir.is_symlink(): fail('Output directory must not exist; nothing is overwritten.')
@@ -595,7 +639,7 @@ def apply(project, xlsx, plan, out_dir):
         nodes[oid]['material'] = copy.deepcopy(material)
         bodies[oid]['material'] = copy.deepcopy(material)
         bodies[oid]['properties']['threeDAppearance']['value'].update(material['threeDAppearance'])
-    if stripped(before, changed) != stripped(after, changed): fail('Unexpected non-material mutation.')
+    if not _same_nonmaterial(before, after, changed): fail('Unexpected non-material mutation.')
     temp = Path(tempfile.mkdtemp(prefix='.gridcad-operator-', dir=out_dir.parent))
     published, owns_dir = [], False
     try:

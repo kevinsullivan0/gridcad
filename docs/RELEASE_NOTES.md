@@ -7,6 +7,9 @@ Download **GridCAD-Windows-x64-v0.2.0-rc.4.zip**, extract the complete folder an
 - Lower transient memory for large preserved archive payloads through bounded streaming, with independent CRC/hash readback and original-file protection retained.
 - Faster shared-reference label validation, recipe preparation and sorted-grid ranking, retaining all per-object safety and precision checks.
 - Lower STL allocation overhead and more efficient finite-coordinate bound scanning. No geometry is changed.
+- Read-only nonmaterial comparison avoids discarded full-project copies while retaining exact target-path preservation checks.
+- Smaller Windows distribution by excluding an unused AVIF image codec; supported inputs, PNG previews, icons, offline help, licenses and optional agent toolkit remain.
+- Parallelism was measured rather than enabled by default: processes can help very large multi-mesh workloads but add memory and startup overhead; threads showed no consistent scalable gain. Ordinary conversion remains deterministic and sequential within its existing background worker.
 - Measured synthetic Linux comparisons and exact-output equivalence tests are documented in `docs/PERFORMANCE.md`. Improvements depend on input size/layout and are not native GrabCAD performance claims.
 
 ### Retained from RC3

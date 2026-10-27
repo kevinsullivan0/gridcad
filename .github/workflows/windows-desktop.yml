@@ -29,6 +29,7 @@ jobs:
           python -m unittest discover -s tests -p test_agent_help.py -v
           python -m unittest discover -s tests -p test_performance_contracts.py -v
           python -m unittest discover -s tests -p test_grid_rank_performance.py -v
+          python -m unittest discover -s tests -p test_nonmaterial_comparison.py -v
       - name: Build offline Windows portable distribution
         run: python tools/build_windows.py
       - name: Real extracted-package Windows GUI acceptance

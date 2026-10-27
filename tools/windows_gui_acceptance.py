@@ -43,7 +43,10 @@ def main():
         p=wait(lambda s:key in s.get('controls',{}),'Control visible: '+key)['controls'][key]
         mouse.click(coords=(p['x']+p['w']//2,p['y']+p['h']//2));time.sleep(.25)
     def select_combo(key,index):
-        click(key);keyboard.send_keys('%{DOWN}{HOME}'+('{DOWN}'*index)+'{ENTER}');time.sleep(.3)
+        click(key);keyboard.send_keys('{ESC}');keyboard.send_keys('%{DOWN}');time.sleep(.3)
+        keyboard.send_keys('{UP 20}');keyboard.send_keys('{DOWN}'*index+'{ENTER}');time.sleep(.4)
+        expected = state()['label_choices'][index] if key == 'labels' else list(core.ORIENTATIONS)[index]
+        wait(lambda s:s.get(key)==expected,'Explicit combobox selection: '+expected)
     def enter(key,text):
         click(key);keyboard.send_keys('^a');keyboard.send_keys(str(text),with_spaces=True,vk_packet=True);time.sleep(.2)
     def dialog_path(path):

@@ -4,7 +4,7 @@ Extract the entire Windows ZIP into a fresh folder. Open `GridCAD.exe`. Keep `_i
 
 ## Try the included example
 
-Click **Load example**, then **Build mapping preview**. This newly invented 4 × 6 archive has simple extruded index labels, 12 mm pitch and 8 mm samples. Its worksheet is `Recipes!D4:I7`. It is a software demonstration, not a native GrabCAD-generated print project. **Do not print it.**
+Click **Load example**, then **Build mapping preview**. This newly invented 4 × 6 archive has simple extruded index labels, 12 mm pitch and 8 mm samples. Its worksheet is `Recipes!D4:I7`. It is a software demonstration, not a native GrabCAD-generated print project. **Do not print it.** For a vendor-neutral geometry starting point, the adjacent `import-geometry` folder contains individually named STL sample/label bodies, a shared-coordinate manifest and an import guide. Keep their relative millimetre positions; native import and the resulting project profile still need checking.
 
 ## Convert a supported project
 

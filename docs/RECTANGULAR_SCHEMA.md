@@ -19,7 +19,7 @@ The existing reviewed-ID writer receives an explicit user-confirmed mapping. Its
 
 ## Synthetic examples and adaptable dimensions
 
-`examples/rectangular/` contains a newly generated `.PRINT` archive contract, `.xlsx` template, guide and preview illustration. No customer files, private mappings, vendor runtime, font or material database are used. These are not native-generated or natively verified printable projects.
+`examples/rectangular/` contains a newly generated `.PRINT` archive contract, `.xlsx` template, guide and preview illustration. No customer files, private mappings, vendor runtime, font or material database are used. These are not native-generated or natively verified printable projects. The build also includes `import-geometry/`: individual, newly generated binary STL bodies in shared millimetre coordinates, a manifest and import guide. Those are ordinary geometry templates, not proof that a newly imported native project matches this converter profile.
 
 To generate another invented example using the portable source:
 

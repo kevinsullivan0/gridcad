@@ -1,4 +1,6 @@
 import copy
+import json
+import struct
 from pathlib import Path
 import sys
 import tempfile
@@ -19,6 +21,16 @@ class DesktopCoreTests(unittest.TestCase):
     def proposal(self,**kw):
         args=dict(sheet='Recipes',selected_range='D4:I7',sample_name='Sample',label_container='synthetic-labels',orientation='Rows down; columns right')
         args.update(kw);return core.propose(self.project,self.book_path,self.book,**args)
+    def test_portable_stl_companion_has_shared_mm_coordinates(self):
+        folder=self.folder/'import-geometry'
+        manifest=json.loads((folder/'geometry-manifest.json').read_text())
+        self.assertEqual(len(manifest['bodies']),34)
+        self.assertEqual(manifest['units'],'mm')
+        self.assertFalse(manifest['native_import_verified'])
+        raw=(folder/'synthetic-sample-4-6.stl').read_bytes()
+        points=[rec[i:i+3] for rec in struct.iter_unpack('<12fH',raw[84:]) for i in (3,6,9)]
+        self.assertEqual(tuple(min(v[k] for v in points) for k in range(3)),(56.,-40.,0.))
+        self.assertEqual(tuple(max(v[k] for v in points) for k in range(3)),(64.,-32.,2.))
     def test_known_physical_indices_exactly_mapped(self):
         proposal=self.proposal()
         self.assertEqual({x['cell']:x['id'] for x in proposal['mapping']},

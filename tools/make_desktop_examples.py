@@ -3,6 +3,7 @@ from pathlib import Path
 import argparse
 import copy
 import html
+import json
 import struct
 import sys
 import zipfile
@@ -82,6 +83,29 @@ def create(folder,rows=4,columns=6,pitch=12,size=8):
         z.comment=b'GRIDCAD SYNTHETIC ARCHIVE CONTRACT - DO NOT PRINT'
         z.writestr('project.json',op.exact_json(doc));z.writestr('SYNTHETIC.txt','DO NOT PRINT. No native application provenance.');
         for name,raw in meshes.items():z.writestr(name,raw)
+    # Vendor-neutral geometry companion, generated from our invented meshes.
+    # Separate bodies share world-space millimetre coordinates for assembly import.
+    geometry=folder/'import-geometry';geometry.mkdir(exist_ok=True)
+    imported=[]
+    for b in bodies:
+        oid=b['occurrence'];member=tess[oid]['representations']['stl'];raw=meshes[member];m=b['transform']
+        triangles=[]
+        for record in struct.iter_unpack('<12fH',raw[84:]):
+            points=[record[3:6],record[6:9],record[9:12]]
+            triangles.append(tuple(tuple(float(sum(m[r*4+k]*D(str(v[k]))*10 for k in range(3))+m[r*4+3]*1000) for r in range(3)) for v in points))
+        name=oid+'.stl';(geometry/name).write_bytes(binary_stl(triangles))
+        imported.append({'file':name,'units':'mm','role':'sample' if oid.startswith('synthetic-sample-') else 'label'})
+    (geometry/'geometry-manifest.json').write_text(json.dumps({'units':'mm','shared_coordinates':True,'native_import_verified':False,'bodies':imported},indent=2),encoding='utf-8')
+    (geometry/'IMPORT-GUIDE.txt').write_text('GENERATED GEOMETRY STUDY, NOT A CERTIFIED PRINT JOB\n'
+        'These ordinary binary STL bodies use millimetres and shared assembly coordinates.\n'
+        'The matching workbook is ../DO_NOT_PRINT.xlsx; sample row/column indices occur in filenames.\n'
+        'In your CAD/printing tool, import all STL bodies as one assembly while preserving relative positions,\n'
+        'do not auto-arrange individual parts, and confirm millimetres and overall dimensions.\n'
+        'Keep sample bodies distinct and group label bodies separately. Save with your own printer/material setup.\n'
+        'Exact import UI and generated native project schema have not been validated here. A newly exported\n'
+        'project may not match the converter\'s bounded 2170 profile; unknown profiles must be refused, not forced.\n'
+        'The adjacent synthetic .PRINT lets you exercise GridCAD directly without native import.\n'
+        'Do not print either example without ordinary native preparation and process review.\n',encoding='utf-8')
     make_workbook(folder/'DO_NOT_PRINT.xlsx',values,rows,columns)
     (folder/'README.txt').write_text(f'INVENTED EXAMPLE — DO NOT PRINT\n{rows} rows x {columns} columns, pitch {pitch} mm, sample width {size} mm.\nWorksheet Recipes!D4:{address(rows+3,columns+3)}. Sample group Sample; label container Printed labels.\nChoose Rows down; columns right. No transpose. Printed index digits start at 1.\nThese archives test software contracts. Native GrabCAD opening/recomposition is unverified.\n',encoding='utf-8')
     return folder

@@ -177,7 +177,7 @@ class App:
             self.resize_after=self.root.after(180,self.draw_geometry)
         self.canvas.bind('<Configure>',resize)
         self.canvas.bind('<Button-1>',self.click_geometry)
-        ttk.Label(self.geotab, text='XY relative geometry • X → right, Y ↑ up • Actual embedded glyph surfaces in black; sample outlines in blue. Select a sample for exact channels.', wraplength=1100).pack(anchor='w')
+        ttk.Label(self.geotab, text='X → right, Y ↑ up • Samples: blue • Selected printed labels: dark • Other preserved bodies: gray. Click a sample for exact channels.', wraplength=1100).pack(anchor='w')
         self.remember('reviewed',ttk.Checkbutton(self.geotab,text='I checked all four corners and representative interior printed labels against the mapped cells.',variable=self.reviewed,command=self.update_save)).pack(anchor='w',pady=(5,0))
         row=ttk.Frame(self.geotab);row.pack(fill='x',pady=4)
         ttk.Label(row,text='Review notes').pack(side='left')
@@ -376,14 +376,15 @@ class App:
         def xy(v):return (28+(v[0]-lo[0])*factor,h-28-(v[1]-lo[1])*factor)
         selected=set(self.project['groups'].get(self.sample.get(),[]))
         mapping={x['id']:x for x in self.proposal['mapping']} if self.proposal else {}
-        key=(self.project['sha256'],w,h,self.sample.get())
+        label_ids=self.project['containers'].get(self.container_ids.get(self.labels.get()),{}).get('leaves',set())
+        key=(self.project['sha256'],w,h,self.sample.get(),self.labels.get())
         if self.image_key!=key:
             image=Image.new('RGB',(w,h),'#f8fafc');draw=ImageDraw.Draw(image)
             for oid,record in records.items():
                 if oid in selected:continue
                 a=record['top']
                 for i in range(0,len(a),6):
-                    draw.polygon([xy((a[i+j],a[i+j+1])) for j in (0,2,4)],fill='#293544')
+                    draw.polygon([xy((a[i+j],a[i+j+1])) for j in (0,2,4)],fill='#293544' if oid in label_ids else '#b7c0c8')
             self.geometry_image=ImageTk.PhotoImage(image);self.image_key=key
         self.canvas.create_image(0,0,image=self.geometry_image,anchor='nw')
         for oid,record in records.items():

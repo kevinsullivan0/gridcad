@@ -23,6 +23,7 @@ def zip_folder(folder,destination):
 
 def main():
     if sys.platform!='win32':raise SystemExit('Build this distribution on Windows; no cross-build claims.')
+    subprocess.run([sys.executable,'tools/make_desktop_examples.py','examples/rectangular'],cwd=ROOT,check=True)
     for name,script,console in [('GridCAD','gridcad_desktop.py',False),('GridCAD-core','desktop_cli.py',True)]:
         args=[sys.executable,'-m','PyInstaller','--clean','--noconfirm','--onedir','--name',name,'--icon','resources/gridcad.ico','--paths','operator','--collect-submodules','gridcad_operator',
               '--add-data','operator/gridcad_operator/material_converter.py;gridcad_operator']
@@ -42,8 +43,18 @@ def main():
             if any(k in str(item).lower() for k in ('license','copying','notice')) and dist.locate_file(item).is_file():
                 target=notices/package/Path(str(item)).name;target.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(dist.locate_file(item),target)
     prefix=Path(sys.base_prefix)
-    for source in [prefix/'LICENSE.txt',prefix/'tcl/tcl8.6/license.terms',prefix/'tcl/tk8.6/license.terms']:
-        if source.exists():shutil.copy2(source,notices/(source.parent.name+'-'+source.name))
+    import tkinter
+    interp=tkinter.Tcl()
+    tcl_version=interp.call('info','patchlevel')
+    if tcl_version!='8.6.15':
+        raise RuntimeError('Review bundled Tcl license for runtime version '+str(tcl_version))
+    required_notices=[(prefix/'LICENSE.txt','Python-LICENSE.txt'),
+                      (prefix/'tcl/tk8.6/license.terms','Tk-license.terms'),
+                      (ROOT/'resources/licenses/tcl8.6.15-license.terms','Tcl-license.terms')]
+    for source,target in required_notices:
+        if not source.is_file():raise RuntimeError('Required runtime license missing: '+str(source))
+        shutil.copy2(source,notices/target)
+    (notices/'SOURCES.txt').write_text('Tcl 8.6.15 license: https://github.com/tcltk/tcl/blob/core-8-6-15/license.terms\nPython and Tk notices copied from the pinned official Python runtime.\n',encoding='utf-8')
     packages={d.metadata['Name']:d.version for d in importlib.metadata.distributions() if d.metadata['Name']}
     (folder/'BUILD_PROVENANCE.json').write_text(json.dumps({'python':sys.version,'platform':sys.platform,'packages':packages,'runtime_download_at_first_launch':False,'signed':False},indent=2),encoding='utf-8')
     entries=[{'path':str(p.relative_to(folder)).replace('\\','/'),'size':p.stat().st_size,'sha256':digest(p)} for p in sorted(folder.rglob('*')) if p.is_file()]

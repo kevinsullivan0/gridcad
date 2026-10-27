@@ -24,9 +24,9 @@ def zip_folder(folder,destination):
 def main():
     if sys.platform!='win32':raise SystemExit('Build this distribution on Windows; no cross-build claims.')
     for name,script,console in [('GridCAD','gridcad_desktop.py',False),('GridCAD-core','desktop_cli.py',True)]:
-        args=[sys.executable,'-m','PyInstaller','--clean','--noconfirm','--onedir','--name',name,'--paths','operator','--collect-submodules','gridcad_operator',
+        args=[sys.executable,'-m','PyInstaller','--clean','--noconfirm','--onedir','--name',name,'--icon','resources/gridcad.ico','--paths','operator','--collect-submodules','gridcad_operator',
               '--add-data','operator/gridcad_operator/material_converter.py;gridcad_operator']
-        if not console:args+=['--windowed','--add-data','docs;docs','--add-data','examples/rectangular;examples/rectangular']
+        if not console:args+=['--windowed','--add-data','docs;docs','--add-data','examples/rectangular;examples/rectangular','--add-data','resources;resources']
         subprocess.run(args+[script],cwd=ROOT,check=True)
     folder=ROOT/'dist/GridCAD';companion=ROOT/'dist/GridCAD-core'
     shutil.copytree(companion,folder/'advanced',dirs_exist_ok=True)
@@ -52,8 +52,10 @@ def main():
     portable=ROOT/'dist/GridCAD-portable-core';portable.mkdir(exist_ok=True)
     for name in ['desktop_core.py','desktop_cli.py','AGENTS.md']:
         shutil.copy2(ROOT/name,portable/name)
-    for source in ['operator','docs','examples/rectangular','tools']:
+    for source in ['operator','docs','examples/rectangular']:
         shutil.copytree(ROOT/source,portable/source,dirs_exist_ok=True,ignore=shutil.ignore_patterns('__pycache__','*.pyc'))
+    (portable/'tools').mkdir(exist_ok=True)
+    shutil.copy2(ROOT/'tools/make_desktop_examples.py',portable/'tools/make_desktop_examples.py')
     zip_folder(portable,ROOT/f'dist/GridCAD-portable-core-v{VERSION}.zip')
     sums=''.join(digest(p)+'  '+p.name+'\n' for p in sorted((ROOT/'dist').glob('*.zip')))
     (ROOT/'dist/SHA256SUMS.txt').write_text(sums,encoding='utf-8')

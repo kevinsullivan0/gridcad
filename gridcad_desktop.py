@@ -55,6 +55,8 @@ class App:
         self.detail = tk.StringVar(value='Select a worksheet cell or mapped sample to inspect exact values.')
         self.summary = tk.StringVar(value='No mapping preview yet.')
         self.root.title('GridCAD 0.2 — Rectangular material converter')
+        if sys.platform=='win32' and resource('resources/gridcad.ico').exists():
+            self.root.iconbitmap(str(resource('resources/gridcad.ico')))
         self.root.geometry('1220x820'); self.root.minsize(960, 680)
         self.root.configure(background='#e9edf1')
         style = ttk.Style(root)

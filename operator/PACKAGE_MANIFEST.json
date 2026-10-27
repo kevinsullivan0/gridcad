@@ -83,12 +83,13 @@
     },
     {
       "path": "tests/test_operator.py",
-      "bytes": 20962,
-      "sha256": "4bbd0cc81aea9e20df5a3c48d255e088f422eb0b93a3229fcecd0986e30bc296"
+      "bytes": 21286,
+      "sha256": "778f5d876f759f11fe405d4fb262c362fdf506e0ae202af9ad9afeb0b5036c5a"
     }
   ],
   "desktop_portability_changes": [
     "Writable staging handles retain fsync on Windows",
-    "Frozen converter includes source and retains source-integrity check"
+    "Frozen converter includes source and retains source-integrity check",
+    "Race test checks actual collision target across platform filename ordering"
   ]
 }

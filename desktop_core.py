@@ -213,6 +213,11 @@ def propose(project, workbook_path, book, sheet, selected_range, sample_name,
     axes = [_clusters([r['center'][i] for r in records]) for i in range(3)]
     if len(axes[2]) != 1 or len(axes[0]) * len(axes[1]) != len(samples):
         op.fail('Samples must fill one complete planar rectangular lattice without holes or duplicates.')
+    for axis in (0,1):
+        if len(axes[axis])>1:
+            pitch=axes[axis][1]-axes[axis][0]
+            if any(r['bounds'][1][axis]-r['bounds'][0][axis]>=pitch-TOLERANCE for r in records):
+                op.fail('Selected sample bounds overlap or touch adjacent grid positions; this separated-sample profile refuses them.')
     # Independently stored occurrence positions corroborate relative geometry:
     # observed profile quarter-turn maps occurrence +Y to tray +X and +X to -Y.
     first = samples[0]

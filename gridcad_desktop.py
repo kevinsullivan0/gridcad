@@ -13,7 +13,9 @@ from PIL import Image, ImageDraw, ImageTk
 
 import desktop_core as core
 
-PROMPT = '''Work in the GridCAD repository at https://github.com/kevinsullivan0/gridcad.
+PROMPT = '''Use the installed GridCAD source folder (beside GridCAD.exe), or the exact release source:
+https://github.com/kevinsullivan0/gridcad/tree/v0.2.0-rc.1
+Do not assume the repository default branch matches this installed release.
 Read AGENTS.md, docs/DESKTOP_API.md, docs/RECTANGULAR_SCHEMA.md, and operator/README.md first.
 Use the portable deterministic core. Keep my original files untouched and all private
 inputs, labels, plans, renders, and outputs outside the public repository. Inspect the
@@ -89,12 +91,13 @@ class App:
         return widget
 
     def build(self):
-        header = tk.Frame(self.root, bg='#182a3c', height=74)
+        header = tk.Frame(self.root, bg='#182a3c', height=58)
         header.pack(fill='x'); header.pack_propagate(False)
         tk.Label(header, text='GRIDCAD', font=('Segoe UI', 23, 'bold'), bg='#182a3c', fg='white').pack(side='left', padx=22)
         tk.Label(header, text='RECTANGULAR MATERIAL CONVERTER   /   0.2 RC1', font=('Segoe UI', 10), bg='#182a3c', fg='#bdcbd8').pack(side='left', padx=10)
-        body = ttk.Frame(self.root, padding=16); body.pack(fill='both', expand=True)
-        inputs = ttk.Frame(body); inputs.pack(fill='x')
+        body = ttk.Frame(self.root, padding=12); body.pack(fill='both', expand=True)
+        body.columnconfigure(0, weight=1); body.rowconfigure(1, weight=1)
+        inputs = ttk.Frame(body); inputs.grid(row=0, column=0, sticky='ew')
         self.button(inputs, 'Open workbook…', self.choose_workbook, 'open_workbook').grid(row=0, column=0, sticky='ew', padx=(0,10), pady=3)
         self.book_label = ttk.Label(inputs, text='Excel .xlsx  •  Originals stay unchanged', anchor='w')
         self.book_label.grid(row=0, column=1, sticky='ew')
@@ -104,7 +107,7 @@ class App:
         self.project_label.grid(row=1, column=1, sticky='ew')
         self.button(inputs, 'Build mapping preview', self.preview, 'preview').grid(row=1, column=2, padx=8)
         inputs.columnconfigure(1, weight=1)
-        self.notebook = ttk.Notebook(body); self.notebook.pack(fill='both', expand=True, pady=(12,8))
+        self.notebook = ttk.Notebook(body); self.notebook.grid(row=1, column=0, sticky='nsew', pady=(8,4))
         self.worktab = ttk.Frame(self.notebook, padding=12)
         self.geotab = ttk.Frame(self.notebook, padding=12)
         self.maptab = ttk.Frame(self.notebook, padding=12)
@@ -115,9 +118,9 @@ class App:
         self.notebook.add(self.helptab, text='  Advanced / Agent & help  ')
         self.remember('tabs', self.notebook)
         self.build_workbook(); self.build_geometry(); self.build_mapping(); self.build_help()
-        ttk.Label(body, textvariable=self.detail, wraplength=1130).pack(fill='x', pady=4)
-        footer = ttk.Frame(body); footer.pack(fill='x', pady=(5,0))
-        ttk.Label(footer, textvariable=self.status, wraplength=900).pack(side='left', fill='x', expand=True)
+        ttk.Label(body, textvariable=self.detail, wraplength=900).grid(row=2, column=0, sticky='ew', pady=3)
+        footer = ttk.Frame(body); footer.grid(row=3, column=0, sticky='ew', pady=(4,0))
+        ttk.Label(footer, textvariable=self.status, wraplength=740).pack(side='left', fill='x', expand=True)
         self.progress = ttk.Progressbar(footer, mode='indeterminate', length=80)
         self.save_button = self.button(footer, 'Save separate result…', self.save, 'save', state='disabled')
         self.save_button.pack(side='right', padx=(12,0))
@@ -163,7 +166,7 @@ class App:
         self.button(zoomrow,'Zoom −',lambda:self.set_zoom(max(1,self.zoom/2)),'zoom_out').pack(side='left',padx=4)
         self.button(zoomrow,'Fit',lambda:self.set_zoom(1),'fit').pack(side='left',padx=4)
         frame=ttk.Frame(self.geotab);frame.pack(fill='both',expand=True,pady=7)
-        self.canvas = self.remember('geometry', tk.Canvas(frame, background='#f8fafc', highlightthickness=1, highlightbackground='#bdc7d1'))
+        self.canvas = self.remember('geometry', tk.Canvas(frame, height=100, width=200, background='#f8fafc', highlightthickness=1, highlightbackground='#bdc7d1'))
         self.canvas.grid(row=0,column=0,sticky='nsew');frame.columnconfigure(0,weight=1);frame.rowconfigure(0,weight=1)
         hscroll=ttk.Scrollbar(frame,orient='horizontal',command=self.canvas.xview);hscroll.grid(row=1,column=0,sticky='ew')
         vscroll=ttk.Scrollbar(frame,orient='vertical',command=self.canvas.yview);vscroll.grid(row=0,column=1,sticky='ns')
@@ -180,7 +183,7 @@ class App:
         ttk.Label(row,text='Review notes').pack(side='left')
         self.evidence=self.remember('evidence',ttk.Entry(row));self.evidence.pack(side='left',fill='x',expand=True,padx=8)
         self.evidence.bind('<KeyRelease>',lambda _:self.update_save())
-        self.remember('material_ack',ttk.Checkbutton(self.geotab,text='Create an unverified candidate; newer material serialization still needs native GrabCAD open / recompose / save validation.',variable=self.material_ack,command=self.update_save)).pack(anchor='w')
+        self.remember('material_ack',ttk.Checkbutton(self.geotab,text='I understand this candidate still needs native GrabCAD validation before printing.',variable=self.material_ack,command=self.update_save)).pack(anchor='w')
 
     def build_mapping(self):
         ttk.Label(self.maptab,text='Exact requested recipes and target bodies',style='Heading.TLabel').pack(anchor='w',pady=(0,8))
@@ -275,6 +278,7 @@ class App:
             if self.future:self.root.after(100,next_step);return
             if not self.book:return
             def finish():
+                self.transpose.set(False)
                 self.labels.set(next(k for k in self.container_ids if k.startswith('Printed labels ')))
                 self.orientation.set('Rows down; columns right');self.status.set('Synthetic example loaded. Build a preview and inspect the corner cell labels. DO NOT PRINT.')
             self.load_project(folder/'DO_NOT_PRINT.PRINT',finish)
@@ -429,7 +433,10 @@ class App:
                'busy':self.future is not None,'workbook':str(self.workbook_path) if self.workbook_path else None,
                'project':str(self.project_path) if self.project_path else None,
                'range':self.cell_range.get(),'sheet':self.sheet.get(),'proposal':self.proposal is not None,
-               'save_enabled':str(self.save_button['state'])!='disabled','controls':{}}
+               'save_enabled':str(self.save_button['state'])!='disabled',
+               'transpose':self.transpose.get(), 'labels':self.labels.get(),
+               'label_choices':list(self.container_ids), 'orientation':self.orientation.get(),
+               'controls':{}}
         for key,w in self.controls.items():
             if w.winfo_ismapped():state['controls'][key]={'x':w.winfo_rootx(),'y':w.winfo_rooty(),'w':w.winfo_width(),'h':w.winfo_height()}
         try:

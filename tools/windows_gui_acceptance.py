@@ -42,6 +42,8 @@ def main():
     def click(key):
         p=wait(lambda s:key in s.get('controls',{}),'Control visible: '+key)['controls'][key]
         mouse.click(coords=(p['x']+p['w']//2,p['y']+p['h']//2));time.sleep(.25)
+    def select_combo(key,index):
+        click(key);keyboard.send_keys('%{DOWN}{HOME}'+('{DOWN}'*index)+'{ENTER}');time.sleep(.3)
     def enter(key,text):
         click(key);keyboard.send_keys('^a');keyboard.send_keys(str(text),with_spaces=True,vk_packet=True);time.sleep(.2)
     def dialog_path(path):
@@ -79,8 +81,9 @@ def main():
         wait(lambda s:s.get('project')==str(example/'DO_NOT_PRINT.PRINT') and not s.get('busy'),'Project loaded by native file dialog')
         assert not state()['save_enabled'];checks.append('Save unavailable before orientation and physical review')
         # Explicit container and orientation choices through native comboboxes.
-        click('labels');keyboard.send_keys('{END}{ENTER}')
-        click('orientation');keyboard.send_keys('{HOME}{ENTER}')
+        label_index=next(i for i,v in enumerate(state()['label_choices']) if v.startswith('Printed labels '))
+        select_combo('labels',label_index)
+        select_combo('orientation',0)
         click('preview');wait(lambda s:s.get('proposal') and not s.get('busy'),'Actual geometry mapping preview created')
         screenshot('04-mapping-preview.png')
         click('zoom_in');time.sleep(.5);screenshot('05-zoomed-labels.png');click('fit')
@@ -89,7 +92,7 @@ def main():
         click('transpose');click('preview')
         wait(lambda s:'Check transpose and orientation' in s.get('status',''),'Dimension mismatch is visible after transpose');dismiss()
         p=state()['controls']['tabs'];mouse.click(coords=(p['x']+250,p['y']+12));time.sleep(.3)
-        click('orientation');keyboard.send_keys('{HOME}{DOWN}{ENTER}');click('preview')
+        select_combo('orientation',1);click('preview')
         wait(lambda s:s.get('proposal') and not s.get('busy'),'Explicit transposed orientation builds correct map')
         assert not state()['save_enabled']
         click('reviewed');enter('evidence','Synthetic physical index corners 1/1, 1/6, 4/1, 4/6 and interior 2/3 checked.');click('material_ack')
@@ -108,6 +111,10 @@ def main():
         assert core.op.digest(example/'DO_NOT_PRINT.PRINT')==source_hash and core.op.digest(example/'DO_NOT_PRINT.xlsx')==workbook_hash
         checks.append('Saved candidate independently matches all known physical sample indices/recipes; original inputs unchanged')
         assert not state()['errors'];checks.append('No unhandled GUI callback errors')
+        click('example')
+        wait(lambda s:not s.get('busy') and not s.get('transpose') and s.get('orientation')=='Rows down; columns right','Load example resets previous transpose and review state')
+        click('preview');wait(lambda s:s.get('proposal') and not s.get('busy'),'Example can be reopened after a completed transposed conversion')
+        assert not state()['save_enabled'];checks.append('Reopened example requires fresh review before saving')
         command=[str(folder/'advanced/GridCAD-core.exe'),'inspect','--project',str(example/'DO_NOT_PRINT.PRINT'),'--workbook',str(example/'DO_NOT_PRINT.xlsx')]
         inspected=subprocess.run(command,cwd=out,capture_output=True,text=True,check=True)
         assert json.loads(inspected.stdout)['profile']==core.PROFILE;checks.append('Bundled agent CLI executes outside source tree')

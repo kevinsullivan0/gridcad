@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="GridCAD rectangular grid mark">
+<rect width="256" height="256" rx="36" fill="#182a3c"/>
+<rect x="48" y="48" width="48" height="48" rx="6" fill="#35b6ce"/>
+<rect x="104" y="48" width="48" height="48" rx="6" fill="#dae8ef"/>
+<rect x="160" y="48" width="48" height="48" rx="6" fill="#dae8ef"/>
+<rect x="48" y="104" width="48" height="48" rx="6" fill="#dae8ef"/>
+<rect x="104" y="104" width="48" height="48" rx="6" fill="#35b6ce"/>
+<rect x="160" y="104" width="48" height="48" rx="6" fill="#dae8ef"/>
+<rect x="48" y="160" width="48" height="48" rx="6" fill="#dae8ef"/>
+<rect x="104" y="160" width="48" height="48" rx="6" fill="#dae8ef"/>
+<rect x="160" y="160" width="48" height="48" rx="6" fill="#35b6ce"/>
+</svg>

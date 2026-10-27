@@ -31,6 +31,16 @@ def main():
     statepath=out/'gui-state.json';checks=[];process=None
     assert 'Copyright (c) 2026 Kevin Sullivan' in (folder/'LICENSE').read_text()
     assert 'Permission is hereby granted' in (folder/'LICENSE').read_text()
+    from PIL import Image
+    assert Image.open(folder/'resources/gridcad.ico').ico.sizes()=={(n,n) for n in (16,24,32,48,64,128,256)}
+    import pefile
+    for executable in (exe,folder/'advanced/GridCAD-core.exe'):
+        pe=pefile.PE(str(executable))
+        ids={entry.id for entry in pe.DIRECTORY_ENTRY_RESOURCE.entries}
+        assert 3 in ids and 14 in ids  # RT_ICON and RT_GROUP_ICON
+        pe.close()
+    checks.append('Original multi-size Windows icon embedded in GUI and CLI PE resources; editable SVG bundled')
+
     def state():
         try:return json.loads(statepath.read_text(encoding='utf-8'))
         except (OSError,ValueError):return {}

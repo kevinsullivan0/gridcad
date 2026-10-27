@@ -102,6 +102,8 @@ class App:
         header = tk.Frame(self.root, bg='#182a3c', height=58)
         header.pack(fill='x'); header.pack_propagate(False)
         self.button(header,'Help',self.open_help,'general_help').pack(side='right',padx=16,pady=12)
+        self.logo=ImageTk.PhotoImage(Image.open(resource('resources/gridcad.png')).resize((32,32),Image.Resampling.LANCZOS))
+        tk.Label(header,image=self.logo,bg='#182a3c').pack(side='left',padx=(20,0))
         tk.Label(header, text='GRIDCAD', font=('Segoe UI', 23, 'bold'), bg='#182a3c', fg='white').pack(side='left', padx=22)
         tk.Label(header, text='RECTANGULAR MATERIAL CONVERTER   /   0.2 RC3', font=('Segoe UI', 10), bg='#182a3c', fg='#bdcbd8').pack(side='left', padx=10)
         body = ttk.Frame(self.root, padding=12); body.pack(fill='both', expand=True)
@@ -277,7 +279,11 @@ class App:
         except tk.TclError:
             self.set_help_text('Clipboard unavailable. Select and copy this text manually:\n\n'+self.external_prompt())
             self.status.set('Could not copy. The prompt is shown in the help tab for manual copying.')
-        else:self.status.set('Prompt copied. Paste into your chosen agent; grant access or attach only needed files. Nothing was launched or uploaded.')
+        else:
+            message='Prompt copied. Paste into your chosen agent; grant access or attach only needed files. Nothing was launched or uploaded.'
+            self.status.set(message)
+            if self.agent_panel is not None and self.agent_panel.winfo_exists():
+                self.set_agent_results(message+'\n\nReview the copied prompt below before sharing:\n\n'+self.external_prompt())
 
     def show_agent_settings(self):
         if self.agent_panel is not None and self.agent_panel.winfo_exists():

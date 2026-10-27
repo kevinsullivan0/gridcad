@@ -33,7 +33,7 @@ def main():
         subprocess.run(args+[script],cwd=ROOT,check=True)
     folder=ROOT/'dist/GridCAD';companion=ROOT/'dist/GridCAD-core'
     shutil.copytree(companion,folder/'advanced',dirs_exist_ok=True)
-    for source in ['docs','examples/rectangular','examples/pyramid','examples/mixed','operator']:
+    for source in ['resources','docs','examples/rectangular','examples/pyramid','examples/mixed','operator']:
         shutil.copytree(ROOT/source,folder/source,dirs_exist_ok=True,ignore=shutil.ignore_patterns('__pycache__','*.pyc'))
     for name in ['README.md','AGENTS.md','LICENSE','desktop_core.py','desktop_cli.py','diagnostics.py','gridcad_desktop.py','agent_help.py']:
         shutil.copy2(ROOT/name,folder/name)

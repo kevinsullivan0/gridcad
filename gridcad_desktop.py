@@ -273,14 +273,16 @@ class App:
         approved=False
         if requested:
             dialog=tk.Toplevel(self.root);dialog.title('Review existing label materials');dialog.geometry('760x420');dialog.transient(self.root)
-            frame=ttk.Frame(dialog,padding=16);frame.pack(fill='both',expand=True)
-            ttk.Label(frame,text='Replace these existing assignments?',style='Heading.TLabel').pack(anchor='w')
-            ttk.Label(frame,text='Reference: '+self.label_reference.get()+'\nEvery listed target will receive this complete saved material. Originals stay unchanged.',wraplength=720).pack(anchor='w',pady=8)
-            table=ttk.Treeview(frame,columns=('object','material'),show='headings');table.heading('object',text='Label object');table.heading('material',text='Current material')
+            frame=ttk.Frame(dialog,padding=16);frame.pack(fill='both',expand=True);frame.columnconfigure(0,weight=1);frame.rowconfigure(2,weight=1)
+            dialog.minsize(640,360)
+            ttk.Label(frame,text='Replace these existing assignments?',style='Heading.TLabel').grid(row=0,column=0,sticky='w')
+            ttk.Label(frame,text='Reference: '+self.label_reference.get()+'\nEvery listed target will receive this complete saved material. Originals stay unchanged.',wraplength=700).grid(row=1,column=0,sticky='w',pady=8)
+            tablebox=ttk.Frame(frame);tablebox.grid(row=2,column=0,sticky='nsew');tablebox.rowconfigure(0,weight=1);tablebox.columnconfigure(0,weight=1)
+            table=ttk.Treeview(tablebox,columns=('object','material'),show='headings');table.heading('object',text='Label object');table.heading('material',text='Current material')
             table.column('object',width=300);table.column('material',width=350)
-            scroll=ttk.Scrollbar(frame,command=table.yview);scroll.pack(side='right',fill='y');table.configure(yscrollcommand=scroll.set);table.pack(fill='both',expand=True)
+            scroll=ttk.Scrollbar(tablebox,command=table.yview);scroll.grid(row=0,column=1,sticky='ns');table.configure(yscrollcommand=scroll.set);table.grid(row=0,column=0,sticky='nsew')
             for row in conflicts:table.insert('','end',values=(row['name'],row['current_material']))
-            buttons=ttk.Frame(frame);buttons.pack(fill='x',pady=8)
+            buttons=ttk.Frame(frame);buttons.grid(row=3,column=0,sticky='ew',pady=(8,0))
             def accept():
                 nonlocal approved
                 approved=True;dialog.destroy()

@@ -6,12 +6,17 @@
 
 **[Download GridCAD 0.2.0-rc.2 for Windows x64](https://github.com/kevinsullivan0/gridcad/releases/download/v0.2.0-rc.2/GridCAD-Windows-x64-v0.2.0-rc.2.zip)** · [Release notes and checksums](https://github.com/kevinsullivan0/gridcad/releases/tag/v0.2.0-rc.2)
 
-1. Extract the **entire ZIP** into a fresh folder.
-2. Open **`GridCAD.exe`**. Keep `_internal` and `advanced` beside it. Python and dependencies are bundled; no installation, administrator rights or first-launch download is required.
-3. Choose **Load example**, then **Build mapping preview**.
-4. For supported actual files, open the workbook and project, select the recipe range and sample/label groups, explicitly choose orientation/transpose, inspect physical labels and exact recipes, and save a **new result folder**.
+**No installer, Python, terminal commands or agent required.**
 
-**Unsigned release candidate: native GrabCAD open/recompose/save and physical printing remain unverified.** Follow your organization's normal application-trust policy; do not disable security protections. Every converted audit retains `print_ready=false`. Inspect candidates in native GrabCAD before printing. GridCAD never submits printer jobs.
+1. **Download the Windows ZIP using the button above.** On the release page, choose `GridCAD-Windows-x64-v0.2.0-rc.2.zip`—**not** “Source code (zip)” or the portable-core ZIP.
+2. In File Explorer, right-click the downloaded ZIP and choose **Extract All…**, then **Extract**. **Do not run the app from inside the ZIP.**
+3. Open the extracted **GridCAD** folder and double-click **`GridCAD.exe`** (it may display as **GridCAD** if file extensions are hidden). Keep the whole folder together, including `_internal` and `advanced`; do not move the EXE out by itself.
+4. Click **Load example**, then **Build mapping preview** for a first try. **The synthetic example is a software demonstration—do not print it.**
+5. For your own supported files, open the workbook and project, select the recipe range and sample/label groups, choose orientation/transpose, check the physical labels and recipes, and save into a **new result folder**. Keep your originals; the app writes separate candidate copies.
+
+**If Windows shows a warning:** this candidate is unsigned, so its publisher is not verified by a code-signing certificate. Windows or your organization may block it. Do not disable security protections; if blocked, stop and ask your IT/support contact. A matching checksum is not proof of publisher identity.
+
+**Before printing:** native GrabCAD open/recompose/save and physical printing remain unverified. Every converted audit retains `print_ready=false`; inspect candidates in native GrabCAD first. GridCAD never submits printer jobs.
 
 [Short manual](https://github.com/kevinsullivan0/gridcad/blob/v0.2.0-rc.2/docs/DESKTOP_MANUAL.md) · [Windows screenshots and GUI-test evidence](https://github.com/kevinsullivan0/gridcad/releases/download/v0.2.0-rc.2/GridCAD-Windows-GUI-evidence.zip)
 
@@ -24,7 +29,7 @@ a22f1a36216ae6a24722afb39164d1871770dae129c2cb9c4e221215c9cca435  GridCAD-Window
 3ac6b4a0934d08c1fc5f8d83d96ee6a0a82a3ff4a91da86980ad91c85430fdaf  GridCAD-portable-core-v0.2.0-rc.2.zip
 ```
 
-On Windows, run `Get-FileHash .\GridCAD-Windows-x64-v0.2.0-rc.2.zip -Algorithm SHA256` in PowerShell and compare the value above. Matching hashes establish file integrity, not a signed publisher or native print compatibility.
+**Optional integrity check—not an installation step:** on Windows, run `Get-FileHash .\GridCAD-Windows-x64-v0.2.0-rc.2.zip -Algorithm SHA256` in PowerShell and compare the value above. Matching hashes establish file integrity, not a signed publisher or native print compatibility.
 
 ## Supported workflow
 

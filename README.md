@@ -31,6 +31,25 @@ a22f1a36216ae6a24722afb39164d1871770dae129c2cb9c4e221215c9cca435  GridCAD-Window
 
 **Optional integrity check—not an installation step:** on Windows, run `Get-FileHash .\GridCAD-Windows-x64-v0.2.0-rc.2.zip -Algorithm SHA256` in PowerShell and compare the value above. Matching hashes establish file integrity, not a signed publisher or native print compatibility.
 
+## Compatibility and prerequisites
+
+**What is tested, and what is not:** RC2's file conversion and extracted Windows app were tested. Opening, recomposing and saving its output in native GrabCAD—and physical printing—remain **unverified**. A successful conversion is not a promise that every GrabCAD version or printer will accept the result.
+
+| Component | Intended support and evidence |
+| --- | --- |
+| GridCAD desktop | **Windows x64** portable app. Packaged with Python 3.13.16; actual GUI acceptance ran on GitHub's **Windows Server 2025** runner, including a 1024 × 768 desktop. That is not testing across every Windows desktop version. No 32-bit, ARM-native, macOS or Linux GUI build is supplied. |
+| Input `.PRINT` files | The strict reviewed source profile is **GrabCAD Print 1.117.12.3985**, with internal schema **2170** for all five stored providers. Matching that header alone is insufficient: geometry, transforms, identities and materials must also pass the documented checks. |
+| Other GrabCAD file versions | **Not automatically supported or claimed likely to work.** RC2 checks the saved file's profile, not whichever GrabCAD application you have installed. Different saved versions are refused; they need a tested adapter, not edited version numbers or a forced import. |
+| Generated material serialization | Based on a separately observed **5.119.0** material profile: Print schema **2191**, PJ schema **2190**. These numbers describe material serialization—not extra accepted input versions, a recommendation to install that version, or proof of native compatibility with the older source format. |
+| Workbook | `.xlsx` with the documented six-channel recipes. Excel is not needed to read saved values. For formula cells, recalculate and save current results in Excel or supply a values-only copy; GridCAD does not calculate formulas. |
+| Portable source core | Python **3.10+**, standard library. The downloaded core CLI was exercised on **Linux with Python 3.12**. This is a source/CLI option, not a macOS or Linux desktop-app claim. |
+
+**GrabCAD is not required to run the converter.** Conversion is local and offline; no vendor runtime or printer connection is called. You do need an appropriate native GrabCAD installation and your actual printer/material setup to perform the separate output-validation step before printing. Do not downgrade software or change project version fields simply to satisfy GridCAD's checks.
+
+GrabCAD has its own requirements, separate from GridCAD's tests. The [official Stratasys English requirements page](https://support.stratasys.com/en/software/grabcad-print/about/system-requirements-for-grabcad-print), checked October 27, 2026, specifies 64-bit Windows 11 or newer, or Windows Server 2016 or newer, with an Intel/AMD AVX-capable processor; ARM is excluded. Consult that page for current installation, graphics and printer-network requirements.
+
+See the [exact supported schema](https://github.com/kevinsullivan0/gridcad/blob/v0.2.0-rc.2/docs/RECTANGULAR_SCHEMA.md) and [user manual](https://github.com/kevinsullivan0/gridcad/blob/v0.2.0-rc.2/docs/DESKTOP_MANUAL.md). If a file is refused, follow the specific correction shown; keep the original and use the optional diagnostic report for a compatibility investigation rather than bypassing the guard.
+
 ## Supported workflow
 
 The desktop supports the documented **rectangular 2170 source profile**, not arbitrary `.PRINT` files. It supports different sample shapes, sizes and heights on a common base plane—including tested pyramids and mixed shapes—when separated footprints and corroborated placements define an unambiguous rectangular grid. It proposes cell-to-body assignments without replacing the source meshes. Orientation and transpose are explicit choices. Users must check actual printed labels: a plausible grid or matching digest does not prove physical correspondence, and the app does not perform OCR.

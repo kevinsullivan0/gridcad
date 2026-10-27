@@ -10,7 +10,7 @@
 
 1. **Download the Windows ZIP using the button above.** On the release page, choose `GridCAD-Windows-x64-v0.2.0-rc.4.zip`—**not** “Source code (zip)” or the portable-core ZIP.
 2. In File Explorer, right-click the downloaded ZIP and choose **Extract All…**, then **Extract**. **Do not run the app from inside the ZIP.**
-3. Open the extracted **GridCAD** folder and double-click **`GridCAD.exe`** (it may display as **GridCAD** if file extensions are hidden). Keep the whole folder together, including `_internal` and `advanced`; do not move the EXE out by itself.
+3. Open the extracted **GridCAD** folder and double-click **`GridCAD.exe`** (it may display as **GridCAD** if file extensions are hidden). Keep the whole folder together, including `_internal` and `GridCAD-core.exe`; do not move the EXE out by itself.
 4. Click **Load example**, then **Build mapping preview** for a first try. **The synthetic example is a software demonstration—do not print it.**
 5. For your own supported files, open the workbook and project, select the recipe range and sample/label groups, choose orientation/transpose, check the physical labels and recipes, and save into a **new result folder**. Keep your originals; the app writes separate candidate copies.
 
@@ -77,7 +77,7 @@ The small desktop UI sits on a reusable core:
 | `gridcad_desktop.py` | Tk/ttk desktop controls, worksheet selection, Pillow geometry preview and review/save flow. |
 | `desktop_core.py` | Deterministic rectangular mapping, recipe validation and reviewed-plan construction. |
 | `operator/gridcad_operator/` | Guarded material writer and preservation checks shared with the earlier reviewed-ID workflow. |
-| `desktop_cli.py` | Scriptable interface to the same core, bundled as `advanced/GridCAD-core.exe` on Windows. |
+| `desktop_cli.py` | Scriptable interface to the same core, bundled as `GridCAD-core.exe` on Windows. |
 | `AGENTS.md`, `docs/`, `tools/` | Agent contract, schema/API/manual, example generator, packaging and acceptance tests. |
 
 **Help** opens the offline quick start; **Help & optional tools** provides documentation and a copyable prompt pointing an external agent at installed files or exact release source. The [portable core download](https://github.com/kevinsullivan0/gridcad/releases/download/v0.2.0-rc.4/GridCAD-portable-core-v0.2.0-rc.4.zip) runs on Python 3.10+ with the standard library; its CLI was also checked on Linux.

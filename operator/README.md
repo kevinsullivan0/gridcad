@@ -8,16 +8,16 @@ This is a cleanup of an actual-file conversion method, not a universal importer.
 
 ## Operator workflow
 
-The ordinary desktop app needs none of these commands. For optional operator use on **Windows PowerShell**, open the extracted Windows package's `GridCAD` folder (the one containing `GridCAD.exe` and `advanced`). The bundled core includes Python; no installation, activation script or execution-policy change is needed. Replace these illustrative paths with your own. Keep actual inputs, private plans, renders, reports and outputs **outside the app/source package**.
+The ordinary desktop app needs none of these commands. For optional operator use on **Windows PowerShell**, open the extracted Windows package's `GridCAD` folder (the one containing `GridCAD.exe`, `GridCAD-core.exe` and `_internal`). The bundled core includes Python; no installation, activation script or execution-policy change is needed. Replace these illustrative paths with your own. Keep actual inputs, private plans, renders, reports and outputs **outside the app/source package**.
 
 ```powershell
 Set-Location -LiteralPath "C:\Users\YourName\Downloads\GridCAD"
-& ".\advanced\GridCAD-core.exe" operator inspect --project "C:\GridCAD work\input.print" --workbook "C:\GridCAD work\input.xlsx"
-& ".\advanced\GridCAD-core.exe" operator check-plan --project "C:\GridCAD work\input.print" --workbook "C:\GridCAD work\input.xlsx" --plan "C:\GridCAD work\plan.json"
-& ".\advanced\GridCAD-core.exe" operator apply --project "C:\GridCAD work\input.print" --workbook "C:\GridCAD work\input.xlsx" --plan "C:\GridCAD work\plan.json" --out-dir "C:\GridCAD work\new-result"
+& ".\GridCAD-core.exe" operator inspect --project "C:\GridCAD work\input.print" --workbook "C:\GridCAD work\input.xlsx"
+& ".\GridCAD-core.exe" operator check-plan --project "C:\GridCAD work\input.print" --workbook "C:\GridCAD work\input.xlsx" --plan "C:\GridCAD work\plan.json"
+& ".\GridCAD-core.exe" operator apply --project "C:\GridCAD work\input.print" --workbook "C:\GridCAD work\input.xlsx" --plan "C:\GridCAD work\plan.json" --out-dir "C:\GridCAD work\new-result"
 ```
 
-The leading `&` runs the quoted executable path. Keep quotes around paths with spaces. To run from the portable source instead, install Python 3.10+, open the source root and replace `& ".\advanced\GridCAD-core.exe"` with `python ".\desktop_cli.py"` in PowerShell. For a **POSIX shell** on macOS/Linux, use `python3 ./desktop_cli.py operator ...` from that root and quoted POSIX paths instead. Do not paste Windows drive-letter paths into a POSIX shell. Native GrabCAD acceptance remains separate from portable CLI operation.
+The leading `&` runs the quoted executable path. Keep quotes around paths with spaces. To run from the portable source instead, install Python 3.10+, open the source root and replace `& ".\GridCAD-core.exe"` with `python ".\desktop_cli.py"` in PowerShell. For a **POSIX shell** on macOS/Linux, use `python3 ./desktop_cli.py operator ...` from that root and quoted POSIX paths instead. Do not paste Windows drive-letter paths into a POSIX shell. Native GrabCAD acceptance remains separate from portable CLI operation.
 
 1. Record original hashes; work on verified copies. `inspect` reads archive/XML content and lists cell values, formula/cache status, IDs, materials, fingerprints, and occurrence/tray matrices. It executes no formulas, macros or external links. Macro/external-link workbooks are refused.
 2. Inspect the actual embedded geometry/printed labels with a trusted native viewer or a safe local geometry renderer. Establish which workbook rows and columns physically exist, orientation, cardinality and pitch. Compare corner recipes and interior labels. **Counts, prior color, repeated shape, or occurrence order alone do not establish a mapping.** This CLI does not render or recognize glyph text and never creates replacement label geometry.

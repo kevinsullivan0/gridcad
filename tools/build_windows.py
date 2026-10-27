@@ -26,15 +26,10 @@ def main():
     subprocess.run([sys.executable,'tools/make_desktop_examples.py','examples/rectangular'],cwd=ROOT,check=True)
     for shape in ['pyramid','mixed']:
         subprocess.run([sys.executable,'tools/make_desktop_examples.py','examples/'+shape,'--shape',shape],cwd=ROOT,check=True)
-    for name,script,console in [('GridCAD','gridcad_desktop.py',False),('GridCAD-core','desktop_cli.py',True)]:
-        args=[sys.executable,'-m','PyInstaller','--clean','--noconfirm','--onedir','--name',name,'--icon','resources/gridcad.ico','--paths','operator','--collect-submodules','gridcad_operator',
-              '--add-data','operator/gridcad_operator/material_converter.py;gridcad_operator']
-        # The app opens PNG resources and creates previews; it does not import AVIF.
-        # Avoid Pillow's all-plugin hook bundling an unused multi-megabyte codec.
-        if not console:args+=['--exclude-module','PIL.AvifImagePlugin','--exclude-module','PIL._avif','--windowed','--add-data','docs;docs','--add-data','examples/rectangular;examples/rectangular','--add-data','examples/pyramid;examples/pyramid','--add-data','examples/mixed;examples/mixed','--add-data','resources;resources']
-        subprocess.run(args+[script],cwd=ROOT,check=True)
-    folder=ROOT/'dist/GridCAD';companion=ROOT/'dist/GridCAD-core'
-    shutil.copytree(companion,folder/'advanced',dirs_exist_ok=True)
+    # Supported multi-entry onedir bundle: both launchers share one _internal.
+    subprocess.run([sys.executable,'-m','PyInstaller','--clean','--noconfirm',
+                    'tools/GridCAD.spec'],cwd=ROOT,check=True)
+    folder=ROOT/'dist/GridCAD'
     if any(p.name.lower().startswith('_avif') for p in folder.rglob('*') if p.is_file()):
         raise RuntimeError('Unused AVIF codec unexpectedly bundled; review the exclusion before release.')
     for source in ['resources','docs','examples/rectangular','examples/pyramid','examples/mixed','operator']:

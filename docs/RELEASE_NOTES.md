@@ -1,6 +1,6 @@
 ## GridCAD 0.2.0-rc.4 — Windows desktop candidate
 
-Download **GridCAD-Windows-x64-v0.2.0-rc.4.zip**, extract the complete folder and open `GridCAD.exe`. Keep `_internal` and `advanced` beside it. No Python installation, LLM, account, administrator rights or first-run downloads are required. This unsigned build follows your normal application-trust policy; it does not change security settings.
+Download **GridCAD-Windows-x64-v0.2.0-rc.4.zip**, extract the complete folder and open `GridCAD.exe`. Keep `_internal` and `GridCAD-core.exe` beside it. No Python installation, LLM, account, administrator rights or first-run downloads are required. This unsigned build follows your normal application-trust policy; it does not change security settings.
 
 ### New in RC4
 

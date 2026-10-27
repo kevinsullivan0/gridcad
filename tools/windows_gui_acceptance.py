@@ -29,12 +29,26 @@ def main():
     with zipfile.ZipFile(a.zip) as archive:archive.extractall(extracted)
     folder=extracted/'GridCAD';exe=folder/'GridCAD.exe';example=folder/'examples/rectangular'
     statepath=out/'gui-state.json';checks=[];process=None
+    # Neither launcher may accidentally borrow the CI machine's Python install.
+    packaged_environment={k:v for k,v in os.environ.items() if not k.upper().startswith('PYTHON')}
+    system32=Path(os.environ['SystemRoot'])/'System32'
+    packaged_environment['PATH']=str(system32)+os.pathsep+str(system32.parent)
+    runtime=list(folder.rglob('python313.dll'))
+    assert runtime==[folder/'_internal/python313.dll'],runtime
+    assert not (folder/'advanced/_internal').exists()
+    checks.append('GUI and CLI share exactly one bundled Python runtime; no separate advanced runtime')
+    command=[str(folder/'GridCAD-core.exe'),'inspect','--project',str(example/'DO_NOT_PRINT.PRINT'),'--workbook',str(example/'DO_NOT_PRINT.xlsx')]
+    def inspect_cli():
+        result=subprocess.run(command,cwd=out,env=packaged_environment,capture_output=True,text=True,check=True,timeout=60)
+        data=json.loads(result.stdout);assert data['profile']==core.PROFILE
+        return data
+
     assert 'Copyright (c) 2026 Kevin Sullivan' in (folder/'LICENSE').read_text()
     assert 'Permission is hereby granted' in (folder/'LICENSE').read_text()
     from PIL import Image
     assert Image.open(folder/'resources/gridcad.ico').ico.sizes()=={(n,n) for n in (16,24,32,48,64,128,256)}
     import pefile
-    for executable in (exe,folder/'advanced/GridCAD-core.exe'):
+    for executable in (exe,folder/'GridCAD-core.exe'):
         pe=pefile.PE(str(executable))
         ids={entry.id for entry in pe.DIRECTORY_ENTRY_RESOURCE.entries}
         assert 3 in ids and 14 in ids  # RT_ICON and RT_GROUP_ICON
@@ -74,7 +88,9 @@ def main():
         click('open_workbook');dialog_path(path)
         wait(lambda s:s.get('workbook')==str(path) and not s.get('busy'),'Workbook loaded by native file dialog: '+path.name)
     try:
-        process=subprocess.Popen([str(exe),'--qa-state',str(statepath)],cwd=out)
+        initial_cli=inspect_cli()
+        checks.append('Bundled CLI works before GUI launch with Python paths removed, outside package cwd and with spaces')
+        process=subprocess.Popen([str(exe),'--qa-state',str(statepath)],cwd=out,env=packaged_environment)
         wait(lambda s:'open_workbook' in s.get('controls',{}),'Extracted EXE launched without source cwd or Python installation dependency')
         app=Application(backend='win32').connect(process=process.pid)
         app.top_window().maximize();time.sleep(.7)
@@ -202,20 +218,35 @@ def main():
             assert newnodes[oid]['material']==expected==newbodies[oid]['material']
         assert newnodes[REFERENCE_ID]==oldnodes[REFERENCE_ID]
         checks.append('Complete native reference metadata cloned; target identities and source reference preserved')
-        command=[str(folder/'advanced/GridCAD-core.exe'),'inspect','--project',str(example/'DO_NOT_PRINT.PRINT'),'--workbook',str(example/'DO_NOT_PRINT.xlsx')]
-        inspected=subprocess.run(command,cwd=out,capture_output=True,text=True,check=True)
-        assert json.loads(inspected.stdout)['profile']==core.PROFILE;checks.append('Bundled agent CLI executes outside source tree')
+        assert inspect_cli()==initial_cli
+        assert process.poll() is None
+        checks.append('CLI and GUI run concurrently against the shared runtime with identical inspection output')
+        cli_output=out/'separate CLI result'
+        conversion=[str(folder/'GridCAD-core.exe'),'convert','--project',str(example/'DO_NOT_PRINT.PRINT'),
+                    '--workbook',str(example/'DO_NOT_PRINT.xlsx'),'--sheet','Recipes','--range','D4:I7',
+                    '--samples','Sample','--labels','Printed labels','--orientation','Rows down; columns right',
+                    '--confirm-mapping','--allow-unverified-material-profile',
+                    '--review-notes','Synthetic example corner/interior labels checked against generated indices.',
+                    '--out-dir',str(cli_output)]
+        converted=subprocess.run(conversion,cwd=out,env=packaged_environment,capture_output=True,text=True,check=True,timeout=60)
+        cli_audit=json.loads(converted.stdout)
+        assert cli_audit['changed_count']==24 and cli_audit['nonmaterial_preservation_passed'] and not cli_audit['print_ready']
+        assert core.op.project_document(cli_output/'candidate_UNVERIFIED.PRINT')==core.op.project_document(result/'candidate_UNVERIFIED.PRINT')
+        assert inspect_cli()==initial_cli
+        checks.append('Frozen CLI conversion preserves exact GUI candidate content and originals while GUI remains open')
         def ps_quote(value):return "'"+str(value).replace("'","''")+"'"
-        ps='& '+ps_quote(folder/'advanced/GridCAD-core.exe')+' inspect --project '+ps_quote(example/'DO_NOT_PRINT.PRINT')+' --workbook '+ps_quote(example/'DO_NOT_PRINT.xlsx')
-        inspected_ps=subprocess.run(['powershell.exe','-NoProfile','-NonInteractive','-Command',ps],cwd=out,capture_output=True,text=True,check=True)
+        ps='& '+ps_quote(folder/'GridCAD-core.exe')+' inspect --project '+ps_quote(example/'DO_NOT_PRINT.PRINT')+' --workbook '+ps_quote(example/'DO_NOT_PRINT.xlsx')
+        inspected_ps=subprocess.run([str(system32/'WindowsPowerShell/v1.0/powershell.exe'),'-NoProfile','-NonInteractive','-Command',ps],cwd=out,env=packaged_environment,capture_output=True,text=True,check=True,timeout=60)
         assert json.loads(inspected_ps.stdout)['profile']==core.PROFILE
         checks.append('Documented PowerShell call operator and quoted paths with spaces work without policy changes')
 
         # A genuinely unwritable report root must not mask the original error.
         Application(backend='win32').connect(process=process.pid).top_window().close();process.wait(timeout=10)
+        assert inspect_cli()==initial_cli
+        checks.append('Bundled CLI remains independent after GUI shutdown; shared files are not locked or removed')
         blocked_root=out/'not-a-report-directory';blocked_root.write_text('keep this file')
         statepath.unlink(missing_ok=True)
-        environment=dict(os.environ,LOCALAPPDATA=str(blocked_root))
+        environment=dict(packaged_environment,LOCALAPPDATA=str(blocked_root))
         process=subprocess.Popen([str(exe),'--qa-state',str(statepath)],cwd=out,env=environment)
         wait(lambda s:'open_workbook' in s.get('controls',{}),'App relaunch with unwritable diagnostics location')
         Application(backend='win32').connect(process=process.pid).top_window().maximize();time.sleep(.4)

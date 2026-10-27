@@ -4,23 +4,23 @@ The ordinary desktop app needs no terminal, Python installation or agent. These 
 
 ## Windows: packaged command line (PowerShell)
 
-Extract the complete Windows ZIP first. Open PowerShell and change to the extracted **GridCAD** folder (the folder containing `GridCAD.exe` and `advanced`). Replace the example folder below with your actual location; keep quotes around paths, especially those containing spaces:
+Extract the complete Windows ZIP first. Open PowerShell and change to the extracted **GridCAD** folder (the folder containing `GridCAD.exe` and `GridCAD-core.exe`). Replace the example folder below with your actual location; keep quotes around paths, especially those containing spaces:
 
 ```powershell
 Set-Location -LiteralPath "C:\Users\YourName\Downloads\GridCAD"
 ```
 
-The bundled `advanced\GridCAD-core.exe` includes Python. The leading `&` tells PowerShell to run the quoted executable path. No activation script or execution-policy change is needed. In the examples below, replace the project/workbook paths, worksheet, range and group names with your own inspected values. Keep private inputs and outputs outside the app/source folder.
+The bundled `GridCAD-core.exe` shares the Python runtime in `_internal` with `GridCAD.exe`; keep both executables and the entire folder together. The leading `&` tells PowerShell to run the quoted executable path. No activation script or execution-policy change is needed. In the examples below, replace the project/workbook paths, worksheet, range and group names with your own inspected values. Keep private inputs and outputs outside the app/source folder.
 
 ```powershell
-& ".\advanced\GridCAD-core.exe" inspect --project "C:\GridCAD work\original.PRINT" --workbook "C:\GridCAD work\recipes.xlsx"
-& ".\advanced\GridCAD-core.exe" propose --project "C:\GridCAD work\original.PRINT" --workbook "C:\GridCAD work\recipes.xlsx" --sheet "Recipes" --range "D4:I7" --samples "Sample" --labels "Printed labels" --orientation "Rows down; columns right"
+& ".\GridCAD-core.exe" inspect --project "C:\GridCAD work\original.PRINT" --workbook "C:\GridCAD work\recipes.xlsx"
+& ".\GridCAD-core.exe" propose --project "C:\GridCAD work\original.PRINT" --workbook "C:\GridCAD work\recipes.xlsx" --sheet "Recipes" --range "D4:I7" --samples "Sample" --labels "Printed labels" --orientation "Rows down; columns right"
 ```
 
 `propose` prints a private JSON proposal and never writes a project. Add `--transpose` only when appropriate. `--confirm-current-formula-caches` explicitly admits saved formula values; it never calculates missing results. Inspect the actual geometry/labels independently before conversion. Reports can contain private source identities and must not be committed or uploaded publicly.
 
 ```powershell
-& ".\advanced\GridCAD-core.exe" convert --project "C:\GridCAD work\original.PRINT" --workbook "C:\GridCAD work\recipes.xlsx" --sheet "Recipes" --range "D4:I7" --samples "Sample" --labels "Printed labels" --orientation "Rows down; columns right" --confirm-mapping --allow-unverified-material-profile --review-notes "Four corners and representative physical interior labels checked against requested recipes" --out-dir "C:\GridCAD work\NEW-result"
+& ".\GridCAD-core.exe" convert --project "C:\GridCAD work\original.PRINT" --workbook "C:\GridCAD work\recipes.xlsx" --sheet "Recipes" --range "D4:I7" --samples "Sample" --labels "Printed labels" --orientation "Rows down; columns right" --confirm-mapping --allow-unverified-material-profile --review-notes "Four corners and representative physical interior labels checked against requested recipes" --out-dir "C:\GridCAD work\NEW-result"
 ```
 
 Required confirmations record actual review responsibility; fabricated notes are not verification. Output directories must not exist. This command recomputes the bounded proposal from actual inputs and uses the preserved operator writer. Native GrabCAD acceptance remains separate and unverified.
@@ -28,9 +28,9 @@ Required confirmations record actual review responsibility; fabricated notes are
 The original exact-ID operator is also exposed:
 
 ```powershell
-& ".\advanced\GridCAD-core.exe" operator inspect --project "C:\GridCAD work\original.PRINT" --workbook "C:\GridCAD work\recipes.xlsx"
-& ".\advanced\GridCAD-core.exe" operator check-plan --project "C:\GridCAD work\original.PRINT" --workbook "C:\GridCAD work\recipes.xlsx" --plan "C:\GridCAD work\private-reviewed-plan.json"
-& ".\advanced\GridCAD-core.exe" operator apply --project "C:\GridCAD work\original.PRINT" --workbook "C:\GridCAD work\recipes.xlsx" --plan "C:\GridCAD work\private-reviewed-plan.json" --out-dir "C:\GridCAD work\NEW-result"
+& ".\GridCAD-core.exe" operator inspect --project "C:\GridCAD work\original.PRINT" --workbook "C:\GridCAD work\recipes.xlsx"
+& ".\GridCAD-core.exe" operator check-plan --project "C:\GridCAD work\original.PRINT" --workbook "C:\GridCAD work\recipes.xlsx" --plan "C:\GridCAD work\private-reviewed-plan.json"
+& ".\GridCAD-core.exe" operator apply --project "C:\GridCAD work\original.PRINT" --workbook "C:\GridCAD work\recipes.xlsx" --plan "C:\GridCAD work\private-reviewed-plan.json" --out-dir "C:\GridCAD work\NEW-result"
 ```
 
 Read `operator/PLAN.md` and `operator/REVIEWED_ID_MODE.md` before using externally reviewed IDs. That route does not create a mapping or waive native proof.
@@ -41,7 +41,7 @@ Source use needs Python 3.10+ and the standard library. No LLM, service, network
 
 From the extracted portable-core folder or the matching release source root:
 
-- **PowerShell:** replace `& ".\advanced\GridCAD-core.exe"` in a command above with `python ".\desktop_cli.py"`. Python must already be installed and available as `python`.
+- **PowerShell:** replace `& ".\GridCAD-core.exe"` in a command above with `python ".\desktop_cli.py"`. Python must already be installed and available as `python`.
 - **POSIX shell (macOS/Linux):** use `python3 ./desktop_cli.py` and your own quoted POSIX paths, for example:
 
 ```sh

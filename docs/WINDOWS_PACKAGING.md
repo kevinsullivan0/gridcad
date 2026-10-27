@@ -24,7 +24,11 @@ PyInstaller collects/deduplicates shared dependencies; we do not delete Python
 DLLs or rewrite bootloader paths after building. Each executable keeps its own
 small Python module archive. Shared destination bytes are fingerprinted immediately
 after each analysis, before a later analysis can overwrite a generated work file.
-Any differing duplicate stops the build rather than silently selecting one copy.
+For `base_library.zip`, equality means the exact same member names and uncompressed
+member bytes; ZIP order and container metadata do not affect Python imports.
+Duplicate ZIP members or changed/missing contents stop the build with member names.
+All other shared files must be byte-identical. Differing duplicates stop the build
+rather than silently selecting one copy.
 GUI resources, PNG preview support, source/agent
 files, help documents, and third-party notices remain packaged. The portable
 source core remains a separate stdlib-only deliverable requiring Python 3.10+.

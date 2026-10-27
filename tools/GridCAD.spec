@@ -6,6 +6,7 @@ See docs/WINDOWS_PACKAGING.md. Do not replace this with post-build DLL deletion.
 from pathlib import Path
 import sys
 import hashlib
+import zipfile
 from PyInstaller.utils.hooks import collect_submodules
 
 root = Path(SPECPATH).parent
@@ -19,14 +20,40 @@ hiddenimports = collect_submodules('gridcad_operator', on_error='raise')
 # (notably base_library.zip, which has one workpath in PyInstaller 6.16).
 collected = {}
 
+def base_library_members(source):
+    """Compare importable contents, not ZIP entry order or container metadata."""
+    members = {}
+    with zipfile.ZipFile(source) as archive:
+        for member in archive.infolist():
+            if member.compress_type not in (zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED):
+                raise RuntimeError('Unsupported zipimport compression in base_library.zip: ' + member.filename)
+            if member.filename in members:
+                raise RuntimeError('Duplicate base_library.zip member: ' + member.filename)
+            members[member.filename] = hashlib.sha256(archive.read(member)).digest()
+    return members
+
+
 def check_shared_files(analysis):
     for table in (analysis.binaries, analysis.datas):
         for destination, source, kind in table:
             key = destination.replace('\\', '/').casefold()
-            fingerprint = (kind, hashlib.sha256(Path(source).read_bytes()).digest())
+            is_base_library = key == 'base_library.zip' and kind == 'DATA'
+            content = (base_library_members(source) if is_base_library
+                       else hashlib.sha256(Path(source).read_bytes()).digest())
+            fingerprint = (kind, content)
             previous = collected.setdefault(key, fingerprint)
             if previous != fingerprint:
-                raise RuntimeError('Conflicting shared runtime destination: ' + destination)
+                detail = ''
+                if is_base_library and isinstance(previous[1], dict):
+                    changed = sorted(name for name in previous[1].keys() | content.keys()
+                                     if previous[1].get(name) != content.get(name))
+                    detail = '; changed/missing members: ' + ', '.join(
+                        name + ' [' + (previous[1][name].hex() if name in previous[1] else 'missing')
+                        + ' -> ' + (content[name].hex() if name in content else 'missing') + ']'
+                        for name in changed[:10])
+                    if len(changed) > 10:
+                        detail += ' (and %d more)' % (len(changed) - 10)
+                raise RuntimeError('Conflicting shared runtime destination: ' + destination + detail)
 
 
 common = dict(

@@ -8,8 +8,6 @@
 
 **No installer, Python, terminal commands or agent required.**
 
-RC4 is **18,894,989 bytes to download** and **40,080,972 bytes extracted**—about 39% and 41% smaller than RC3. The desktop and optional CLI now share one bundled Python runtime; keep the complete folder together. Existing scripts should use root-level `GridCAD-core.exe` rather than the former `advanced` path. [Performance measurements](https://github.com/kevinsullivan0/gridcad/blob/v0.2.0-rc.4/docs/PERFORMANCE.md) describe the input-dependent memory/speed improvements.
-
 1. **Download the Windows ZIP using the button above.** On the release page, choose `GridCAD-Windows-x64-v0.2.0-rc.4.zip`—**not** “Source code (zip)” or the portable-core ZIP.
 2. In File Explorer, right-click the downloaded ZIP and choose **Extract All…**, then **Extract**. **Do not run the app from inside the ZIP.**
 3. Open the extracted **GridCAD** folder and double-click **`GridCAD.exe`** (it may display as **GridCAD** if file extensions are hidden). Keep the whole folder together, including `_internal` and `GridCAD-core.exe`; do not move the EXE out by itself.
@@ -37,13 +35,13 @@ cb70a8f72b83388184349f0c99d998fcf627c4057a05599ece8277eed7fa3b8f  GridCAD-portab
 
 ## Compatibility and prerequisites
 
-**What is tested, and what is not:** RC4's file conversion and extracted Windows app were tested. Opening, recomposing and saving its output in native GrabCAD—and physical printing—remain **unverified**. A successful conversion is not a promise that every GrabCAD version or printer will accept the result.
+**What is tested, and what is not:** file conversion and the extracted Windows app were tested. Opening, recomposing and saving its output in native GrabCAD—and physical printing—remain **unverified**. A successful conversion is not a promise that every GrabCAD version or printer will accept the result.
 
 | Component | Intended support and evidence |
 | --- | --- |
 | GridCAD desktop | **Windows x64** portable app. Packaged with Python 3.13.16; actual GUI acceptance ran on GitHub's **Windows Server 2025** runner, including a 1024 × 768 desktop. That is not testing across every Windows desktop version. No 32-bit, ARM-native, macOS or Linux GUI build is supplied. |
 | Input `.PRINT` files | The strict reviewed source profile is **GrabCAD Print 1.117.12.3985**, with internal schema **2170** for all five stored providers. Matching that header alone is insufficient: geometry, transforms, identities and materials must also pass the documented checks. |
-| Other GrabCAD file versions | **Not automatically supported or claimed likely to work.** RC4 checks the saved file's profile, not whichever GrabCAD application you have installed. Different saved versions are refused; they need a tested adapter, not edited version numbers or a forced import. |
+| Other GrabCAD file versions | **Not automatically supported or claimed likely to work.** GridCAD checks the saved file's profile, not whichever GrabCAD application you have installed. Different saved versions are refused; they need a tested adapter, not edited version numbers or a forced import. |
 | Generated material serialization | Based on a separately observed **5.119.0** material profile: Print schema **2191**, PJ schema **2190**. These numbers describe material serialization—not extra accepted input versions, a recommendation to install that version, or proof of native compatibility with the older source format. |
 | Workbook | `.xlsx` with the documented six-channel recipes. Excel is not needed to read saved values. For formula cells, recalculate and save current results in Excel or supply a values-only copy; GridCAD does not calculate formulas. |
 | Portable source core | Python **3.10+**, standard library. The downloaded core CLI was exercised on **Linux with Python 3.12**. This is a source/CLI option, not a macOS or Linux desktop-app claim. |
@@ -81,7 +79,7 @@ The small desktop UI sits on a reusable core:
 | --- | --- |
 | `gridcad_desktop.py` | Tk/ttk desktop controls, worksheet selection, Pillow geometry preview and review/save flow. |
 | `desktop_core.py` | Deterministic rectangular mapping, recipe validation and reviewed-plan construction. |
-| `operator/gridcad_operator/` | Guarded material writer and preservation checks shared with the earlier reviewed-ID workflow. |
+| `operator/gridcad_operator/` | Guarded material writer and preservation checks. |
 | `desktop_cli.py` | Scriptable interface to the same core, bundled as `GridCAD-core.exe` on Windows. |
 | `AGENTS.md`, `docs/`, `tools/` | Agent contract, schema/API/manual, example generator, packaging and acceptance tests. |
 
@@ -91,7 +89,7 @@ Nonrectangular lattice layouts (such as triangular or hexagonal layouts), grids 
 
 [Release source](https://github.com/kevinsullivan0/gridcad/tree/v0.2.0-rc.4) · [API and CLI](https://github.com/kevinsullivan0/gridcad/blob/v0.2.0-rc.4/docs/DESKTOP_API.md) · [Agent instructions](https://github.com/kevinsullivan0/gridcad/blob/v0.2.0-rc.4/AGENTS.md)
 
-**Source layout:** the desktop implementation is at the release tag above. The default branch still contains the earlier browser implementation and operator; this README update does not merge the desktop branch.
+**Desktop source:** use the release source linked above for the implementation matching the download.
 
 
 ### Optional agent help and settings
@@ -104,14 +102,16 @@ Errors explain the problem and a practical manual correction first. Optional con
 
 **Help & optional tools** also includes About/version and an offline view of bundled third-party licenses. See [licensing scope](https://github.com/kevinsullivan0/gridcad/blob/v0.2.0-rc.4/docs/LICENSING.md).
 
-## Verification and earlier work
+## Verification and limits
 
-RC4 passed **81 operator tests**, the desktop/shape/diagnostic/agent/performance/resource/packaging regressions, and **160 real extracted-package Windows GUI/CLI checks**: native dialogs, long worksheets, formula-cache refusals, mapping/transpose, guarded saving, pyramid/mixed grids, explicit label replacement review, help/licenses and diagnostic recovery. GUI and console CLI were exercised before, during and after each other's use, outside the package working directory, with paths containing spaces and installed-Python environment paths removed. Frozen CLI conversion matched the GUI candidate exactly. All published asset checksums were verified after download.
+Automated tests cover file preservation, mapping, recipes, input limits and the extracted Windows GUI/CLI. The GUI and CLI are exercised with paths containing spaces, outside the package working directory and without installed-Python paths. Current public tests use generated examples and exact-output comparisons. Published download checksums are verified after download.
+
+[Windows test evidence](https://github.com/kevinsullivan0/gridcad/releases/download/v0.2.0-rc.4/GridCAD-Windows-GUI-evidence.zip) · [Performance measurements](https://github.com/kevinsullivan0/gridcad/blob/v0.2.0-rc.4/docs/PERFORMANCE.md)
 
 The original official Codex Security scan identified two low-severity local input-resource issues. Resource guards were implemented and regression-tested; independent Codex Security post-fix verification was unavailable because of a platform restriction. This is not a clean security certification. See the [release review status](https://github.com/kevinsullivan0/gridcad/releases/tag/v0.2.0-rc.4) and [documented input ceilings](https://github.com/kevinsullivan0/gridcad/blob/v0.2.0-rc.4/docs/RECTANGULAR_SCHEMA.md#input-resource-ceilings).
 
-Two private actual-file conversions reproduced earlier independently reviewed candidates byte for byte during prior releases; those private fixtures were not available for this RC4 rerun. Current public tests use generated examples and exact-output comparisons. None of these checks establishes native GrabCAD or printer acceptance.
+These checks do not establish native GrabCAD or printer acceptance. Inspect converted candidates in your native workflow before printing.
 
-The earlier browser alpha uses `launch-windows.cmd`, **not** the desktop launch route. Its [historical instructions and verification limits](https://github.com/kevinsullivan0/gridcad/blob/a81ccb2ed759d5fec6d609805230f467d03f5cf6/README.md) and old releases remain available. The [assistant-operated workflow](operator/README.md) and [reviewed-ID instructions](operator/REVIEWED_ID_MODE.md) remain useful when an operator independently establishes an explicit cell-to-body mapping.
+## License
 
 Preserve third-party notices and private input boundaries. Original GridCAD code is licensed under the [MIT License](LICENSE), copyright 2026 Kevin Sullivan. Third-party runtime components retain their own licenses and notices; this does not relicense the entire bundled binary. Checksums establish integrity, not signing or print readiness.

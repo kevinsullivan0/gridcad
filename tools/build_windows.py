@@ -9,7 +9,7 @@ import sys
 import zipfile
 
 ROOT=Path(__file__).resolve().parents[1]
-VERSION='0.2.0-rc.2'
+VERSION='0.2.0-rc.3'
 
 
 def digest(path):return hashlib.sha256(path.read_bytes()).hexdigest()
@@ -35,7 +35,7 @@ def main():
     shutil.copytree(companion,folder/'advanced',dirs_exist_ok=True)
     for source in ['docs','examples/rectangular','examples/pyramid','examples/mixed','operator']:
         shutil.copytree(ROOT/source,folder/source,dirs_exist_ok=True,ignore=shutil.ignore_patterns('__pycache__','*.pyc'))
-    for name in ['README.md','AGENTS.md','LICENSE','desktop_core.py','desktop_cli.py','diagnostics.py','gridcad_desktop.py']:
+    for name in ['README.md','AGENTS.md','LICENSE','desktop_core.py','desktop_cli.py','diagnostics.py','gridcad_desktop.py','agent_help.py']:
         shutil.copy2(ROOT/name,folder/name)
     shutil.copytree(ROOT/'tools',folder/'tools',ignore=shutil.ignore_patterns('__pycache__','*.pyc'))
     notices=folder/'THIRD_PARTY_NOTICES';notices.mkdir(exist_ok=True)

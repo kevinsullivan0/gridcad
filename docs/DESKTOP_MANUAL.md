@@ -2,6 +2,8 @@
 
 Extract the entire Windows ZIP into a fresh folder. Open `GridCAD.exe`. Keep `_internal` and the `advanced` folder beside it. No Python installation, administrator rights, browser, LLM, account, or first-run download is needed. This candidate is unsigned; organizational trust policies may restrict it. The app does not change security settings or send files anywhere.
 
+
+**If Windows shows a warning:** this candidate is unsigned; a checksum does not authenticate its publisher or establish safety. On your own PC, an **unrecognized app / Microsoft Defender SmartScreen** reputation warning may offer **More info → Run anyway**. If you trust this repository and have checked the download, you may choose that per-file option; it is your decision, not a requirement. Do not treat a **malware detection**, **Smart App Control block**, or **administrator/policy block** as the same warning. Do not disable protection, alter registry/Execution Policy, or work around an organization’s restrictions. On a managed computer, follow your administrator’s policy; if no allowed continuation is offered, stop. See [Microsoft’s SmartScreen guidance](https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/smartscreen-reputation) and [Smart App Control FAQ](https://support.microsoft.com/en-us/windows/security/threat-malware-protection/smart-app-control-frequently-asked-questions).
 ## Try the included example
 
 Click **Load example**, then **Build mapping preview**. This newly invented 4 × 6 archive has simple extruded index labels, 12 mm pitch and 8 mm samples. Its worksheet is `Recipes!D4:I7`. It is a software demonstration, not a native GrabCAD-generated print project. **Do not print it.** For a vendor-neutral geometry starting point, the adjacent `import-geometry` folder contains individually named STL sample/label bodies, a shared-coordinate manifest and an import guide. Keep their relative millimetre positions; native import and the resulting project profile still need checking.
@@ -24,7 +26,7 @@ Open the separate candidate in the ordinary Windows GrabCAD application. Check s
 
 Read the specific message. Choose a matching recipe rectangle, sample group, label container, transpose and orientation. Recalculate formula workbooks in Excel and save a values-only copy if needed. Existing conflicting materials, unknown versions, unsupported transforms, duplicate/instanced bodies, missing embedded STLs or irregular grids need separate investigation. Do not change version/unit fields or disable guards to force a file through. A failed save leaves originals untouched and attempts to remove only its own staged files.
 
-The **Advanced / Agent & help** tab contains the schema, API and a copyable external-agent prompt. `advanced/GridCAD-core.exe` exposes the deterministic core on a Windows machine without installing Python. The portable source bundle runs on Python 3.10+ with the standard library. Other geometries require an explicit new adapter and evidence; nonrectangular lattice layouts and grids stacked in 3D are not implemented. Sample shapes such as pyramids can be used on supported rectangular layouts.
+The **Help & optional tools** tab contains the schema, API and a copyable external-agent prompt. `advanced/GridCAD-core.exe` exposes the deterministic core on a Windows machine without installing Python. The portable source bundle runs on Python 3.10+ with the standard library. Other geometries require an explicit new adapter and evidence; nonrectangular lattice layouts and grids stacked in 3D are not implemented. Sample shapes such as pyramids can be used on supported rectangular layouts.
 
 ## Copy a compatible existing material onto labels
 
@@ -37,3 +39,11 @@ Errors lead with a plain-language explanation, location and suggested correction
 ### If you have not used an agent before
 
 You do not need one to open files, convert a grid or follow an error's suggested correction. Agent help is an optional extra. Open the assistant/coding agent you already use, click **Copy external-agent prompt** (or **Copy debugging prompt** on an error), and paste it into that conversation. If it cannot access your computer, attach the named report or grant file access deliberately; do not upload your whole project by default. Review paths and object names before sharing. Ask it to explain its proposed changes before modifying your original files.
+
+## Ordinary help and optional agent settings
+
+Use **Help** at the top of the window for this offline guide. **Quick start**, **Schema**, **Portable core / API**, **About** and **Third-party licenses** are available without a browser. Saved results are in the new folder you selected at **Save separate result**; your inputs stay where they were.
+
+**Agent help & settings** is optional. Its checkbox includes or omits the local app folder path in copied prompts for this session only. Copy a prompt, paste it into the agent you already use, and grant access or attach only the files needed. GridCAD never launches an agent or connects an account. Generic chat apps may not have local file access.
+
+**Detect installed agents** runs only when clicked. It checks a small set of known filenames and application registration metadata on local drives, without running an agent, scanning credentials or contacting the network. A match is not proof of identity, configuration or sign-in; no match is not proof of absence. Detection is not needed to use an agent manually. **Official agent information** lists neutral provider documentation; no affiliation or sponsorship is implied. Displaying these addresses does not open websites.

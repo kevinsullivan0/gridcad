@@ -1,3 +1,5 @@
+> Historical snapshot of the earlier operator review; licensing and desktop release status below are not current. See the root README and LICENSE for the current release.
+
 # Review status
 
 Prepared source review package; **not published**. No new production conversion was performed during cleanup. The exact original conversion scripts and evidence are retained separately in the private workspace.

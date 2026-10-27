@@ -26,10 +26,11 @@ jobs:
           python -m unittest discover -s tests -p test_desktop_core.py -v
           python -m unittest discover -s tests -p test_grid_shapes.py -v
           python -m unittest discover -s tests -p test_diagnostics.py -v
+          python -m unittest discover -s tests -p test_agent_help.py -v
       - name: Build offline Windows portable distribution
         run: python tools/build_windows.py
       - name: Real extracted-package Windows GUI acceptance
-        run: python tools/windows_gui_acceptance.py --zip dist/GridCAD-Windows-x64-v0.2.0-rc.2.zip --out desktop-qa
+        run: python tools/windows_gui_acceptance.py --zip dist/GridCAD-Windows-x64-v0.2.0-rc.3.zip --out desktop-qa
       - name: Archive GUI evidence
         if: always()
         shell: pwsh

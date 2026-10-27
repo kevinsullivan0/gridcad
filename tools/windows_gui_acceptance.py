@@ -69,11 +69,27 @@ def main():
         app=Application(backend='win32').connect(process=process.pid)
         app.top_window().maximize();time.sleep(.7)
         screenshot('01-launched.png')
-        p=state()['controls']['tabs'];mouse.click(coords=(p['x']+460,p['y']+12));time.sleep(.3)
+        click('general_help');wait(lambda s:s.get('help_document')=='docs/DESKTOP_MANUAL.md','Ordinary Help opens offline quick start')
+        screenshot('01a-ordinary-help.png')
         click('about');wait(lambda s:s.get('help_document')=='about','About/version view opens in extracted app')
         screenshot('01b-about.png');click('licenses')
         wait(lambda s:'Tcl-license.terms' in s.get('license_files',[]) and 'Python-LICENSE.txt' in s.get('license_files',[]) and 'OpenSSL-LICENSE.txt' in s.get('license_files',[]),'Bundled third-party license text opens without network')
         screenshot('01c-licenses.png')
+        assert state()['agent_detection'] is None;checks.append('No agent detection occurs at launch or ordinary Help')
+        click('agent_settings');wait(lambda s:'agent_detect' in s.get('controls',{}),'Optional agent settings opens')
+        app.window(title='Optional agent help & settings').move_window(width=810,height=480)
+        time.sleep(.4);screenshot('01d-agent-help.png')
+        click('agent_include_path');wait(lambda s:not s.get('agent_include_path'),'Local app path disclosure can be disabled')
+        click('agent_copy');wait(lambda s:'Prompt copied' in s.get('status',''),'Optional prompt copied without launching an agent')
+        from pywinauto import clipboard
+        assert str(folder) not in clipboard.GetData()
+        click('agent_detect');wait(lambda s:s.get('agent_detection') is not None,'User-triggered local metadata detection completes')
+        click('agent_detect');time.sleep(.3);screenshot('01e-agent-detection.png')
+        click('agent_links');time.sleep(.3);screenshot('01f-agent-information.png')
+        click('agent_close');wait(lambda s:'agent_close' not in s.get('controls',{}),'Agent panel closes without blocking ordinary use')
+        click('agent_settings');wait(lambda s:'agent_detect' in s.get('controls',{}),'Agent help reopens cleanly')
+        click('agent_close');wait(lambda s:'agent_close' not in s.get('controls',{}),'Repeated help closes')
+
         p=state()['controls']['tabs'];mouse.click(coords=(p['x']+70,p['y']+12));time.sleep(.3)
         source_hash=core.op.digest(example/'DO_NOT_PRINT.PRINT');workbook_hash=core.op.digest(example/'DO_NOT_PRINT.xlsx')
         load_book(example/'DO_NOT_PRINT.xlsx')
@@ -179,6 +195,12 @@ def main():
         command=[str(folder/'advanced/GridCAD-core.exe'),'inspect','--project',str(example/'DO_NOT_PRINT.PRINT'),'--workbook',str(example/'DO_NOT_PRINT.xlsx')]
         inspected=subprocess.run(command,cwd=out,capture_output=True,text=True,check=True)
         assert json.loads(inspected.stdout)['profile']==core.PROFILE;checks.append('Bundled agent CLI executes outside source tree')
+        def ps_quote(value):return "'"+str(value).replace("'","''")+"'"
+        ps='& '+ps_quote(folder/'advanced/GridCAD-core.exe')+' inspect --project '+ps_quote(example/'DO_NOT_PRINT.PRINT')+' --workbook '+ps_quote(example/'DO_NOT_PRINT.xlsx')
+        inspected_ps=subprocess.run(['powershell.exe','-NoProfile','-NonInteractive','-Command',ps],cwd=out,capture_output=True,text=True,check=True)
+        assert json.loads(inspected_ps.stdout)['profile']==core.PROFILE
+        checks.append('Documented PowerShell call operator and quoted paths with spaces work without policy changes')
+
         # A genuinely unwritable report root must not mask the original error.
         Application(backend='win32').connect(process=process.pid).top_window().close();process.wait(timeout=10)
         blocked_root=out/'not-a-report-directory';blocked_root.write_text('keep this file')

@@ -8,13 +8,16 @@ This is a cleanup of an actual-file conversion method, not a universal importer.
 
 ## Operator workflow
 
-Run these commands from this directory. Keep actual inputs, private plans, renders, reports and outputs **outside the source package**.
+The ordinary desktop app needs none of these commands. For optional operator use on **Windows PowerShell**, open the extracted Windows package's `GridCAD` folder (the one containing `GridCAD.exe` and `advanced`). The bundled core includes Python; no installation, activation script or execution-policy change is needed. Replace these illustrative paths with your own. Keep actual inputs, private plans, renders, reports and outputs **outside the app/source package**.
 
-```sh
-python -m gridcad_operator inspect --project /private/input.print --workbook /private/input.xlsx > /private/inventory.json
-python -m gridcad_operator check-plan --project /private/input.print --workbook /private/input.xlsx --plan /private/plan.json
-python -m gridcad_operator apply --project /private/input.print --workbook /private/input.xlsx --plan /private/plan.json --out-dir /private/new-result
+```powershell
+Set-Location -LiteralPath "C:\Users\YourName\Downloads\GridCAD"
+& ".\advanced\GridCAD-core.exe" operator inspect --project "C:\GridCAD work\input.print" --workbook "C:\GridCAD work\input.xlsx"
+& ".\advanced\GridCAD-core.exe" operator check-plan --project "C:\GridCAD work\input.print" --workbook "C:\GridCAD work\input.xlsx" --plan "C:\GridCAD work\plan.json"
+& ".\advanced\GridCAD-core.exe" operator apply --project "C:\GridCAD work\input.print" --workbook "C:\GridCAD work\input.xlsx" --plan "C:\GridCAD work\plan.json" --out-dir "C:\GridCAD work\new-result"
 ```
+
+The leading `&` runs the quoted executable path. Keep quotes around paths with spaces. To run from the portable source instead, install Python 3.10+, open the source root and replace `& ".\advanced\GridCAD-core.exe"` with `python ".\desktop_cli.py"` in PowerShell. For a **POSIX shell** on macOS/Linux, use `python3 ./desktop_cli.py operator ...` from that root and quoted POSIX paths instead. Do not paste Windows drive-letter paths into a POSIX shell. Native GrabCAD acceptance remains separate from portable CLI operation.
 
 1. Record original hashes; work on verified copies. `inspect` reads archive/XML content and lists cell values, formula/cache status, IDs, materials, fingerprints, and occurrence/tray matrices. It executes no formulas, macros or external links. Macro/external-link workbooks are refused.
 2. Inspect the actual embedded geometry/printed labels with a trusted native viewer or a safe local geometry renderer. Establish which workbook rows and columns physically exist, orientation, cardinality and pitch. Compare corner recipes and interior labels. **Counts, prior color, repeated shape, or occurrence order alone do not establish a mapping.** This CLI does not render or recognize glyph text and never creates replacement label geometry.
@@ -48,18 +51,34 @@ The reused own material serializer has observed profile **5.119.0 / Print 2191 /
 ## Native acceptance checklist
 
 - Open a separate candidate in ordinary Windows GrabCAD; record application/version and loader warnings. Verify geometry, body count, orientation, source scale, tray/printer/fabric settings and support/adhesion state.
-- Inspect all four mapped corners and representative interior/zero-heavy/clear-heavy recipes. Verify actual percentages, resin identities and material mode, not only preview color. Verify labels are direct EcoFlex Black rather than a K=100 mixer.
+- Inspect all four mapped corners and representative interior/zero-heavy/clear-heavy recipes. Verify actual percentages, resin identities and material mode, not only preview color. Verify the chosen label assignment in full: direct EcoFlex Black in default mode (not a K=100 mixer), or the explicitly reviewed compatible reference material in reference mode.
 - Recompose and save a separate native copy. Check for errors and preserve the evidence. Compare saved assignments and unrelated state against the independent manifest; native reserialization can change metadata and must be reviewed, not blanket-ignored.
 - Confirm loaded printer materials and appropriate process settings using the native application. File-level equality does not establish process suitability or physical print quality.
 - Record the outcome explicitly. A file opening, looking plausible, or passing synthetic tests alone does not close all checks. Never change an already-delivered file under validation without coordination.
 
 ## Synthetic demonstration and tests
 
-```sh
-python examples/make_synthetic_case.py /tmp/gridcad-invented-case
-python -m gridcad_operator check-plan --project /tmp/gridcad-invented-case/DO_NOT_PRINT.print --workbook /tmp/gridcad-invented-case/DO_NOT_PRINT.xlsx --plan /tmp/gridcad-invented-case/synthetic_plan.json
-python -m gridcad_operator apply --project /tmp/gridcad-invented-case/DO_NOT_PRINT.print --workbook /tmp/gridcad-invented-case/DO_NOT_PRINT.xlsx --plan /tmp/gridcad-invented-case/synthetic_plan.json --out-dir /tmp/gridcad-invented-result
+These developer tests require Python 3.10+; they are not needed to install or use the app. From the **source root**, enter its `operator` subfolder in PowerShell, then use new temporary directories:
+
+```powershell
+Set-Location -LiteralPath ".\operator"
+$case = Join-Path $env:TEMP ("gridcad-invented-" + [guid]::NewGuid().ToString())
+$result = Join-Path $env:TEMP ("gridcad-result-" + [guid]::NewGuid().ToString())
+python ".\examples\make_synthetic_case.py" "$case"
+python -m gridcad_operator check-plan --project "$case\DO_NOT_PRINT.print" --workbook "$case\DO_NOT_PRINT.xlsx" --plan "$case\synthetic_plan.json"
+python -m gridcad_operator apply --project "$case\DO_NOT_PRINT.print" --workbook "$case\DO_NOT_PRINT.xlsx" --plan "$case\synthetic_plan.json" --out-dir "$result"
 python -m unittest discover -s tests -v
+```
+
+For a **POSIX shell**, enter the source's `operator` directory and use this separate alternative:
+
+```sh
+case_dir="$(mktemp -d)/case"
+result_dir="$(mktemp -d)/result"
+python3 ./examples/make_synthetic_case.py "$case_dir"
+python3 -m gridcad_operator check-plan --project "$case_dir/DO_NOT_PRINT.print" --workbook "$case_dir/DO_NOT_PRINT.xlsx" --plan "$case_dir/synthetic_plan.json"
+python3 -m gridcad_operator apply --project "$case_dir/DO_NOT_PRINT.print" --workbook "$case_dir/DO_NOT_PRINT.xlsx" --plan "$case_dir/synthetic_plan.json" --out-dir "$result_dir"
+python3 -m unittest discover -s tests -v
 ```
 
 Choose fresh temporary names. The invented fixtures are mathematical contract tests, not native GrabCAD outputs and never print files. They include a shared synthetic black material with extra metadata and an unrelated nonempty identity map to test preservation. No actual workbook, project, glyph render, identity-bearing private plan, or private path is included in this package. See `PROVENANCE.md` and `REVIEW.md`.

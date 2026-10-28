@@ -1,5 +1,6 @@
 """Headless callback tests, not a substitute for native Windows GUI acceptance."""
 import unittest
+from unittest import mock
 from types import SimpleNamespace
 from gridcad_desktop import App
 
@@ -137,6 +138,34 @@ class CellSelectionTests(unittest.TestCase):
         self.assertLess(len(self.app.detail.get()),700)
         self.assertIn('display shortened',self.app.detail.get())
         self.assertEqual(self.app.book['Sheet']['B2']['value'],original)
+
+
+    def test_qa_reports_clickable_intersection_for_partially_visible_cells(self):
+        grid=mock.Mock()
+        grid.winfo_ismapped.return_value=True
+        grid.canvasx.return_value=0;grid.canvasy.return_value=0
+        grid.winfo_width.return_value=955;grid.winfo_height.return_value=267
+        grid.winfo_rootx.return_value=25;grid.winfo_rooty.return_value=265
+        grid.coords.side_effect=lambda box: {
+            'partial_right':(808,27,958,54),
+            'outside':(958,27,1108,54),
+            'partial_bottom':(58,243,208,270),
+            'one_pixel_edge':(954,81,1104,108),
+        }[box]
+        grid.itemcget.return_value='white'
+        self.app.sheet_grid=grid
+        self.app.cell_boxes={(1,6):'partial_right',(1,7):'outside',(9,1):'partial_bottom',(3,6):'one_pixel_edge'}
+        cells=self.app.worksheet_qa_cells()
+        self.assertEqual(cells['F1'],{'x':833,'y':292,'w':147,'h':27,'selected':False})
+        self.assertEqual(cells['A9']['h'],24)
+        self.assertNotIn('G1',cells)
+        self.assertNotIn('F3',cells)
+        grid.canvasx.return_value=75;grid.canvasy.return_value=35
+        scrolled=self.app.worksheet_qa_cells()
+        self.assertEqual(scrolled['F1']['y'],265)
+        self.assertEqual(scrolled['F1']['h'],19)
+        self.assertEqual(scrolled['A9']['x'],25)
+        self.assertEqual(scrolled['A9']['w'],133)
 
 
 if __name__ == '__main__':

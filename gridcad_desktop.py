@@ -1050,7 +1050,13 @@ class App:
         left=self.sheet_grid.canvasx(0);top=self.sheet_grid.canvasy(0)
         for (row,col),box in self.cell_boxes.items():
             x1,y1,x2,y2=self.sheet_grid.coords(box)
-            if x1<left or y1<top or x2>left+self.sheet_grid.winfo_width() or y2>top+self.sheet_grid.winfo_height():continue
+            # A partially clipped cell is still clickable. Report only its
+            # actual visible intersection, so OS mouse tests never click an
+            # offscreen center or incorrectly treat a visible cell as absent.
+            x1,y1=max(x1,left),max(y1,top)
+            x2=min(x2,left+self.sheet_grid.winfo_width())
+            y2=min(y2,top+self.sheet_grid.winfo_height())
+            if x2-x1<2 or y2-y1<2:continue
             result[core.address(row,col)]={
                 'x':int(self.sheet_grid.winfo_rootx()+x1-left),
                 'y':int(self.sheet_grid.winfo_rooty()+y1-top),

@@ -81,6 +81,23 @@ class WorkbookActivityTests(unittest.TestCase):
         self.app.book_label.configure.assert_called_with(text='Workbook could not be loaded. Choose another file to retry.')
         after.assert_not_called()
 
+    def test_successful_project_load_replaces_loading_detail(self):
+        app=self.app
+        app.project_label=Mock();app.draw_geometry=Mock();app.geotab=object()
+        for name in ('sample','labels','label_reference','orientation','label_mode'):
+            setattr(app,name,Value())
+        app.controls.update({key:Mock() for key in ('samples','labels','label_reference')})
+        # Combobox item assignment must remain distinct from its configure call.
+        from unittest.mock import MagicMock
+        for key in ('samples','labels','label_reference'):app.controls[key]=MagicMock()
+        app.load_project('new.print')
+        self.assertIn('Reading',app.detail.get())
+        _,done,_=self.jobs.pop()
+        done({'groups':{'Sample':['one']},'containers':{},'leaves':[], 'nodes':{}})
+        self.assertIn('Project loaded',app.detail.get())
+        self.assertNotIn('Reading',app.detail.get())
+        self.assertEqual(app.project_path,Path('new.print'))
+
     def test_example_continues_only_after_matching_success_and_idle(self):
         self.app.load_workbook=Mock();self.app.load_project=Mock()
         self.app.load_example()

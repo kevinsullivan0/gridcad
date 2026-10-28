@@ -76,9 +76,32 @@ def main():
             if process and process.poll() is not None:raise AssertionError('Application exited during '+description)
             time.sleep(.2)
         raise AssertionError(description+' timed out. Last state: '+str(state()))
+    settings_keys={'samples','labels','orientation','label_mode','label_reference','replace_labels'}
     def click(key):
-        p=wait(lambda s:key in s.get('controls',{}),'Control visible: '+key)['controls'][key]
+        # Scroll the real configuration pane with OS scrollbar clicks. No synthetic
+        # widget invocation or acknowledgment bypass is used for clipped items.
+        for attempt in range(30):
+            controls=wait(lambda s:key in s.get('controls',{}),'Control mapped: '+key)['controls']
+            p=controls[key]
+            if key not in settings_keys:break
+            viewport=controls['geometry_settings']
+            if p['y']>=viewport['y'] and p['y']+p['h']<=viewport['y']+viewport['h']:break
+            scrollbar=controls['geometry_settings_scroll']
+            y=scrollbar['y']+7 if p['y']<viewport['y'] else scrollbar['y']+scrollbar['h']-7
+            mouse.click(coords=(scrollbar['x']+scrollbar['w']//2,y))
+            time.sleep(.3)
+        else:raise AssertionError('Configuration control could not be scrolled into view: '+key)
+        assert p['w']>=8 and p['h']>=16,(key,p)
         mouse.click(coords=(p['x']+p['w']//2,p['y']+p['h']//2));time.sleep(.25)
+    def check_tab_bounds(keys,minimums=None):
+        controls=state()['controls'];tab=controls['tabs']
+        for key in keys:
+            p=controls[key]
+            assert p['x']>=tab['x'] and p['y']>=tab['y']+20,(key,p,tab)
+            assert p['x']+p['w']<=tab['x']+tab['w'] and p['y']+p['h']<=tab['y']+tab['h'],(key,p,tab)
+            width,height=(minimums or {}).get(key,(8,16))
+            assert p['w']>=width and p['h']>=height,(key,p)
+        checks.append('Fully visible usable tab controls: '+', '.join(keys))
     def cell_point(address):
         cell=wait(lambda s:address in s.get('worksheet_cells',{}),
                   'Worksheet cell visible: '+address)['worksheet_cells'][address]
@@ -129,6 +152,7 @@ def main():
         app.top_window().maximize();time.sleep(.7)
         screenshot('01-launched.png')
         click('general_help');wait(lambda s:s.get('help_document')=='docs/DESKTOP_MANUAL.md','Ordinary Help opens offline quick start')
+        check_tab_bounds(['about','licenses','agent_settings','help_content'],{'help_content':(400,100)})
         screenshot('01a-ordinary-help.png')
         click('about');wait(lambda s:s.get('help_document')=='about','About/version view opens in extracted app')
         screenshot('01b-about.png');click('licenses')
@@ -172,6 +196,7 @@ def main():
         enter('jump','D4');click('go')
         drag_cells('D4','I7')
         wait(lambda s:s.get('range')=='D4:I7','Actual mouse drag chooses the complete synthetic recipe grid')
+        check_tab_bounds(['worksheet','cache','next_rows','jump','go'],{'worksheet':(400,100)})
         screenshot('02b-full-cell-selection.png')
         click('check_recipes');wait(lambda s:'24 recipes valid' in s.get('status',''),'All exact recipe percentages validate through visible Check recipes button')
         longfile=out/'long sheet.xlsx';make_workbook(longfile,{'D501':'2/0/0/0/98/0','E501':'0/0/0/0/0/100'},1,2)
@@ -230,6 +255,30 @@ def main():
         select_combo('orientation',1);click('preview')
         wait(lambda s:s.get('proposal') and not s.get('busy'),'Explicit transposed orientation builds correct map')
         assert not state()['save_enabled']
+        assert 'No project loaded' not in state()['detail']
+        check_tab_bounds(['geometry','reviewed','evidence','material_ack'],{'geometry':(300,140)})
+        # Exercise the declared minimum window as well as the runner desktop.
+        app.top_window().restore();app.top_window().move_window(x=0,y=0,width=960,height=680)
+        time.sleep(1)
+        wait(lambda s:not s.get('busy'),'Minimum-window geometry repaint completes')
+        check_tab_bounds(['geometry','reviewed','evidence','material_ack'],{'geometry':(300,100)})
+        screenshot('05a-minimum-geometry.png')
+        p=state()['controls']['tabs'];mouse.click(coords=(p['x']+70,p['y']+12));time.sleep(.4)
+        check_tab_bounds(['worksheet','cache','next_rows','jump','go'],{'worksheet':(400,100)})
+        screenshot('05a-minimum-worksheet.png')
+        click('general_help');time.sleep(.3)
+        check_tab_bounds(['about','licenses','agent_settings','help_content'],{'help_content':(400,100)})
+        screenshot('05a-minimum-help.png')
+        p=state()['controls']['tabs'];mouse.click(coords=(p['x']+315,p['y']+12));time.sleep(.4)
+        check_tab_bounds(['assignments'],{'assignments':(600,100)})
+        screenshot('05a-minimum-assignments.png')
+        p=state()['controls']['tabs'];mouse.click(coords=(p['x']+250,p['y']+12));time.sleep(.4)
+        app.top_window().maximize();time.sleep(1)
+        wait(lambda s:not s.get('busy'),'Maximized geometry repaint completes')
+        p=state()['controls']['tabs'];mouse.click(coords=(p['x']+315,p['y']+12));time.sleep(.4)
+        check_tab_bounds(['assignments'],{'assignments':(600,100)})
+        screenshot('05b-exact-assignments.png')
+        p=state()['controls']['tabs'];mouse.click(coords=(p['x']+250,p['y']+12));time.sleep(.4)
         click('reviewed');enter('evidence','Synthetic physical index corners 1/1, 1/6, 4/1, 4/6 and interior 2/3 checked.');click('material_ack')
         wait(lambda s:s.get('save_enabled'),'Save enables only after all review prerequisites')
         screenshot('06-reviewed.png')

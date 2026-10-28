@@ -265,30 +265,59 @@ class App:
         self.remember('cache', ttk.Checkbutton(self.worktab, text='I recalculated this workbook in Excel and saved current formula results. Missing results always fail.', variable=self.cache)).grid(row=4,column=0,sticky='w')
 
     def build_geometry(self):
-        selectors = ttk.Frame(self.geotab); selectors.pack(fill='x')
+        # Keep review acknowledgments reachable at the minimum window size.
+        # Configuration scrolls independently; review controls never compete with it.
+        self.geotab.columnconfigure(0,weight=1)
+        self.geotab.rowconfigure(0,weight=1)
+        panes=ttk.Frame(self.geotab);panes.grid(row=0,column=0,sticky='nsew')
+        panes.rowconfigure(0,weight=1);panes.columnconfigure(1,weight=1)
+        settings=ttk.Frame(panes);settings.grid(row=0,column=0,sticky='ns',padx=(0,10))
+        settings.rowconfigure(0,weight=1);settings.columnconfigure(0,weight=1)
+        self.geometry_settings=self.remember('geometry_settings',tk.Canvas(settings,width=360,height=100,highlightthickness=0,background='#e9edf1'))
+        self.geometry_settings.grid(row=0,column=0,sticky='nsew')
+        settings_scroll=self.remember('geometry_settings_scroll',ttk.Scrollbar(settings,orient='vertical',command=self.geometry_settings.yview))
+        settings_scroll.grid(row=0,column=1,sticky='ns')
+        self.geometry_settings.configure(yscrollcommand=settings_scroll.set)
+        configuration=ttk.Frame(self.geometry_settings)
+        window=self.geometry_settings.create_window(0,0,anchor='nw',window=configuration)
+        configuration.columnconfigure(0,weight=1)
+        configuration.bind('<Configure>',lambda _:self.geometry_settings.configure(scrollregion=self.geometry_settings.bbox('all')))
+        self.geometry_settings.bind('<Configure>',lambda e:self.geometry_settings.itemconfigure(window,width=e.width))
+        # A scoped wheel binding keeps worksheet/combobox scrolling independent.
+        def scroll_settings(event):
+            steps=(-1 if event.num==4 else 1) if getattr(event,'num',None) in (4,5) else (-1 if event.delta>0 else 1)
+            self.geometry_settings.yview_scroll(steps*3,'units')
+            return 'break'
+        self.geometry_settings.bind('<MouseWheel>',scroll_settings)
+        self.geometry_settings.bind('<Button-4>',scroll_settings)
+        self.geometry_settings.bind('<Button-5>',scroll_settings)
+        self.geometry_config=configuration
+        selectors = ttk.Frame(configuration); selectors.grid(row=0,column=0,sticky='ew')
         for i, (label, var, key, width) in enumerate([
             ('Sample group',self.sample,'samples',20), ('Printed-label container',self.labels,'labels',22),
             ('Worksheet directions in XY view',self.orientation,'orientation',28)]):
-            ttk.Label(selectors, text=label).grid(row=0,column=i,sticky='w',padx=(0,10))
+            ttk.Label(selectors, text=label).grid(row=i*2,column=0,sticky='w')
             cb = self.remember(key, ttk.Combobox(selectors,textvariable=var,state='readonly',width=width))
-            cb.grid(row=1,column=i,sticky='ew',padx=(0,10),pady=(3,8)); selectors.columnconfigure(i,weight=1)
+            cb.grid(row=i*2+1,column=0,sticky='ew',pady=(3,8)); selectors.columnconfigure(0,weight=1)
             if key == 'orientation': cb['values'] = list(core.ORIENTATIONS)
-        materialrow=ttk.Frame(self.geotab);materialrow.pack(fill='x',pady=(0,4))
-        ttk.Label(materialrow,text='Label material').pack(side='left')
+        materialrow=ttk.Frame(configuration);materialrow.grid(row=1,column=0,sticky='ew',pady=(0,4))
+        ttk.Label(materialrow,text='Label material').pack(anchor='w')
         mode=self.remember('label_mode',ttk.Combobox(materialrow,textvariable=self.label_mode,values=['Direct black','Copy from reference body'],state='readonly',width=24))
-        mode.pack(side='left',padx=6)
+        mode.pack(fill='x',pady=3)
         reference=self.remember('label_reference',ttk.Combobox(materialrow,textvariable=self.label_reference,state='disabled',width=32))
-        reference.pack(side='left',fill='x',expand=True,padx=4)
+        reference.pack(fill='x',pady=3)
         mode.bind('<<ComboboxSelected>>',lambda _:reference.configure(state='readonly' if self.label_mode.get()!='Direct black' else 'disabled'))
-        self.remember('replace_labels',ttk.Checkbutton(self.geotab,text='I reviewed the listed existing label materials and want to replace them with the reference material.',variable=self.replace_labels,command=self.review_label_replacements)).pack(anchor='w')
-        ttk.Label(self.geotab, textvariable=self.summary, wraplength=900).pack(fill='x')
-        ttk.Label(self.geotab, textvariable=self.preview_notice, wraplength=1100).pack(fill='x')
-        zoomrow=ttk.Frame(self.geotab);zoomrow.pack(fill='x',pady=3)
+        self.remember('replace_labels',ttk.Checkbutton(configuration,text='Replace existing label materials with reference\n(after reviewing the listed materials)',variable=self.replace_labels,command=self.review_label_replacements)).grid(row=2,column=0,sticky='w')
+        ttk.Label(configuration, textvariable=self.summary, wraplength=345).grid(row=3,column=0,sticky='ew')
+        ttk.Label(configuration, textvariable=self.preview_notice, wraplength=345).grid(row=4,column=0,sticky='ew')
+        view=ttk.Frame(panes);view.grid(row=0,column=1,sticky='nsew')
+        view.columnconfigure(0,weight=1);view.rowconfigure(1,weight=1)
+        zoomrow=ttk.Frame(view);zoomrow.grid(row=0,column=0,sticky='ew',pady=3)
         self.button(zoomrow,'Zoom +',lambda:self.set_zoom(min(4,self.zoom*2)),'zoom_in').pack(side='left',padx=(0,4))
         self.button(zoomrow,'Zoom −',lambda:self.set_zoom(max(1,self.zoom/2)),'zoom_out').pack(side='left',padx=4)
         self.button(zoomrow,'Fit',lambda:self.set_zoom(1),'fit').pack(side='left',padx=4)
-        frame=ttk.Frame(self.geotab);frame.pack(fill='both',expand=True,pady=7)
-        self.canvas = self.remember('geometry', tk.Canvas(frame, height=100, width=200, background='#f8fafc', highlightthickness=1, highlightbackground='#bdc7d1'))
+        frame=ttk.Frame(view);frame.grid(row=1,column=0,sticky='nsew',pady=7)
+        self.canvas = self.remember('geometry', tk.Canvas(frame, height=220, width=200, background='#f8fafc', highlightthickness=1, highlightbackground='#bdc7d1'))
         self.canvas.grid(row=0,column=0,sticky='nsew');frame.columnconfigure(0,weight=1);frame.rowconfigure(0,weight=1)
         hscroll=ttk.Scrollbar(frame,orient='horizontal',command=self.canvas.xview);hscroll.grid(row=1,column=0,sticky='ew')
         vscroll=ttk.Scrollbar(frame,orient='vertical',command=self.canvas.yview);vscroll.grid(row=0,column=1,sticky='ns')
@@ -299,13 +328,30 @@ class App:
             self.resize_after=self.root.after(180,self.draw_geometry)
         self.canvas.bind('<Configure>',resize)
         self.canvas.bind('<Button-1>',self.click_geometry)
-        ttk.Label(self.geotab, text='X → right, Y ↑ up • Samples: blue • Selected printed labels: dark • Other preserved bodies: gray. Click a sample for exact channels.', wraplength=1100).pack(anchor='w')
-        self.remember('reviewed',ttk.Checkbutton(self.geotab,text='I checked all four corners and representative interior printed labels against the mapped cells.',variable=self.reviewed,command=self.update_save)).pack(anchor='w',pady=(5,0))
-        row=ttk.Frame(self.geotab);row.pack(fill='x',pady=4)
+        ttk.Label(view, text='X → right, Y ↑ up • Samples: blue • Selected printed labels: dark • Other preserved bodies: gray. Click a sample for exact channels.', wraplength=460).grid(row=2,column=0,sticky='w')
+        self.remember('reviewed',ttk.Checkbutton(self.geotab,text='I checked all four corners and representative interior printed labels against the mapped cells.',variable=self.reviewed,command=self.update_save)).grid(row=1,column=0,sticky='w',pady=(5,0))
+        row=ttk.Frame(self.geotab);row.grid(row=2,column=0,sticky='ew',pady=4)
         ttk.Label(row,text='Review notes').pack(side='left')
         self.evidence=self.remember('evidence',ttk.Entry(row));self.evidence.pack(side='left',fill='x',expand=True,padx=8)
         self.evidence.bind('<KeyRelease>',lambda _:self.update_save())
-        self.remember('material_ack',ttk.Checkbutton(self.geotab,text='I understand this candidate still needs native GrabCAD validation before printing.',variable=self.material_ack,command=self.update_save)).pack(anchor='w')
+        self.remember('material_ack',ttk.Checkbutton(self.geotab,text='I understand this candidate still needs native GrabCAD validation before printing.',variable=self.material_ack,command=self.update_save)).grid(row=3,column=0,sticky='w')
+        def reveal_focus(event):
+            widget=event.widget
+            top=widget.winfo_rooty()-configuration.winfo_rooty()
+            visible_top=self.geometry_settings.canvasy(0)
+            visible_height=self.geometry_settings.winfo_height()
+            bottom=top+widget.winfo_height()
+            if top<visible_top or bottom>visible_top+visible_height:
+                target=top if top<visible_top else bottom-visible_height
+                self.geometry_settings.yview_moveto(max(0,target)/max(1,configuration.winfo_height()))
+        def bind_settings(widget):
+            widget.bind('<FocusIn>',reveal_focus,add='+')
+            if widget.winfo_class()!='TCombobox':
+                for event in ('<MouseWheel>','<Button-4>','<Button-5>'):
+                    widget.bind(event,scroll_settings,add='+')
+            for child in widget.winfo_children():bind_settings(child)
+        bind_settings(configuration)
+
 
     def build_mapping(self):
         ttk.Label(self.maptab,text='Exact requested recipes and target bodies',style='Heading.TLabel').pack(anchor='w',pady=(0,8))
@@ -333,7 +379,7 @@ class App:
         self.button(agentbar,'Agent help & settings…',self.show_agent_settings,'agent_settings').pack(side='left',padx=4)
         ttk.Label(agentbar,text='Optional extras. Ordinary conversion works without any agent.').pack(side='left',padx=8)
         helpbox=ttk.Frame(self.helptab);helpbox.pack(fill='both',expand=True)
-        self.help_text=tk.Text(helpbox,wrap='word',font=('Consolas',10),padx=16,pady=12,background='#f8fafc',relief='flat')
+        self.help_text=self.remember('help_content',tk.Text(helpbox,wrap='word',font=('Consolas',10),padx=16,pady=12,background='#f8fafc',relief='flat'))
         helpscroll=ttk.Scrollbar(helpbox,command=self.help_text.yview);helpscroll.pack(side='right',fill='y')
         self.help_text.configure(yscrollcommand=helpscroll.set)
         self.help_text.pack(fill='both',expand=True)
@@ -664,6 +710,7 @@ class App:
             self.controls['labels']['values']=list(self.container_ids);self.labels.set('');self.orientation.set('')
             self.reference_ids={f"{project['nodes'][oid].get('name','Body')} — {project['nodes'][oid]['material'].get('name','material')} [{i+1}]":oid for i,oid in enumerate(sorted(project['leaves']))}
             self.controls['label_reference']['values']=list(self.reference_ids);self.label_reference.set('');self.label_mode.set('Direct black');self.controls['label_reference'].configure(state='disabled')
+            self.detail.set('Project loaded. Select a mapped sample to inspect exact channels.')
             self.notebook.select(self.geotab);self.draw_geometry();self.status.set('Geometry loaded. Explicitly choose the printed-label container and worksheet directions.')
             if after:after()
         def failed(_):
@@ -1069,7 +1116,7 @@ class App:
         return result
 
     def write_qa_state(self):
-        state={'status':self.status.get(),'summary':self.summary.get(),'errors':self.errors,
+        state={'status':self.status.get(),'summary':self.summary.get(),'detail':self.detail.get(),'errors':self.errors,
                'busy':self.future is not None or getattr(self,'render_future',None) is not None or getattr(self,'render_pending',None) is not None or getattr(self,'render_paint_pending',False),
                'activity':self.activity.get(),'progress_visible':bool(self.progress.winfo_ismapped()),'workbook':str(self.workbook_path) if self.workbook_path else None,
                'project':str(self.project_path) if self.project_path else None,

@@ -182,7 +182,13 @@ def main():
         expected_links.append('https://github.com/kevinsullivan0/gridcad')
         wait(lambda s:browser_log.read_text(encoding='utf-8').splitlines()==expected_links,
              'Keyboard-focusable GitHub button invokes only its fixed URL')
-        keyboard.send_keys('{TAB}{ENTER}')
+        # A real browser handoff may change foreground windows. Return to
+        # GridCAD through the OS, then prove actual Tab focus before Enter.
+        app.top_window().set_focus()
+        wait(lambda s:s.get('focused_control')=='project_link','GitHub button retains keyboard focus after returning from browser handoff')
+        keyboard.send_keys('{TAB}')
+        wait(lambda s:s.get('focused_control')=='releases_link','Real Tab moves focus to Releases button')
+        keyboard.send_keys('{ENTER}')
         expected_links.append('https://github.com/kevinsullivan0/gridcad/releases')
         wait(lambda s:browser_log.read_text(encoding='utf-8').splitlines()==expected_links,
              'Tab then Enter activates the ordinary Releases button')

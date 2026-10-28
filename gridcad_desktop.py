@@ -379,8 +379,16 @@ class App:
         agentbar=ttk.Frame(self.helptab);agentbar.pack(fill='x',pady=(0,8))
         self.button(agentbar,'Agent help & settings…',self.show_agent_settings,'agent_settings').pack(side='left',padx=4)
         ttk.Label(agentbar,text='Optional; not needed for conversion.').pack(side='left',padx=8)
-        self.button(agentbar,'GitHub',lambda:self.open_help_link('https://github.com/kevinsullivan0/gridcad'),'project_link').pack(side='left',padx=4)
-        self.button(agentbar,'Releases',lambda:self.open_help_link('https://github.com/kevinsullivan0/gridcad/releases'),'releases_link').pack(side='left',padx=4)
+        for label,url,key in [('GitHub','https://github.com/kevinsullivan0/gridcad','project_link'),
+                              ('Releases','https://github.com/kevinsullivan0/gridcad/releases','releases_link')]:
+            link=self.button(agentbar,label,lambda target=url:self.open_help_link(target),key,takefocus=True)
+            link.pack(side='left',padx=4)
+            # ttk supplies Space, but not consistent Return activation across
+            # platforms. Keep both keyboard routes on the ordinary command.
+            def activate_link(event,button=link):
+                button.invoke()
+                return 'break'
+            link.bind('<Return>',activate_link)
         helpbox=ttk.Frame(self.helptab);helpbox.pack(fill='both',expand=True)
         self.help_text=self.remember('help_content',tk.Text(helpbox,wrap='word',font=('Consolas',10),padx=16,pady=12,background='#f8fafc',relief='flat'))
         helpscroll=ttk.Scrollbar(helpbox,command=self.help_text.yview);helpscroll.pack(side='right',fill='y')
@@ -1155,7 +1163,9 @@ class App:
         return result
 
     def write_qa_state(self):
-        state={'app_version':diagnostics.VERSION,'about_links':self.about_link_qa_points(),'status':self.status.get(),'summary':self.summary.get(),'detail':self.detail.get(),'errors':self.errors,
+        focused=self.root.focus_get()
+        focused_control=next((key for key,widget in self.controls.items() if widget==focused),None)
+        state={'focused_control':focused_control,'app_version':diagnostics.VERSION,'about_links':self.about_link_qa_points(),'status':self.status.get(),'summary':self.summary.get(),'detail':self.detail.get(),'errors':self.errors,
                'busy':self.future is not None or getattr(self,'render_future',None) is not None or getattr(self,'render_pending',None) is not None or getattr(self,'render_paint_pending',False),
                'activity':self.activity.get(),'progress_visible':bool(self.progress.winfo_ismapped()),'workbook':str(self.workbook_path) if self.workbook_path else None,
                'project':str(self.project_path) if self.project_path else None,

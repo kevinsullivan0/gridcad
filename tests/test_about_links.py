@@ -64,7 +64,12 @@ class AboutLinksTests(unittest.TestCase):
         from contextlib import ExitStack
         import gridcad_desktop as gui
         app=self.app();app.helptab=Mock();app.controls={};app.show_help=Mock()
-        app.button=Mock(side_effect=lambda *args,**kwargs:Mock())
+        buttons={}
+        def button(*args,**kwargs):
+            widget=Mock();widget.invoke.side_effect=args[2]
+            if len(args)>3:buttons[args[3]]=widget
+            return widget
+        app.button=Mock(side_effect=button)
         with ExitStack() as stack:
             for name in ('Frame','Label','Scrollbar'):
                 stack.enter_context(patch.object(gui.ttk,name,side_effect=lambda *a,**k:Mock()))
@@ -75,3 +80,12 @@ class AboutLinksTests(unittest.TestCase):
             for key,url in [('project_link','https://github.com/kevinsullivan0/gridcad'),
                             ('releases_link','https://github.com/kevinsullivan0/gridcad/releases')]:
                 calls[key].args[2]();browser.assert_called_with(url)
+                self.assertTrue(calls[key].kwargs['takefocus'])
+                binding=buttons[key].bind.call_args
+                self.assertEqual(binding.args[0],'<Return>')
+                before=browser.call_count
+                self.assertEqual(binding.args[1](Mock()),'break')
+                buttons[key].invoke.assert_called_once()
+                browser.assert_called_with(url)
+                self.assertEqual(browser.call_count,before+1)
+                buttons[key].bind.assert_called_once()  # Space class binding remains untouched

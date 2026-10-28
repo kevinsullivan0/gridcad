@@ -11,6 +11,7 @@ from pathlib import Path
 import sys
 import tkinter as tk
 import threading
+import webbrowser
 from tkinter import filedialog, messagebox, ttk
 from PIL import Image, ImageDraw, ImageTk
 
@@ -397,9 +398,29 @@ class App:
     def show_about(self):
         self.help_document='about'
         self.set_help_text('GridCAD '+diagnostics.VERSION+'\n\nOffline rectangular material converter. No agent, account or network service is needed.\n\n'
-                           'Source: '+diagnostics.SOURCE_URL+'\n\n'
+                           'GitHub project: https://github.com/kevinsullivan0/gridcad\n'
+                           'Releases: https://github.com/kevinsullivan0/gridcad/releases\n'
+                           'Links open your browser only when clicked. No automatic update checks or downloads.\n\n'
+                           'Exact installed source: '+diagnostics.SOURCE_URL+'\n\n'
                            'Unsigned candidate. Native GrabCAD open/recompose/save and physical printing remain unverified. Originals are preserved; outputs remain separate candidates.\n\n'
                            'Original GridCAD code: MIT License, copyright 2026 Kevin Sullivan. Read LICENSE beside the application. Third-party runtime licenses remain separate; use the Third-party licenses button to read the bundled notices.')
+
+        for tag,url in (
+                ('about_project','https://github.com/kevinsullivan0/gridcad'),
+                ('about_releases','https://github.com/kevinsullivan0/gridcad/releases')):
+            start=self.help_text.search(url+'\n','1.0',stopindex='end')
+            if start:
+                self.help_text.tag_add(tag,start,f'{start}+{len(url)}c')
+                self.help_text.tag_configure(tag,foreground='#075aa6',underline=True)
+                self.help_text.tag_bind(tag,'<Button-1>',lambda event,target=url:self.open_help_link(target))
+                self.help_text.tag_bind(tag,'<Enter>',lambda event:self.help_text.configure(cursor='hand2'))
+                self.help_text.tag_bind(tag,'<Leave>',lambda event:self.help_text.configure(cursor='xterm'))
+
+    def open_help_link(self,url):
+        try:opened=webbrowser.open_new_tab(url)
+        except (OSError,webbrowser.Error):opened=False
+        if not opened:self.status.set('Could not open a browser. Copy this address into your browser: '+url)
+        return 'break'
 
     def show_licenses(self):
         self.help_document='licenses'

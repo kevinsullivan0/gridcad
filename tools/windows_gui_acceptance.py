@@ -19,6 +19,16 @@ from tools.make_reference_example import create_reference_example, REFERENCE_ID
 import desktop_core as core
 
 
+PROGRESS_RECIPE_COUNT = 40_000
+
+
+def make_progress_workbook(path):
+    # Keep real validation work, but stay below expanded XML-name/text limits.
+    # 100k inline-string cells exceeded that independent guard on Windows.
+    make_workbook(path,{f'A{row}':'2/0/0/0/98/0'
+                        for row in range(1,PROGRESS_RECIPE_COUNT+1)},rows=0,columns=0)
+
+
 def main():
     if sys.platform!='win32':raise SystemExit('This acceptance requires Windows desktop interaction.')
     from pywinauto import Application, Desktop, mouse, keyboard
@@ -171,15 +181,15 @@ def main():
         # Real bounded work, not a delayed/mock worker: exercise the visible
         # progress indicator and prove Tk keeps publishing state during it.
         progressbook=out/'large progress workbook.xlsx'
-        make_workbook(progressbook,{f'A{row}':'2/0/0/0/98/0' for row in range(1,100001)},rows=0,columns=0)
-        load_book(progressbook);enter('range','A1:A100000');click('check_recipes')
+        make_progress_workbook(progressbook)
+        load_book(progressbook);enter('range',f'A1:A{PROGRESS_RECIPE_COUNT}');click('check_recipes')
         wait(lambda s:s.get('busy') and s.get('progress_visible') and bool(s.get('activity')),
              'Large recipe validation displays an honest animated activity indicator')
         stamp=statepath.stat().st_mtime_ns
         wait(lambda s:s.get('busy') and statepath.stat().st_mtime_ns>stamp,
              'Tk event loop keeps updating QA state while recipe worker runs')
         screenshot('02c-active-recipe-validation.png')
-        wait(lambda s:not s.get('busy') and '100000 recipes valid' in s.get('status',''),
+        wait(lambda s:not s.get('busy') and f'{PROGRESS_RECIPE_COUNT} recipes valid' in s.get('status',''),
              'Large recipe validation completes without UI freeze',timeout=120)
         assert not state().get('progress_visible')
         checks.append('Activity indicator clears after recipe completion')

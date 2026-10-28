@@ -12,6 +12,9 @@ from collections.abc import Sequence
 import hashlib
 import itertools
 import math
+import os
+import stat
+import tempfile
 from pathlib import Path
 import struct
 import sys
@@ -22,6 +25,7 @@ from gridcad_operator import operator as op
 VERSION = '0.2.0-rc.4'
 PROFILE = 'rectangular-2170-mesh-review-v1'
 TOLERANCE = 0.0001  # mm, fixed; never enlarged to make an input fit.
+MAX_PROJECT_BYTES = 2 * 1024**3
 MAX_UNIQUE_TRIANGLES = 8_000_000
 MAX_PREVIEW_TRIANGLES = 200_000
 ORIENTATIONS = {
@@ -200,7 +204,47 @@ def preview_triangles(record, max_triangles):
         yield tuple((top[offset + j], top[offset + j + 1]) for j in (0, 2, 4))
 
 
+def _bounded_project_digest(path, destination=None):
+    """Hash/copy a regular project file with bounded buffers and total bytes."""
+    digest = hashlib.sha256()
+    with Path(path).open('rb') as source:
+        info = os.fstat(source.fileno())
+        if not stat.S_ISREG(info.st_mode):
+            op.fail('Project source must be a regular file.')
+        if info.st_size > MAX_PROJECT_BYTES:
+            op.fail('Archive exceeds 2 GiB.')
+        copied = 0
+        while True:
+            block = source.read(min(1024 * 1024, MAX_PROJECT_BYTES - copied + 1))
+            if not block:
+                break
+            copied += len(block)
+            if copied > MAX_PROJECT_BYTES:
+                op.fail('Archive exceeds 2 GiB.')
+            digest.update(block)
+            if destination is not None:
+                destination.write(block)
+    return digest.hexdigest()
+
+
 def load_project(path):
+    """Bind the displayed document, meshes and digest to one private snapshot.
+
+    The temporary copy is removed on success or failure. The public identity
+    remains the original path; later conversion still rechecks its source hash.
+    """
+    with tempfile.TemporaryDirectory(prefix='gridcad-preview-') as directory:
+        snapshot = Path(directory) / 'source.print'
+        with snapshot.open('xb') as destination:
+            source_hash = _bounded_project_digest(path, destination)
+        project = _load_project_snapshot(snapshot)
+        if project['sha256'] != source_hash or _bounded_project_digest(path) != source_hash:
+            op.fail('Source changed while loading. Reopen the original project before mapping.')
+        project['path'] = str(path)
+        return project
+
+
+def _load_project_snapshot(path):
     document = op.project_document(path)
     nodes, leaves, bodies = op.index(document)
     if not bodies or len(bodies) > 10000:

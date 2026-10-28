@@ -85,6 +85,10 @@ def archive(path):
             fail('Archive has too many or duplicate entries.')
         if sum(i.file_size for i in infos) > 2 * 1024**3: fail('Expanded archive exceeds 2 GiB.')
         for i in infos:
+            # These are the supported PRINT/XLSX storage methods. Reject other
+            # decoders before any member is opened, regardless of declared size.
+            if i.compress_type not in (zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED):
+                fail('Unsupported archive compression; use stored or deflated ZIP members.')
             name = PurePosixPath(i.filename)
             if name.is_absolute() or '..' in name.parts or '\\' in i.filename:
                 fail('Unsafe archive member name.')

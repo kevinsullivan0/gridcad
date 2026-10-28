@@ -223,7 +223,11 @@ class App:
         self.save_button.pack(side='right', padx=(12,0))
 
     def build_workbook(self):
-        bar = ttk.Frame(self.worktab); bar.pack(fill='x', pady=(0,8))
+        # Only the sheet viewport shrinks; navigation and cache consent keep
+        # their requested height even on the supported small Windows desktop.
+        self.worktab.columnconfigure(0,weight=1)
+        self.worktab.rowconfigure(2,weight=1)
+        bar = ttk.Frame(self.worktab); bar.grid(row=0,column=0,sticky='ew',pady=(0,8))
         ttk.Label(bar, text='Sheet').pack(side='left')
         sheet = self.remember('sheet', ttk.Combobox(bar, textvariable=self.sheet, state='readonly', width=22))
         sheet.pack(side='left', padx=6); sheet.bind('<<ComboboxSelected>>', lambda _: self.change_sheet())
@@ -231,8 +235,8 @@ class App:
         self.remember('range', ttk.Entry(bar, textvariable=self.cell_range, width=17)).pack(side='left', padx=6)
         self.remember('transpose', ttk.Checkbutton(bar, text='Transpose mapping', variable=self.transpose)).pack(side='left', padx=10)
         self.button(bar, 'Check recipes', self.check_recipes, 'check_recipes').pack(side='right')
-        ttk.Label(self.worktab, text='Six explicit C / M / Y / K / W / T percentages, total exactly 100. Click one cell; drag or Shift-click to select a rectangle (also across pages).').pack(anchor='w', pady=(0,5))
-        table = ttk.Frame(self.worktab); table.pack(fill='both', expand=True)
+        ttk.Label(self.worktab, text='Six explicit C / M / Y / K / W / T percentages, total exactly 100. Click one cell; drag or Shift-click to select a rectangle (also across pages).').grid(row=1,column=0,sticky='w',pady=(0,5))
+        table = ttk.Frame(self.worktab); table.grid(row=2,column=0,sticky='nsew')
         table.rowconfigure(0, weight=1); table.columnconfigure(0, weight=1)
         self.sheet_grid = self.remember('worksheet', tk.Canvas(
             table, background='white', highlightthickness=1, highlightbackground='#8191a0',
@@ -250,7 +254,7 @@ class App:
         for sequence in ('<MouseWheel>','<Button-4>','<Button-5>'):
             self.sheet_grid.bind(sequence,self.scroll_sheet)
         self.cell_boxes = {}
-        nav = ttk.Frame(self.worktab); nav.pack(fill='x', pady=6)
+        nav = ttk.Frame(self.worktab); nav.grid(row=3,column=0,sticky='ew',pady=6)
         for text, dr, dc in [('◀ Columns',0,-8),('Columns ▶',0,8),('↑ Rows',-30,0),('Rows ↓',30,0)]:
             key = 'next_rows' if dr == 30 else None
             self.button(nav, text, lambda r=dr,c=dc: self.move_page(r,c), key).pack(side='left', padx=(0,5))
@@ -258,7 +262,7 @@ class App:
         self.jump = self.remember('jump', ttk.Entry(nav, width=10)); self.jump.insert(0,'A1'); self.jump.pack(side='left')
         self.button(nav, 'Go', self.jump_page, 'go').pack(side='left', padx=4)
         self.page_info = ttk.Label(nav, text='No worksheet loaded'); self.page_info.pack(side='right')
-        self.remember('cache', ttk.Checkbutton(self.worktab, text='I recalculated this workbook in Excel and saved current formula results. Missing results always fail.', variable=self.cache)).pack(anchor='w')
+        self.remember('cache', ttk.Checkbutton(self.worktab, text='I recalculated this workbook in Excel and saved current formula results. Missing results always fail.', variable=self.cache)).grid(row=4,column=0,sticky='w')
 
     def build_geometry(self):
         selectors = ttk.Frame(self.geotab); selectors.pack(fill='x')

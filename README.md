@@ -4,7 +4,7 @@
 
 ## Download and start
 
-**[Download GridCAD 0.2.0-rc.5 for Windows x64](https://github.com/kevinsullivan0/gridcad/releases/download/v0.2.0-rc.5/GridCAD-Windows-x64-v0.2.0-rc.5.zip)** · [Release notes, checksums and test evidence](https://github.com/kevinsullivan0/gridcad/releases/tag/v0.2.0-rc.5)
+**[Download GridCAD 0.2.0-rc.6 for Windows x64](https://github.com/kevinsullivan0/gridcad/releases/download/v0.2.0-rc.6/GridCAD-Windows-x64-v0.2.0-rc.6.zip)** · [Release notes, checksums and test evidence](https://github.com/kevinsullivan0/gridcad/releases/tag/v0.2.0-rc.6)
 
 1. Download the **Windows x64 ZIP**, not “Source code” or the portable-core ZIP.
 2. In File Explorer choose **Extract All…**. Open the extracted **GridCAD** folder and double-click **GridCAD.exe**. No installer, Python or terminal commands are needed.
@@ -26,23 +26,23 @@
 
 Preview work is bounded and may be sampled; its notice explains reduced detail. Exact conversion does not use the sampled display. Resource limits and unsupported inputs are refused rather than silently truncated or repaired.
 
-[Supported schema](https://github.com/kevinsullivan0/gridcad/blob/v0.2.0-rc.5/docs/RECTANGULAR_SCHEMA.md) · [User manual](https://github.com/kevinsullivan0/gridcad/blob/v0.2.0-rc.5/docs/DESKTOP_MANUAL.md)
+[Supported schema](https://github.com/kevinsullivan0/gridcad/blob/v0.2.0-rc.6/docs/RECTANGULAR_SCHEMA.md) · [User manual](https://github.com/kevinsullivan0/gridcad/blob/v0.2.0-rc.6/docs/DESKTOP_MANUAL.md)
 
 ## Verify and get help
 
-Compare the download's SHA256 with the exact filename in [SHA256SUMS.txt](https://github.com/kevinsullivan0/gridcad/releases/download/v0.2.0-rc.5/SHA256SUMS.txt). On Windows, an optional check is:
+Compare the download's SHA256 with the exact filename in [SHA256SUMS.txt](https://github.com/kevinsullivan0/gridcad/releases/download/v0.2.0-rc.6/SHA256SUMS.txt). On Windows, an optional check is:
 
 ```powershell
-Get-FileHash ".\GridCAD-Windows-x64-v0.2.0-rc.5.zip" -Algorithm SHA256
+Get-FileHash ".\GridCAD-Windows-x64-v0.2.0-rc.6.zip" -Algorithm SHA256
 ```
 
-**Help** opens the offline guide. Errors offer manual remedies and optional local diagnostics. Optional agent tools do not launch an agent, connect an account or upload files; sharing a report or local path remains your choice. [Agent download/checksum guide](https://github.com/kevinsullivan0/gridcad/blob/v0.2.0-rc.5/docs/AGENT_INSTALL.md).
+**Help** opens the offline guide. Errors offer manual remedies and optional local diagnostics. Optional agent tools do not launch an agent, connect an account or upload files; sharing a report or local path remains your choice. [Agent download/checksum guide](https://github.com/kevinsullivan0/gridcad/blob/v0.2.0-rc.6/docs/AGENT_INSTALL.md).
 
-The release includes [Windows GUI evidence](https://github.com/kevinsullivan0/gridcad/releases/download/v0.2.0-rc.5/GridCAD-Windows-GUI-evidence.zip). Testing covers conversion preservation, real mouse selection, responsive activity feedback and guarded saving; it is not native printer certification. Security review coverage is partial, not a clean security certification; see release notes.
+The release includes [Windows GUI evidence](https://github.com/kevinsullivan0/gridcad/releases/download/v0.2.0-rc.6/GridCAD-Windows-GUI-evidence.zip). Testing covers conversion preservation, real mouse selection, responsive activity feedback and guarded saving; it is not native printer certification. Security review coverage is partial, not a clean security certification; see release notes.
 
 ## Source and advanced use
 
-[Exact release source](https://github.com/kevinsullivan0/gridcad/tree/v0.2.0-rc.5) · [API / CLI](https://github.com/kevinsullivan0/gridcad/blob/v0.2.0-rc.5/docs/DESKTOP_API.md) · [Portable Python core](https://github.com/kevinsullivan0/gridcad/releases/download/v0.2.0-rc.5/GridCAD-portable-core-v0.2.0-rc.5.zip) · [Contributor instructions](https://github.com/kevinsullivan0/gridcad/blob/v0.2.0-rc.5/AGENTS.md)
+[Exact release source](https://github.com/kevinsullivan0/gridcad/tree/v0.2.0-rc.6) · [API / CLI](https://github.com/kevinsullivan0/gridcad/blob/v0.2.0-rc.6/docs/DESKTOP_API.md) · [Portable Python core](https://github.com/kevinsullivan0/gridcad/releases/download/v0.2.0-rc.6/GridCAD-portable-core-v0.2.0-rc.6.zip) · [Contributor instructions](https://github.com/kevinsullivan0/gridcad/blob/v0.2.0-rc.6/AGENTS.md)
 
 The desktop implementation is at the release tag. The default branch retains the earlier browser implementation; updating this README does not merge the desktop branch. Earlier releases remain available.
 

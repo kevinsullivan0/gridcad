@@ -43,6 +43,13 @@ def main():
     packaged_environment={k:v for k,v in os.environ.items() if not k.upper().startswith('PYTHON')}
     system32=Path(os.environ['SystemRoot'])/'System32'
     packaged_environment['PATH']=str(system32)+os.pathsep+str(system32.parent)
+    # Exercise the standard webbrowser handoff with a local default-browser
+    # handler. Real link clicks launch cmd.exe through webbrowser; no external
+    # site is contacted, and no product callback/backend is replaced.
+    browser_log=out/'browser-links.txt'
+    browser_handler=out/'browser-link-handler.cmd'
+    browser_handler.write_text('@echo off\n>>"'+str(browser_log)+'" echo %~1\n',encoding='ascii')
+    packaged_environment['BROWSER']='"'+str(system32/'cmd.exe')+'" /d /c "'+str(browser_handler)+'" "%s"'
     runtime=list(folder.rglob('python313.dll'))
     assert runtime==[folder/'_internal/python313.dll'],runtime
     assert not (folder/'advanced/_internal').exists()
@@ -152,10 +159,35 @@ def main():
         app.top_window().maximize();time.sleep(.7)
         screenshot('01-launched.png')
         click('general_help');wait(lambda s:s.get('help_document')=='docs/DESKTOP_MANUAL.md','Ordinary Help opens offline quick start')
-        check_tab_bounds(['about','licenses','agent_settings','help_content'],{'help_content':(400,100)})
+        check_tab_bounds(['about','licenses','agent_settings','project_link','releases_link','help_content'],{'help_content':(400,100)})
         screenshot('01a-ordinary-help.png')
         click('about');wait(lambda s:s.get('help_document')=='about','About/version view opens in extracted app')
-        screenshot('01b-about.png');click('licenses')
+        assert state()['app_version']==core.VERSION
+        wait(lambda s:len(s.get('about_links',{}))==2,'About displays both manual links')
+        assert not browser_log.exists(),'Opening About must not open a browser or check for updates'
+        screenshot('01b-about.png')
+        expected_links=[]
+        for key,url in [('about_project','https://github.com/kevinsullivan0/gridcad'),
+                        ('about_releases','https://github.com/kevinsullivan0/gridcad/releases')]:
+            point=state()['about_links'][key]
+            assert point['url']==url
+            mouse.click(coords=(point['x'],point['y']))
+            expected_links.append(url)
+            wait(lambda s:browser_log.exists() and browser_log.read_text(encoding='utf-8').splitlines()==expected_links,
+                 'Actual About hyperlink hands exact fixed URL to configured browser: '+url)
+        click('about');time.sleep(.3)
+        assert browser_log.read_text(encoding='utf-8').splitlines()==expected_links
+        checks.append('Current version visible; reopening About performs no update check or browser launch')
+        click('project_link')
+        expected_links.append('https://github.com/kevinsullivan0/gridcad')
+        wait(lambda s:browser_log.read_text(encoding='utf-8').splitlines()==expected_links,
+             'Keyboard-focusable GitHub button invokes only its fixed URL')
+        keyboard.send_keys('{TAB}{ENTER}')
+        expected_links.append('https://github.com/kevinsullivan0/gridcad/releases')
+        wait(lambda s:browser_log.read_text(encoding='utf-8').splitlines()==expected_links,
+             'Tab then Enter activates the ordinary Releases button')
+
+        click('licenses')
         wait(lambda s:'Tcl-license.terms' in s.get('license_files',[]) and 'Python-LICENSE.txt' in s.get('license_files',[]) and 'OpenSSL-LICENSE.txt' in s.get('license_files',[]),'Bundled third-party license text opens without network')
         screenshot('01c-licenses.png')
         assert state()['agent_detection'] is None;checks.append('No agent detection occurs at launch or ordinary Help')
@@ -267,7 +299,7 @@ def main():
         check_tab_bounds(['worksheet','cache','next_rows','jump','go'],{'worksheet':(400,100)})
         screenshot('05a-minimum-worksheet.png')
         click('general_help');time.sleep(.3)
-        check_tab_bounds(['about','licenses','agent_settings','help_content'],{'help_content':(400,100)})
+        check_tab_bounds(['about','licenses','agent_settings','project_link','releases_link','help_content'],{'help_content':(400,100)})
         screenshot('05a-minimum-help.png')
         p=state()['controls']['tabs'];mouse.click(coords=(p['x']+315,p['y']+12));time.sleep(.4)
         check_tab_bounds(['assignments'],{'assignments':(600,100)})

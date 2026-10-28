@@ -20,7 +20,7 @@ import diagnostics
 import agent_help
 
 PROMPT = '''Use the installed GridCAD source folder (beside GridCAD.exe), or the exact release source:
-https://github.com/kevinsullivan0/gridcad/tree/v0.2.0-rc.5
+https://github.com/kevinsullivan0/gridcad/tree/v0.2.0-rc.6
 Do not assume the repository default branch matches this installed release.
 Read AGENTS.md, docs/DESKTOP_API.md, docs/RECTANGULAR_SCHEMA.md, and operator/README.md first.
 Use the portable deterministic core. Keep my original files untouched and all private
@@ -378,7 +378,9 @@ class App:
         self.button(bar,'Third-party licenses',self.show_licenses,'licenses').pack(side='left',padx=4)
         agentbar=ttk.Frame(self.helptab);agentbar.pack(fill='x',pady=(0,8))
         self.button(agentbar,'Agent help & settings…',self.show_agent_settings,'agent_settings').pack(side='left',padx=4)
-        ttk.Label(agentbar,text='Optional extras. Ordinary conversion works without any agent.').pack(side='left',padx=8)
+        ttk.Label(agentbar,text='Optional; not needed for conversion.').pack(side='left',padx=8)
+        self.button(agentbar,'GitHub',lambda:self.open_help_link('https://github.com/kevinsullivan0/gridcad'),'project_link').pack(side='left',padx=4)
+        self.button(agentbar,'Releases',lambda:self.open_help_link('https://github.com/kevinsullivan0/gridcad/releases'),'releases_link').pack(side='left',padx=4)
         helpbox=ttk.Frame(self.helptab);helpbox.pack(fill='both',expand=True)
         self.help_text=self.remember('help_content',tk.Text(helpbox,wrap='word',font=('Consolas',10),padx=16,pady=12,background='#f8fafc',relief='flat'))
         helpscroll=ttk.Scrollbar(helpbox,command=self.help_text.yview);helpscroll.pack(side='right',fill='y')
@@ -1136,8 +1138,24 @@ class App:
                 'selected':self.sheet_grid.itemcget(box,'fill')=='#b7d9ff'}
         return result
 
+    def about_link_qa_points(self):
+        """Read-only positions for OS mouse acceptance; never invoke a link."""
+        if self.help_document!='about' or not self.help_text.winfo_ismapped():return {}
+        result={}
+        for tag in ('about_project','about_releases'):
+            bounds=self.help_text.tag_ranges(tag)
+            if len(bounds)!=2:continue
+            box=self.help_text.bbox(bounds[0])
+            if box is None:continue
+            x,y,width,height=box
+            if width<2 or height<2:continue
+            result[tag]={'x':self.help_text.winfo_rootx()+x+width//2,
+                         'y':self.help_text.winfo_rooty()+y+height//2,
+                         'url':self.help_text.get(*bounds)}
+        return result
+
     def write_qa_state(self):
-        state={'status':self.status.get(),'summary':self.summary.get(),'detail':self.detail.get(),'errors':self.errors,
+        state={'app_version':diagnostics.VERSION,'about_links':self.about_link_qa_points(),'status':self.status.get(),'summary':self.summary.get(),'detail':self.detail.get(),'errors':self.errors,
                'busy':self.future is not None or getattr(self,'render_future',None) is not None or getattr(self,'render_pending',None) is not None or getattr(self,'render_paint_pending',False),
                'activity':self.activity.get(),'progress_visible':bool(self.progress.winfo_ismapped()),'workbook':str(self.workbook_path) if self.workbook_path else None,
                'project':str(self.project_path) if self.project_path else None,

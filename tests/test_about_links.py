@@ -1,5 +1,6 @@
 """About navigation is explicit and never performs an update check."""
 import unittest
+import webbrowser
 from unittest.mock import Mock, patch
 import diagnostics
 from gridcad_desktop import App
@@ -35,6 +36,42 @@ class AboutLinksTests(unittest.TestCase):
         with patch('gridcad_desktop.webbrowser.open_new_tab',return_value=False):
             app.open_help_link(url)
         self.assertIn(url,app.status.set.call_args.args[0])
-        with patch('gridcad_desktop.webbrowser.open_new_tab',side_effect=OSError('unavailable')):
-            app.open_help_link(url)
-        self.assertIn('Copy',app.status.set.call_args.args[0])
+        for error in (OSError('unavailable'),webbrowser.Error('no browser')):
+            with patch('gridcad_desktop.webbrowser.open_new_tab',side_effect=error):
+                app.open_help_link(url)
+            self.assertIn('Copy',app.status.set.call_args.args[0])
+
+    def test_qa_link_points_are_actual_visible_text_not_synthetic_actions(self):
+        app=self.app();app.help_document='about'
+        app.help_text.winfo_ismapped.return_value=True
+        app.help_text.tag_ranges.return_value=('5.16','5.58')
+        app.help_text.bbox.return_value=(30,70,9,18)
+        app.help_text.winfo_rootx.return_value=100
+        app.help_text.winfo_rooty.return_value=200
+        app.help_text.get.return_value='https://github.com/kevinsullivan0/gridcad'
+        with patch('gridcad_desktop.webbrowser.open_new_tab') as browser:
+            links=app.about_link_qa_points()
+            self.assertEqual(links['about_project']['x'],134)
+            self.assertEqual(links['about_project']['y'],279)
+            self.assertEqual(links['about_project']['url'],app.help_text.get.return_value)
+            browser.assert_not_called()
+            app.help_text.bbox.return_value=None
+            self.assertEqual(app.about_link_qa_points(),{})
+            app.help_document='licenses'
+            self.assertEqual(app.about_link_qa_points(),{})
+
+    def test_help_buttons_share_manual_urls_and_do_not_open_during_build(self):
+        from contextlib import ExitStack
+        import gridcad_desktop as gui
+        app=self.app();app.helptab=Mock();app.controls={};app.show_help=Mock()
+        app.button=Mock(side_effect=lambda *args,**kwargs:Mock())
+        with ExitStack() as stack:
+            for name in ('Frame','Label','Scrollbar'):
+                stack.enter_context(patch.object(gui.ttk,name,side_effect=lambda *a,**k:Mock()))
+            stack.enter_context(patch.object(gui.tk,'Text',return_value=Mock()))
+            browser=stack.enter_context(patch('gridcad_desktop.webbrowser.open_new_tab',return_value=True))
+            app.build_help();browser.assert_not_called()
+            calls={call.args[3]:call for call in app.button.call_args_list if len(call.args)>3}
+            for key,url in [('project_link','https://github.com/kevinsullivan0/gridcad'),
+                            ('releases_link','https://github.com/kevinsullivan0/gridcad/releases')]:
+                calls[key].args[2]();browser.assert_called_with(url)

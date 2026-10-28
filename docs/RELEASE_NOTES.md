@@ -1,27 +1,23 @@
-## GridCAD 0.2.0-rc.5 — Windows desktop candidate
+## GridCAD 0.2.0-rc.6 — Windows desktop candidate
 
-Download **GridCAD-Windows-x64-v0.2.0-rc.5.zip**, extract the complete folder and open `GridCAD.exe`. Keep `_internal` and `GridCAD-core.exe` beside it. No installer, Python, account, LLM or first-run downloads are needed. This unsigned candidate follows your normal application-trust policy; it does not change security settings.
+This small follow-up adds manual project and release navigation. Download **GridCAD-Windows-x64-v0.2.0-rc.6.zip**, extract the entire folder, and open `GridCAD.exe`. Keep `_internal` and `GridCAD-core.exe` beside it. No installer, Python, account or first-run download is needed.
 
-### Changes since RC4
+### Changes since RC5
 
-- Large repeated-mesh projects use lazy shared preview geometry rather than rejecting otherwise supported inputs solely because instanced triangle counts exceed the former preview ceiling. Rendering has bounded sampling and honest detail notices; exact conversion retains the original source geometry, transforms and complete preserved payloads.
-- Worksheet click, drag and Shift-click select actual cells and rectangular ranges across columns, with visible highlighting and cross-page range extension.
-- Honest activity indicators and stage text accompany background loading, recipe checks, rendering and saving. Expensive raster work no longer runs on the Tk event loop. Superseded results are discarded; errors clear stale views and progress safely.
-- Worksheet navigation and formula acknowledgment remain visible. Geometry settings and notices scroll independently of a useful preview canvas; review notes and required acknowledgments remain reachable at the minimum window size.
-- Project loading uses a bounded temporary snapshot and verifies source identity, avoiding a stale preview paired with a different source digest. Archive loading accepts only the supported STORED/DEFLATED compression methods before member decompression. Existing byte, structure, mesh, cell and render limits remain in force; there is no unchecked bypass.
+- About shows the installed version, exact release source, and clickable GitHub project/releases URLs.
+- Ordinary focusable **GitHub** and **Releases** buttons also appear in Help, including Tab/Enter keyboard access.
+- Links open the default browser only when explicitly activated. There is no automatic update check, installer download, background network connection or self-updater. If a browser cannot open, a copyable URL is shown instead.
 
-### Verification and limits
+### Verification
 
-The attached evidence records the exact final Windows build and real extracted-package GUI acceptance. Coverage includes native file dialogs, individual-cell/rectangular mouse selection, responsive recipe progress and event-loop heartbeat, all four tabs at the minimum window size, mapping/transpose, review-gated saving, reference-material replacement cancel/confirm, error recovery, and packaged CLI operation. Public regressions and independent acceptance checks also passed before publication.
+Public regressions cover fixed URL targets, absence of browser calls while viewing Help/About, and missing-browser/error fallback. Packaged Windows acceptance uses real mouse clicks and Tab/Enter activation with a controlled local browser handler, recording exact requested URLs without opening external sites. The full existing Windows workflow also exercises worksheet selection, progress/event-loop responsiveness, minimum-window layout, mapping, guarded saving, error recovery and CLI operation. See the attached evidence for the exact tested build.
 
-Two original production PRINT fixtures were separately loaded and converted in the cloud without changing non-material data; repeated outputs were byte-identical. Those private files were not uploaded to CI or included in this release. This is not a claim that the private originals were exercised through the packaged Windows GUI.
+RC5's bounded shared/sampled preview, source snapshots, supported archive methods, worksheet selection and responsive background operations are retained. Exact conversion and its resource/preservation guards are unchanged. Earlier private production-fixture conversion checks remain relevant to that unchanged core; private inputs are not bundled or uploaded to public CI.
 
-### Security review status
+### Candidate and review limits
 
-Official Codex Security was unavailable for this repair. A partial manual review identified source-snapshot and archive-compression issues, which received narrow defensive repairs and ordinary functional regressions. That review was stopped by a platform restriction; no completed independent security audit or clean security certification is claimed.
+Unsigned prerelease. Native GrabCAD open/recompose/save and physical printing remain unverified; every output retains `print_ready=false`. Synthetic examples are software demonstrations and must not be printed. Follow your normal application-trust policy; do not bypass malware or administrator-policy blocks.
 
-### Still a release candidate
+Security coverage remains partial: official Codex Security was unavailable for the preceding repair, and the manual review was stopped by a platform restriction. Narrow defensive fixes and ordinary regressions do not establish a completed independent security audit or clean certification. This follow-up does not restart or claim additional security review.
 
-Unsigned; native GrabCAD open/recompose/save and physical printing remain unverified. Every output retains `print_ready=false`. Synthetic PRINT examples are software demonstrations, not native-generated print jobs, and must not be printed. Geometry companions and output candidates require validation in the intended native printer workflow. Supported input versions, material profiles and resource limits are documented in the bundled schema guide.
-
-The Windows ZIP, portable core, GUI evidence and SHA256SUMS belong to this exact release. Checksums establish download integrity, not publisher authentication or print compatibility. Private inputs and proprietary vendor software are not bundled. Prior releases remain available.
+The Windows ZIP, portable core, GUI evidence and SHA256SUMS identify this exact release. Checksums establish integrity, not publisher authentication or print compatibility. RC5 and earlier releases remain unchanged. No private inputs or proprietary vendor software are included.

@@ -115,6 +115,6 @@ class ReleaseVersionTests(unittest.TestCase):
         self.assertEqual(desktop_core.VERSION,build_windows.VERSION)
         version=desktop_core.VERSION
         self.assertIn(f'GridCAD-Windows-x64-v{version}.zip',
-                      (root/'.github/workflows/windows-desktop.yml').read_text())
+                      (root/'.github/workflows/windows-desktop.yml').read_text(encoding='utf-8'))
         for name in ('README.md','docs/AGENT_INSTALL.md','docs/RELEASE_NOTES.md','gridcad_desktop.py'):
-            self.assertIn(version,(root/name).read_text(),name)
+            self.assertIn(version,(root/name).read_text(encoding='utf-8'),name)

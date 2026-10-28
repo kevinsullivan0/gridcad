@@ -22,7 +22,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parent / 'operator'))
 from gridcad_operator import operator as op
 
-VERSION = '0.2.0-rc.4'
+VERSION = '0.2.0-rc.5'
 PROFILE = 'rectangular-2170-mesh-review-v1'
 TOLERANCE = 0.0001  # mm, fixed; never enlarged to make an input fit.
 MAX_PROJECT_BYTES = 2 * 1024**3

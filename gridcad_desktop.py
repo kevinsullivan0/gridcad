@@ -19,7 +19,7 @@ import diagnostics
 import agent_help
 
 PROMPT = '''Use the installed GridCAD source folder (beside GridCAD.exe), or the exact release source:
-https://github.com/kevinsullivan0/gridcad/tree/v0.2.0-rc.4
+https://github.com/kevinsullivan0/gridcad/tree/v0.2.0-rc.5
 Do not assume the repository default branch matches this installed release.
 Read AGENTS.md, docs/DESKTOP_API.md, docs/RECTANGULAR_SCHEMA.md, and operator/README.md first.
 Use the portable deterministic core. Keep my original files untouched and all private

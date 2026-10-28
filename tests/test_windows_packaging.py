@@ -103,3 +103,18 @@ class SharedRuntimeFilesTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class ReleaseVersionTests(unittest.TestCase):
+    def test_embedded_and_packaged_versions_match(self):
+        import desktop_core
+        import diagnostics
+        from tools import build_windows
+        root=SPEC.parents[1]
+        self.assertEqual(desktop_core.VERSION,diagnostics.VERSION)
+        self.assertEqual(desktop_core.VERSION,build_windows.VERSION)
+        version=desktop_core.VERSION
+        self.assertIn(f'GridCAD-Windows-x64-v{version}.zip',
+                      (root/'.github/workflows/windows-desktop.yml').read_text())
+        for name in ('README.md','docs/AGENT_INSTALL.md','docs/RELEASE_NOTES.md','gridcad_desktop.py'):
+            self.assertIn(version,(root/name).read_text(),name)

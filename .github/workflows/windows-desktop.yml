@@ -1,7 +1,7 @@
 name: Windows desktop
 on:
   push:
-    branches: [windows-desktop, main]
+    branches: [windows-desktop, main, repair/bounded-preview-cell-selection]
   workflow_dispatch:
 permissions:
   contents: read

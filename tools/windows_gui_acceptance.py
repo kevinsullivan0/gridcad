@@ -69,6 +69,29 @@ def main():
     def click(key):
         p=wait(lambda s:key in s.get('controls',{}),'Control visible: '+key)['controls'][key]
         mouse.click(coords=(p['x']+p['w']//2,p['y']+p['h']//2));time.sleep(.25)
+    def cell_point(address):
+        cell=wait(lambda s:address in s.get('worksheet_cells',{}),
+                  'Worksheet cell visible: '+address)['worksheet_cells'][address]
+        return (cell['x']+cell['w']//2,cell['y']+cell['h']//2)
+    def click_cell(address,shift=False):
+        point=cell_point(address)
+        if shift:keyboard.send_keys('{VK_SHIFT down}')
+        try:mouse.click(coords=point)
+        finally:
+            if shift:keyboard.send_keys('{VK_SHIFT up}')
+        time.sleep(.3)
+    def drag_cells(first,last):
+        start,end=cell_point(first),cell_point(last)
+        mouse.press(coords=start)
+        try:
+            for step in range(1,11):
+                mouse.move(coords=(start[0]+(end[0]-start[0])*step//10,
+                                   start[1]+(end[1]-start[1])*step//10))
+                time.sleep(.05)
+        finally:mouse.release(coords=end)
+        time.sleep(.3)
+    def selected_cells():
+        return {address for address,cell in state().get('worksheet_cells',{}).items() if cell['selected']}
     def select_combo(key,index):
         click(key);keyboard.send_keys('{ESC}');keyboard.send_keys('%{DOWN}');time.sleep(.3)
         keyboard.send_keys('{HOME}{UP 50}');keyboard.send_keys('{DOWN}'*index+'{ENTER}');time.sleep(.4)
@@ -120,11 +143,46 @@ def main():
         source_hash=core.op.digest(example/'DO_NOT_PRINT.PRINT');workbook_hash=core.op.digest(example/'DO_NOT_PRINT.xlsx')
         load_book(example/'DO_NOT_PRINT.xlsx')
         assert state()['range']=='D4:I7';checks.append('Suggested exact recipe range excludes sidebars')
+        click_cell('D4')
+        wait(lambda s:s.get('range')=='D4:D4','Actual cell click selects one cell, not its row')
+        assert selected_cells()=={'D4'}
+        click_cell('F6',shift=True)
+        wait(lambda s:s.get('range')=='D4:F6','Actual Shift-click selects a rectangle across columns and rows')
+        assert selected_cells()=={f'{c}{r}' for c in 'DEF' for r in range(4,7)}
+        screenshot('02a-cell-range-highlight.png')
+        click_cell('E5')
+        wait(lambda s:s.get('range')=='E5:E5','Ordinary click restarts a one-cell selection')
+        assert selected_cells()=={'E5'}
+        drag_cells('F6','D4')
+        wait(lambda s:s.get('range')=='D4:F6','Actual reversed mouse drag selects the intended rectangle')
+        assert selected_cells()=={f'{c}{r}' for c in 'DEF' for r in range(4,7)}
+        click_cell('D4');click('next_rows');click_cell('D34',shift=True)
+        wait(lambda s:s.get('range')=='D4:D34','Actual Shift-click extends an anchor across row pages')
+        load_book(example/'DO_NOT_PRINT.xlsx')
+        enter('jump','D4');click('go')
+        drag_cells('D4','I7')
+        wait(lambda s:s.get('range')=='D4:I7','Actual mouse drag chooses the complete synthetic recipe grid')
+        screenshot('02b-full-cell-selection.png')
         click('check_recipes');wait(lambda s:'24 recipes valid' in s.get('status',''),'All exact recipe percentages validate through visible Check recipes button')
         longfile=out/'long sheet.xlsx';make_workbook(longfile,{'D501':'2/0/0/0/98/0','E501':'0/0/0/0/0/100'},1,2)
-        load_book(longfile);enter('jump','D481');click('go');enter('range','D501:E501');click('check_recipes')
+        load_book(longfile);enter('jump','D501');click('go');click_cell('D501');click_cell('E501',shift=True);click('check_recipes')
         wait(lambda s:'2 recipes valid' in s.get('status',''),'Long sheet address navigation and late rectangle selection')
         screenshot('02-long-sheet.png')
+        # Real bounded work, not a delayed/mock worker: exercise the visible
+        # progress indicator and prove Tk keeps publishing state during it.
+        progressbook=out/'large progress workbook.xlsx'
+        make_workbook(progressbook,{f'A{row}':'2/0/0/0/98/0' for row in range(1,100001)},rows=0,columns=0)
+        load_book(progressbook);enter('range','A1:A100000');click('check_recipes')
+        wait(lambda s:s.get('busy') and s.get('progress_visible') and bool(s.get('activity')),
+             'Large recipe validation displays an honest animated activity indicator')
+        stamp=statepath.stat().st_mtime_ns
+        wait(lambda s:s.get('busy') and statepath.stat().st_mtime_ns>stamp,
+             'Tk event loop keeps updating QA state while recipe worker runs')
+        screenshot('02c-active-recipe-validation.png')
+        wait(lambda s:not s.get('busy') and '100000 recipes valid' in s.get('status',''),
+             'Large recipe validation completes without UI freeze',timeout=120)
+        assert not state().get('progress_visible')
+        checks.append('Activity indicator clears after recipe completion')
         cached=out/'cached formula.xlsx';make_workbook(cached,{'D4':'2/0/0/0/98/0'},1,1,formula_cache={'D4':'2/0/0/0/98/0'})
         load_book(cached);enter('range','D4:D4');click('check_recipes')
         wait(lambda s:s.get('diagnostic',{}).get('code')=='GCD101','Unconfirmed formula cache blocked by real UI')

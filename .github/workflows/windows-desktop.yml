@@ -32,6 +32,10 @@ jobs:
           python -m unittest discover -s tests -p test_nonmaterial_comparison.py -v
           python -m unittest discover -s tests -p test_workbook_resource_limits.py -v
           python -m unittest discover -s tests -p test_mesh_resource_limits.py -v
+          python -m unittest discover -s tests -p test_desktop_cell_selection.py -v
+          python -m unittest discover -s tests -p test_preview_renderer.py -v
+          python -m unittest discover -s tests -p test_desktop_activity.py -v
+          python -m unittest discover -s tests -p test_desktop_workbook_activity.py -v
           python -m unittest discover -s tests -p test_windows_packaging.py -v
       - name: Build offline Windows portable distribution
         run: python tools/build_windows.py

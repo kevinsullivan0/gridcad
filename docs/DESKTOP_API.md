@@ -67,7 +67,7 @@ assert audit["nonmaterial_preservation_passed"]
 assert not audit["print_ready"]
 ```
 
-Use `core.op.ValidationError` and a nonzero CLI exit to handle refusal. No overwrite/conflict-bypass API is provided. Preserve hashes and the complete private output audit. `load_project` supplies bounded binary-STL top-surface arrays for relative XY visualization; it does not recognize glyph text or implement native compose semantics.
+Use `core.op.ValidationError` and a nonzero CLI exit to handle refusal. No overwrite/conflict-bypass API is provided. Preserve hashes and the complete private output audit. `load_project` supplies exact lazy binary-STL top-surface sequences sharing one coordinate array per embedded mesh for relative XY visualization; `preview_render_plan` and `preview_triangles` bound display work separately (and may sample); it does not recognize glyph text or implement native compose semantics.
 
 For a different grid layout or unsupported transform, supply a separate mapper with explicit source and numeric contracts, independently reviewed mapping evidence, preservation and round-trip tests, and native acceptance evidence when claiming native compatibility. Triangular/hexagonal lattices, arbitrary rotation/scale and multilayer 3D layouts are unsupported. Different sample shapes, including pyramids, are supported within the documented unambiguous rectangular-grid contract; no geometry is replaced.
 

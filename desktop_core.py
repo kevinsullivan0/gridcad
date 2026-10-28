@@ -8,6 +8,7 @@ from __future__ import annotations
 import copy
 from array import array
 from bisect import bisect_left
+from collections.abc import Sequence
 import hashlib
 import itertools
 import math
@@ -21,7 +22,8 @@ from gridcad_operator import operator as op
 VERSION = '0.2.0-rc.4'
 PROFILE = 'rectangular-2170-mesh-review-v1'
 TOLERANCE = 0.0001  # mm, fixed; never enlarged to make an input fit.
-MAX_INSTANCE_TRIANGLES = 8_000_000
+MAX_UNIQUE_TRIANGLES = 8_000_000
+MAX_PREVIEW_TRIANGLES = 200_000
 ORIENTATIONS = {
     'Rows down; columns right': (1, -1, 0, 1),
     'Rows right; columns down': (0, 1, 1, -1),
@@ -128,6 +130,76 @@ def _mesh(raw):
             'sha256': hashlib.sha256(raw).hexdigest()}
 
 
+class SharedTopSurface(Sequence):
+    """Exact XY coordinates, transformed on access instead of copied per instance.
+
+    A shared mesh owns one compact float array. Each body stores only its matrix;
+    indexing performs the same arithmetic as the former expanded double array.
+    Bounds and conversion never use preview sampling.
+    """
+    __slots__ = ('_coordinates', '_matrix')
+
+    def __init__(self, coordinates, matrix):
+        self._coordinates = coordinates
+        self._matrix = tuple(matrix)
+
+    def __len__(self):
+        return len(self._coordinates)
+
+    def __getitem__(self, index):
+        if isinstance(index, slice):
+            return array('d', (self[i] for i in range(*index.indices(len(self)))))
+        if index < 0:
+            index += len(self)
+        if not 0 <= index < len(self):
+            raise IndexError('top-surface coordinate index out of range')
+        offset = index - index % 2
+        point = (self._coordinates[offset], self._coordinates[offset + 1], 0)
+        row = index % 2
+        m = self._matrix
+        return sum(m[row * 4 + k] * point[k] * 10 for k in range(3)) + m[row * 4 + 3] * 1000
+
+    def __eq__(self, other):
+        if not isinstance(other, Sequence):
+            return NotImplemented
+        return len(self) == len(other) and all(a == b for a, b in zip(self, other))
+
+
+def preview_render_plan(records, excluded_ids=()):
+    """Allocate a fixed polygon budget fairly, including every nonempty body.
+
+    The plan counts drawable top faces, not total mesh faces. Sampling is purely
+    a display decision: all source faces are validated and source bytes preserved.
+    Sorted IDs make allocation independent of dictionary insertion order.
+    """
+    excluded = set(excluded_ids)
+    counts = {oid: len(records[oid]['top']) // 6 for oid in sorted(records)
+              if oid not in excluded}
+    total = sum(counts.values())
+    if total <= MAX_PREVIEW_TRIANGLES:
+        return counts
+    nonempty = sum(count > 0 for count in counts.values())
+    # The body limit is 10,000, below the normal 200,000-polygon budget.
+    if nonempty > MAX_PREVIEW_TRIANGLES:
+        op.fail('Resource limit: too many bodies for the bounded preview.')
+    remaining = MAX_PREVIEW_TRIANGLES - nonempty
+    extra_faces = total - nonempty
+    return {oid: (1 + (count - 1) * remaining // extra_faces if count else 0)
+            for oid, count in counts.items()}
+
+
+def preview_triangles(record, max_triangles):
+    """Yield at most the assigned number of evenly spaced, actual source faces."""
+    top = record['top']
+    count = len(top) // 6
+    limit = min(count, max(0, max_triangles))
+    for sample in range(limit):
+        # Include both ends when possible. No unbounded traversal of skipped faces.
+        face = sample * (count - 1) // (limit - 1) if limit > 1 else 0
+        offset = face * 6
+        yield tuple((top[offset + j], top[offset + j + 1]) for j in (0, 2, 4))
+
+
 def load_project(path):
     document = op.project_document(path)
     nodes, leaves, bodies = op.index(document)
@@ -167,19 +239,23 @@ def load_project(path):
             if member not in cache:
                 if archive.getinfo(member).file_size > 32 * 1024**2:
                     op.fail('Embedded STL exceeds preview limit.')
+                # Preflight the header before allocating/decoding another mesh.
+                with archive.open(member) as stream:
+                    header = stream.read(84)
+                if len(header) != 84:
+                    op.fail('Unsupported or corrupt binary STL.')
+                declared = struct.unpack_from('<I', header, 80)[0]
+                if not 0 < declared <= 600000 or archive.getinfo(member).file_size != 84 + 50 * declared:
+                    op.fail('Unsupported or corrupt binary STL. ASCII and other geometry need an explicit adapter.')
+                if total_triangles + declared > MAX_UNIQUE_TRIANGLES:
+                    op.fail('Unique embedded meshes exceed eight million triangles.')
                 mesh = _mesh(archive.read(member))
                 total_triangles += mesh['triangles']
-                if total_triangles > 8000000:
-                    op.fail('Unique embedded meshes exceed eight million triangles.')
                 cache[member] = mesh
             mesh = cache[member]
-            # Every body owns a transformed preview array, even on a mesh-cache
-            # hit. Preflight the full instance cost before transforming any body.
+            # Shared source geometry is decoded once. Instance amplification adds
+            # only a matrix/view, never a transformed face array or a face loop.
             instance_triangles += mesh['triangles']
-            if instance_triangles > MAX_INSTANCE_TRIANGLES:
-                op.fail('Resource limit: project preview exceeds '
-                        f'{MAX_INSTANCE_TRIANGLES:,} triangles across all body instances. '
-                        'Use a smaller project; no geometry was truncated.')
             body_meshes[oid] = member
         for oid, body in bodies.items():
             node = nodes[oid]
@@ -192,16 +268,18 @@ def load_project(path):
             corners = [transform(v) for v in itertools.product(*zip(*mesh['bounds']))]
             bounds = [[min(v[k] for v in corners) for k in range(3)],
                       [max(v[k] for v in corners) for k in range(3)]]
-            top = array('d')
-            for i in range(0,len(mesh['top']),2):
-                top.extend(transform((mesh['top'][i],mesh['top'][i+1],0))[:2])
+            top = SharedTopSurface(mesh['top'], m)
             records[oid] = {'id': oid, 'name': node.get('name', ''), 'bounds': bounds,
                             'center': [(bounds[0][k] + bounds[1][k]) / 2 for k in range(3)],
                             'mesh_sha256': mesh['sha256'],
                             'top': top}
     return {'path': str(path), 'sha256': op.digest(path), 'document': document,
             'nodes': nodes, 'leaves': leaves, 'bodies': bodies, 'groups': groups,
-            'containers': containers, 'records': records, 'profile': PROFILE}
+            'containers': containers, 'records': records, 'profile': PROFILE,
+            'preview_resources': {'unique_triangles': total_triangles,
+                                  'instance_triangles': instance_triangles,
+                                  'shared_top_bytes': sum(len(mesh['top']) * mesh['top'].itemsize for mesh in cache.values()),
+                                  'max_render_triangles': MAX_PREVIEW_TRIANGLES}}
 
 
 def _clusters(values):
@@ -416,7 +494,7 @@ def confirm(proposal, evidence):
         'evidence': (f"{PROFILE}; mesh-derived relative XY, occurrence corroboration; "
                      f"orientation={proposal['orientation']}; transpose={proposal['transpose']}; grid_basis={proposal.get('grid_basis','mesh-footprint-centers')}. "
                      'Expected percentages are worksheet-derived requests, not OCR or independent label transcription. '
-                     'User inspected actual displayed glyph geometry and confirms the requested mapping: ' + evidence.strip())}
+                     'Preview may sample top-surface triangles; it is not proof of label correspondence. User confirms physical labels/corners from sufficient geometry or source/native inspection: ' + evidence.strip())}
     plan['review']['mapping_sha256'] = op.mapping_digest(plan)
     return plan
 

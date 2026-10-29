@@ -33,6 +33,27 @@ class DistributionOracleTests(unittest.TestCase):
             (base / 'evidence.txt').unlink()
             self.assertEqual(len(journey.validate(report, base)), len(journey.CASES))
 
+    def test_inert_exe_fixture_changes_only_its_manifest_entry(self):
+        import hashlib
+        import json
+        with tempfile.TemporaryDirectory() as td:
+            app = Path(td)
+            (app / 'GridCAD.exe').write_bytes(b'synthetic executable bytes')
+            other = {'path': 'keep.txt', 'size': 4, 'sha256': 'a' * 64}
+            manifest = {'version': '1.0.1', 'files': [
+                {'path': 'GridCAD.exe', 'size': 26, 'sha256': 'b' * 64}, other]}
+            (app / 'keep.txt').write_bytes(b'keep')
+            (app / 'INSTALL_MANIFEST.json').write_text(json.dumps(manifest))
+            journey.make_nonexecutable_fixture(app)
+            updated = json.loads((app / 'INSTALL_MANIFEST.json').read_text())
+            content = (app / 'GridCAD.exe').read_bytes()
+            self.assertFalse(content.startswith(b'MZ'))
+            self.assertEqual(updated['files'][0]['size'], len(content))
+            self.assertEqual(updated['files'][0]['sha256'], hashlib.sha256(content).hexdigest())
+            self.assertEqual(updated['files'][1], other)
+            self.assertEqual(updated['version'], manifest['version'])
+            self.assertEqual((app / 'keep.txt').read_bytes(), b'keep')
+
     @unittest.skipUnless(os.environ.get('GRIDCAD_DISTRIBUTION_ZIP'), 'Set GRIDCAD_DISTRIBUTION_ZIP for exact built-artifact contract')
     def test_exact_combined_artifact_contents(self):
         with zipfile.ZipFile(os.environ['GRIDCAD_DISTRIBUTION_ZIP']) as archive:

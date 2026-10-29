@@ -19,12 +19,13 @@ class ReleasePublicationTests(unittest.TestCase):
     def fixture(self):
         temporary=tempfile.TemporaryDirectory();self.addCleanup(temporary.cleanup)
         folder=Path(temporary.name)
-        names=['GridCAD-Windows-x64-v1.0.0.zip','GridCAD-Source-Windows-v1.0.0.zip',
-               'GridCAD-portable-core-v1.0.0.zip','GridCAD-Windows-GUI-evidence.zip','GridCAD-launcher-evidence.zip']
+        names=['GridCAD-Windows-x64-v1.0.1.zip','GridCAD-Source-Windows-v1.0.1.zip',
+               'GridCAD-portable-core-v1.0.1.zip','GridCAD-Windows-GUI-evidence.zip','GridCAD-launcher-evidence.zip','GridCAD-distribution-evidence.zip']
         for name in names:
             with zipfile.ZipFile(folder/name,'w') as archive:
-                archive.writestr('acceptance.json',json.dumps({'status':'passed','native_grabcad_open_recompose_save_verified':False}))
-        record={'tag':'v1.0.0','source_sha':'a'*40,'run_id':123,'verification_passed':True,
+                members=('distribution-qa/acceptance.json','fallback-qa/acceptance.json') if name=='GridCAD-distribution-evidence.zip' else ('acceptance.json',)
+                for member in members:archive.writestr(member,json.dumps({'status':'passed','native_grabcad_open_recompose_save_verified':False}))
+        record={'tag':'v1.0.1','source_sha':'a'*40,'run_id':123,'verification_passed':True,
                 'assets':{name:hashlib.sha256((folder/name).read_bytes()).hexdigest() for name in names}}
         run={'conclusion':'success','status':'completed','head_sha':'a'*40,'head_branch':'release/v1.0-polish'}
         return folder,record,run
@@ -46,14 +47,14 @@ class ReleasePublicationTests(unittest.TestCase):
         with self.assertRaises(ValueError):self.load().validate_release(record,run,folder)
 
     def test_gui_or_launcher_failure_is_refused_even_if_hash_matches(self):
-        for name in ('GridCAD-Windows-GUI-evidence.zip','GridCAD-launcher-evidence.zip'):
+        for name in ('GridCAD-Windows-GUI-evidence.zip','GridCAD-launcher-evidence.zip','GridCAD-distribution-evidence.zip'):
             folder,record,run=self.fixture()
             with zipfile.ZipFile(folder/name,'w') as archive:archive.writestr('acceptance.json','{"status":"failed"}')
             record['assets'][name]=hashlib.sha256((folder/name).read_bytes()).hexdigest()
             with self.subTest(name=name),self.assertRaises(ValueError):self.load().validate_release(record,run,folder)
 
     def test_missing_required_asset_or_unsafe_filename_is_refused(self):
-        folder,record,run=self.fixture();record['assets'].pop('GridCAD-Source-Windows-v1.0.0.zip')
+        folder,record,run=self.fixture();record['assets'].pop('GridCAD-Source-Windows-v1.0.1.zip')
         with self.assertRaises(ValueError):self.load().validate_release(record,run,folder)
         folder,record,run=self.fixture();record['assets']['../other']='0'*64
         with self.assertRaises(ValueError):self.load().validate_release(record,run,folder)

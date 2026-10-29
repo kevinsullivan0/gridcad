@@ -11,7 +11,7 @@ The frozen package has two entry points at its root:
 - `_internal/`: one shared Python runtime, standard-library archive, extension
   modules, Tcl/Tk, Pillow/PNG support, and bundled resources.
 
-Keep the entire extracted folder together. The CLI is no longer under
+The normal starting point is `Start GridCAD.bat`: it verifies and copies the complete app into a versioned per-user location, then offers a Desktop shortcut. See `docs/SOURCE_LAUNCHER.md` for setup, source fallback, upgrades and removal. Both EXEs include Explorer version metadata; this is not a publisher signature. For direct portable EXE or CLI use, keep the entire extracted folder together. The CLI is no longer under
 `advanced/`; scripts referring to that previous path must use the root-level
 `GridCAD-core.exe`. Neither launcher requires installed Python, downloads a
 runtime, or starts the other launcher. Sharing files does not mean sharing a
@@ -42,5 +42,7 @@ during, and after the GUI session. Use paths containing spaces and an unrelated
 working directory, with installed Python removed from the launch environment.
 Check real dialogs, PNG previews, saving, local help, license display, and
 optional agent tools as well as executable exit codes. Runtime sharing alone
-does not establish a releasable candidate; RC4 remains held until all required
-release gates have passed.
+does not establish a releasable candidate; all required application and distribution
+journey gates must pass for the exact release artifact.
+
+The combined distribution gate runs `tools/windows_distribution_acceptance.py` against the final Windows ZIP. It exercises per-user installation, consent/cancellation, duplicate launch refusal, Desktop shortcut after deleting the download, version preservation and source recovery. GUI screenshots/process records and launcher logs are attached as release evidence. Hosted tests are not Smart App Control, native GrabCAD or physical printer acceptance.

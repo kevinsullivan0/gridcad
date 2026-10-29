@@ -60,5 +60,12 @@ class CombinedLauncherContractTests(unittest.TestCase):
         self.assertIn('INSTALL_MANIFEST.json',text)
         self.assertIn('WaitForExit',text)
 
+    def test_loaded_scriptblock_helpers_use_their_invocation_scope(self):
+        # The BAT invokes Create(...), not -File. $script: targets its outer
+        # -Command script and loses the launcher's version/log variables.
+        source=(ROOT/'tools/windows_launcher.ps1').read_text()
+        self.assertNotIn('$script:Version',source)
+        self.assertNotIn('$script:log',source)
+
 
 if __name__=='__main__':unittest.main()

@@ -9,14 +9,15 @@ import tempfile
 import zipfile
 
 REPOSITORY='kevinsullivan0/gridcad'
-TAG='v1.0.0'
+TAG='v1.0.1'
 BRANCH='release/v1.0-polish'
 REQUIRED_ASSETS={
-    'GridCAD-Windows-x64-v1.0.0.zip',
-    'GridCAD-Source-Windows-v1.0.0.zip',
-    'GridCAD-portable-core-v1.0.0.zip',
+    'GridCAD-Windows-x64-v1.0.1.zip',
+    'GridCAD-Source-Windows-v1.0.1.zip',
+    'GridCAD-portable-core-v1.0.1.zip',
     'GridCAD-Windows-GUI-evidence.zip',
     'GridCAD-launcher-evidence.zip',
+    'GridCAD-distribution-evidence.zip',
 }
 
 
@@ -28,25 +29,30 @@ def validate_release(record,run,folder):
     """Validate a frozen release record without network or publication."""
     folder=Path(folder)
     if record.get('tag')!=TAG or record.get('verification_passed') is not True:
-        raise ValueError('This publication path requires a verified GridCAD 1.0 record.')
+        raise ValueError('This publication path requires a verified GridCAD 1.0.1 record.')
     if (run.get('status')!='completed' or run.get('conclusion')!='success'
             or run.get('head_sha')!=record.get('source_sha')
             or run.get('head_branch')!=BRANCH):
         raise ValueError('The exact source revision must have a passing Windows run.')
     assets=record.get('assets',{})
     if set(assets)!=REQUIRED_ASSETS:
-        raise ValueError('Release assets must be the complete, explicit 1.0 set.')
+        raise ValueError('Release assets must be the complete, explicit 1.0.1 set.')
     for name,digest in assets.items():
         if Path(name).name!=name or not re.fullmatch(r'[0-9a-f]{64}',digest):
             raise ValueError('Invalid asset filename or SHA256.')
         path=folder/name
         if not path.is_file() or path.is_symlink() or hashlib.sha256(path.read_bytes()).hexdigest()!=digest:
             raise ValueError('Asset digest mismatch: '+name)
-    for name in ('GridCAD-Windows-GUI-evidence.zip','GridCAD-launcher-evidence.zip'):
+    for name in ('GridCAD-Windows-GUI-evidence.zip','GridCAD-launcher-evidence.zip','GridCAD-distribution-evidence.zip'):
         with zipfile.ZipFile(folder/name) as archive:
             members=[n for n in archive.namelist() if Path(n).name=='acceptance.json']
-            if len(members)!=1 or json.loads(archive.read(members[0])).get('status')!='passed':
+            expected=({'distribution-qa/acceptance.json','fallback-qa/acceptance.json'}
+                      if name=='GridCAD-distribution-evidence.zip' else None)
+            if ((expected is not None and set(members)!=expected)
+                    or (expected is None and len(members)!=1)
+                    or any(json.loads(archive.read(member)).get('status')!='passed' for member in members)):
                 raise ValueError('Missing or failed Windows acceptance: '+name)
+
 
 
 def main():
@@ -72,7 +78,7 @@ def main():
         notes+=f'\nSource commit: `{record["source_sha"]}`. Verified Windows run: https://github.com/{repo}/actions/runs/{record["run_id"]}.\n'
         notes_path=folder/'release-notes.txt';notes_path.write_text(notes,encoding='utf-8')
         gh('release','create',TAG,'--repo',repo,'--target',record['source_sha'],
-           '--title','GridCAD 1.0 — named PRINT exports and source launcher',
+           '--title','GridCAD 1.0.1 — one-download setup and desktop shortcut',
            '--notes-file',str(notes_path),
            *[str(folder/name) for name in sorted(record['assets'])],str(folder/'SHA256SUMS.txt'))
 

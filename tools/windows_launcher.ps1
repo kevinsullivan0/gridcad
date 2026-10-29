@@ -8,14 +8,14 @@ $ready = $null
 
 function Write-Status([string]$message) {
     Write-Host $message
-    if ($script:log) { Add-Content -LiteralPath $script:log -Value ((Get-Date -Format o)+' '+$message) -Encoding UTF8 }
+    if ($log) { Add-Content -LiteralPath $log -Value ((Get-Date -Format o)+' '+$message) -Encoding UTF8 }
 }
 
 function Read-Manifest([string]$folder) {
     $path = Join-Path $folder 'INSTALL_MANIFEST.json'
     if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw 'The complete download is missing. Extract the complete Windows ZIP and try again.' }
     $record = Get-Content -LiteralPath $path -Raw -Encoding UTF8 | ConvertFrom-Json
-    if ($record.version -ne $script:Version -or $record.files.Count -lt 10) { throw 'This download has an unsupported installation manifest. Download the current complete Windows package.' }
+    if ($record.version -ne $Version -or $record.files.Count -lt 10) { throw 'This download has an unsupported installation manifest. Download the current complete Windows package.' }
     $names = @{}
     foreach ($entry in $record.files) {
         $name = [string]$entry.path
@@ -41,10 +41,10 @@ function Test-Package([string]$folder, $manifest) {
 
 function Install-Package([string]$from, [string]$destination, $manifest) {
     if (Test-Path -LiteralPath $destination) {
-        if (-not (Test-Package $destination $manifest)) { throw ('An existing GridCAD '+$script:Version+' folder is incomplete or changed. Nothing was overwritten. Keep any files you added, rename that folder, and run setup again: '+$destination) }
+        if (-not (Test-Package $destination $manifest)) { throw ('An existing GridCAD '+$Version+' folder is incomplete or changed. Nothing was overwritten. Keep any files you added, rename that folder, and run setup again: '+$destination) }
         return
     }
-    Write-Status ('Set up GridCAD '+$script:Version+' for your account in: '+$destination)
+    Write-Status ('Set up GridCAD '+$Version+' for your account in: '+$destination)
     Write-Host 'This copies the included app only. No administrator rights, downloads or Windows setting changes are needed.'
     $answer = Read-Host 'Press Enter to set up and open GridCAD, or type N to cancel'
     if ($answer -match '^[nN]$') { throw [OperationCanceledException]::new('Setup canceled. No app was installed.') }
@@ -82,7 +82,7 @@ function Offer-Shortcut([string]$folder) {
     $shortcut.TargetPath = Join-Path $folder 'Start GridCAD.bat'
     $shortcut.WorkingDirectory = $folder
     $shortcut.IconLocation = (Join-Path $folder 'resources\gridcad.ico')+',0'
-    $shortcut.Description = 'GridCAD '+$script:Version+' per-user launcher'
+    $shortcut.Description = 'GridCAD '+$Version+' per-user launcher'
     $shortcut.Save()
     Write-Status 'Desktop shortcut ready. It keeps working if you delete the downloaded ZIP and its extracted folder.'
 }
@@ -90,7 +90,7 @@ function Offer-Shortcut([string]$folder) {
 function Get-Ready([string]$path, [string]$token, [int]$expectedPid = 0) {
     if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { return $null }
     try { $record = Get-Content -LiteralPath $path -Raw -Encoding UTF8 | ConvertFrom-Json } catch { return $null }
-    if ($record.token -ne $token -or $record.version -ne $script:Version -or ($expectedPid -and $record.pid -ne $expectedPid)) { return $null }
+    if ($record.token -ne $token -or $record.version -ne $Version -or ($expectedPid -and $record.pid -ne $expectedPid)) { return $null }
     return $record
 }
 

@@ -118,3 +118,17 @@ class ReleaseVersionTests(unittest.TestCase):
                       (root/'.github/workflows/windows-desktop.yml').read_text(encoding='utf-8'))
         for name in ('README.md','docs/AGENT_INSTALL.md','docs/RELEASE_NOTES.md','gridcad_desktop.py'):
             self.assertIn(version,(root/name).read_text(encoding='utf-8'),name)
+
+
+class WindowsVersionMetadataTests(unittest.TestCase):
+    def test_build_writes_explorer_version_and_mit_owner_metadata(self):
+        from tools import build_windows
+        self.assertTrue(hasattr(build_windows,'write_version_resource'),'Windows Explorer version metadata is missing')
+        with tempfile.TemporaryDirectory() as td:
+            path=Path(td)/'version.txt'
+            build_windows.write_version_resource(path,'1.0.1')
+            text=path.read_text()
+            for expected in ("filevers=(1, 0, 1, 0)","StringStruct('ProductVersion', '1.0.1')",'Kevin Sullivan','GridCAD'):
+                self.assertIn(expected,text)
+        source=SPEC.read_text()
+        self.assertEqual(source.count("version=str(root / 'build/windows-version.txt')"),2)

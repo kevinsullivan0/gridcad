@@ -79,12 +79,12 @@ check_shared_files(cli)
 gui_exe = EXE(
     PYZ(gui.pure), gui.scripts, [], exclude_binaries=True,
     name='GridCAD', console=False, icon=str(root / 'resources/gridcad.ico'),
-    contents_directory='_internal',
+    contents_directory='_internal', version=str(root / 'build/windows-version.txt'),
 )
 cli_exe = EXE(
     PYZ(cli.pure), cli.scripts, [], exclude_binaries=True,
     name='GridCAD-core', console=True, icon=str(root / 'resources/gridcad.ico'),
-    contents_directory='_internal',
+    contents_directory='_internal', version=str(root / 'build/windows-version.txt'),
 )
 # COLLECT combines/deduplicates both analyses' DLL and data tables. Each EXE
 # retains its own Python module archive and bootloader mode; neither launches

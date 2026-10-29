@@ -65,6 +65,22 @@ def validate(report: dict, base: Path) -> list[str]:
     return errors
 
 
+def make_nonexecutable_fixture(app: Path) -> None:
+    """Alter only a disposable extracted copy, preserving integrity verification."""
+    import hashlib
+    exe = app / 'GridCAD.exe'
+    manifest_path = app / 'INSTALL_MANIFEST.json'
+    manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
+    entries = [entry for entry in manifest['files'] if entry['path'] == 'GridCAD.exe']
+    if len(entries) != 1:
+        raise ValueError('Fixture requires exactly one GridCAD.exe manifest entry')
+    content = b'GridCAD ordinary functional fixture: deliberately not an executable.\r\n'
+    exe.write_bytes(content)
+    entries[0]['size'] = len(content)
+    entries[0]['sha256'] = hashlib.sha256(content).hexdigest()
+    manifest_path.write_text(json.dumps(manifest, indent=2), encoding='utf-8')
+
+
 def acceptance(args):
     """Operate only a fresh disposable Windows artifact installation."""
     import hashlib
@@ -96,8 +112,10 @@ def acceptance(args):
     powershell = str(system / 'WindowsPowerShell/v1.0/powershell.exe')
 
     def ps(code):
+        code = '[Console]::OutputEncoding=[Text.UTF8Encoding]::new($false); ' + code
         result = subprocess.run([powershell, '-NoProfile', '-Command', code],
-                                env=env, capture_output=True, text=True, check=True, timeout=30)
+                                env=env, capture_output=True, text=True, encoding='utf-8',
+                                errors='strict', check=True, timeout=30)
         return result.stdout.strip()
 
     desktop = Path(ps("[Environment]::GetFolderPath('Desktop')"))
@@ -122,7 +140,7 @@ def acceptance(args):
     def shortcut_command(path):
         return f'"{os.environ["COMSPEC"]}" /d /v:off /s /c "start "" /wait "{path}""'
 
-    def launch(label, command, expected_mode):
+    def launch(label, command, expected_mode, consent=True):
         logpath = out / (label + '.log')
         log = logpath.open('w', encoding='utf-8')
         process = subprocess.Popen(command, cwd=out, env=env, stdin=subprocess.PIPE,
@@ -131,8 +149,11 @@ def acceptance(args):
         # Public, ordinary prompts: shortcut, fallback, and dependencies. No
         # production hook substitutes for consent or for the app's startup.
         try:
-            process.stdin.write('Y\nY\nY\nY\n')
-            process.stdin.flush()
+            if consent:
+                process.stdin.write('Y\nY\nY\nY\n')
+                process.stdin.flush()
+            else:
+                process.stdin.close()
         except (BrokenPipeError, OSError):
             pass
         window = None
@@ -195,7 +216,44 @@ def acceptance(args):
         assert expected_text in result.stdout, (label, result.stdout)
         checks.append(label + ': truthful refusal and expected exit status')
 
+    def offline_source_repeat(label):
+        preference = local / ('GridCAD/Launcher/' + version + '-mode.txt')
+        assert preference.read_text(encoding='ascii').strip() == 'source'
+        saved_preference = preference.read_bytes()
+        env['HTTP_PROXY'] = env['HTTPS_PROXY'] = 'http://127.0.0.1:1'
+        try:
+            launch(label, batch(installed / 'Start GridCAD.bat', '-NoShortcut'), 'source', consent=False)
+        finally:
+            env.pop('HTTP_PROXY', None)
+            env.pop('HTTPS_PROXY', None)
+        text = (out / (label + '.log')).read_text(encoding='utf-8', errors='replace')
+        assert 'Opening the included Windows app' not in text, text
+        assert 'Try the source launch method now?' not in text, text
+        assert 'Install these free components now?' not in text, text
+        assert 'Set up GridCAD now?' not in text, text
+        assert 'No downloads or installation needed' in text, text
+        assert preference.read_bytes() == saved_preference
+        checks.append('Default offline launch reuses persisted source preference without EXE retry or dependency consent')
+
     try:
+        if args.exe_failure_fixture:
+            make_nonexecutable_fixture(app)
+            launch('fixture-actual-exe-failure-source', batch(app / 'Start GridCAD.bat', '-NoShortcut'), 'source')
+            text = (out / 'fixture-actual-exe-failure-source.log').read_text(encoding='utf-8', errors='replace')
+            assert 'The Windows app did not start:' in text, text
+            assert 'Try the source launch method now?' in text, text
+            assert 'Opening the source launch method' in text, text
+            assert 'Windows security blocked' not in text and 'was blocked by Windows' not in text, text
+            checks.append('Inert non-executable EXE fixture triggers actual launch failure then ordinary consented source fallback')
+            offline_source_repeat('fixture-default-source-offline')
+            report = {'status': 'passed', 'fixture': 'extracted EXE replaced by inert text; matching install manifest entry updated',
+                      'artifact_sha256': hashlib.sha256(args.zip.read_bytes()).hexdigest(),
+                      'version': version, 'checks': checks,
+                      'limits': ['Disposable fixture only; original published ZIP unchanged.',
+                                 'Functional launch-failure recovery, not Windows security compatibility certification.']}
+            (out / 'acceptance.json').write_text(json.dumps(report, indent=2), encoding='utf-8')
+            print(json.dumps(report, indent=2))
+            return
         manifest_path = app / 'INSTALL_MANIFEST.json'
         manifest_bytes = manifest_path.read_bytes()
         try:
@@ -241,6 +299,7 @@ def acceptance(args):
         launch('03-deleted-download-shortcut', shortcut_command(shortcut), 'exe')
         if args.source:
             launch('04-installed-forced-source', batch(installed / 'Start GridCAD.bat', '-Source', '-NoShortcut'), 'source')
+            offline_source_repeat('05-default-source-offline')
         report = {'status': 'passed', 'artifact_sha256': hashlib.sha256(args.zip.read_bytes()).hexdigest(),
                   'version': version, 'checks': checks,
                   'limits': ['Hosted Windows functional evidence is not user-device or Smart App Control acceptance.',
@@ -273,6 +332,7 @@ def main() -> int:
     parser.add_argument('--zip', type=Path, help='combined Windows artifact to exercise')
     parser.add_argument('--out', type=Path)
     parser.add_argument('--source', action='store_true', help='also exercise consented forced source startup')
+    parser.add_argument('--exe-failure-fixture', action='store_true', help='separate disposable extracted-package EXE launch-failure/source-recovery journey')
     parser.add_argument('--report', type=Path, help='validate an existing full manual matrix report')
     args = parser.parse_args()
     if args.zip:

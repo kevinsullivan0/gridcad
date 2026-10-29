@@ -21,6 +21,26 @@ def zip_folder(folder,destination):
             if path.is_file():z.write(path,Path(folder.name)/path.relative_to(folder))
 
 
+def write_version_resource(path, version):
+    parts=tuple(int(part) for part in version.split('.'))
+    if len(parts)!=3 or any(part<0 or part>65535 for part in parts):
+        raise ValueError('Windows version must contain three 16-bit integers')
+    numbers=parts+(0,)
+    text=("VSVersionInfo(ffi=FixedFileInfo(filevers="+repr(numbers)+", prodvers="+repr(numbers)+
+          ", mask=0x3f, flags=0, OS=0x40004, fileType=0x1, subtype=0, date=(0,0)), kids=["+
+          "StringFileInfo([StringTable('040904B0', ["+
+          "StringStruct('CompanyName', 'Kevin Sullivan'), "+
+          "StringStruct('FileDescription', 'GridCAD material conversion'), "+
+          "StringStruct('FileVersion', '"+version+".0'), "+
+          "StringStruct('ProductName', 'GridCAD'), "+
+          "StringStruct('ProductVersion', '"+version+"'), "+
+          "StringStruct('LegalCopyright', 'Copyright (c) 2026 Kevin Sullivan; MIT licensed')"+
+          "])]), VarFileInfo([VarStruct('Translation', [1033, 1200])])])")
+    path=Path(path);path.parent.mkdir(parents=True,exist_ok=True)
+    path.write_text(text,encoding='utf-8')
+    return path
+
+
 def create_install_manifest(folder, version):
     """Hash every explicitly assembled app file before installation/copying."""
     folder=Path(folder)
@@ -57,6 +77,7 @@ def main():
     subprocess.run([sys.executable,'tools/make_desktop_examples.py','examples/rectangular'],cwd=ROOT,check=True)
     for shape in ['pyramid','mixed']:
         subprocess.run([sys.executable,'tools/make_desktop_examples.py','examples/'+shape,'--shape',shape],cwd=ROOT,check=True)
+    write_version_resource(ROOT/'build/windows-version.txt',VERSION)
     # Supported multi-entry onedir bundle: both launchers share one _internal.
     subprocess.run([sys.executable,'-m','PyInstaller','--clean','--noconfirm',
                     'tools/GridCAD.spec'],cwd=ROOT,check=True)

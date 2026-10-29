@@ -88,6 +88,15 @@ def main():
         pe=pefile.PE(str(executable))
         ids={entry.id for entry in pe.DIRECTORY_ENTRY_RESOURCE.entries}
         assert 3 in ids and 14 in ids  # RT_ICON and RT_GROUP_ICON
+        strings={}
+        for group in getattr(pe,'FileInfo',[]):
+            for entry in group:
+                if entry.Key==b'StringFileInfo':
+                    for table in entry.StringTable:
+                        strings.update({k.decode('utf-8'):v.decode('utf-8') for k,v in table.entries.items()})
+        assert strings.get('ProductVersion')==core.VERSION,strings
+        assert strings.get('FileVersion')==core.VERSION+'.0',strings
+        assert strings.get('CompanyName')=='Kevin Sullivan',strings
         pe.close()
     checks.append('Original multi-size Windows icon embedded in GUI and CLI PE resources; editable SVG bundled')
 

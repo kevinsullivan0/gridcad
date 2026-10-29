@@ -1358,22 +1358,23 @@ class App:
         names=('worktab','geotab','maptab','helptab')
         # Ttk does not expose a tab bounding-box command. Hit-test a bounded
         # strip of the actual widget instead of assuming font-dependent widths.
-        size=(self.notebook.winfo_width(),self.notebook.winfo_height(),self.notebook.winfo_rootx(),self.notebook.winfo_rooty())
+        size=(self.notebook.winfo_width(),self.notebook.winfo_height(),self.notebook.winfo_rootx(),self.notebook.winfo_rooty(),self.notebook.select())
         if getattr(self,'tab_qa_cache',None) and self.tab_qa_cache[0]==size:return self.tab_qa_cache[1]
-        row=None
+        # Selected tabs can be taller than their neighbors. A scan along only
+        # the first tab's top edge misses other tabs under the Windows theme.
         for y in range(0,min(45,size[1]),2):
-            try:self.notebook.index(f'@10,{y}');row=y;break
-            except tk.TclError:continue
-        if row is not None:
-            for x in range(size[0]):
-                try:index=self.notebook.index(f'@{x},{row}')
+            for x in range(0,size[0],4):
+                try:index=self.notebook.index(f'@{x},{y}')
                 except tk.TclError:continue
                 if index>=len(names):continue
                 key=names[index]
-                if key not in positions:positions[key]=[x,row,x,row]
-                else:positions[key][2]=x
+                if key not in positions:positions[key]=[x,y,x,y]
+                else:
+                    box=positions[key]
+                    box[0]=min(box[0],x);box[1]=min(box[1],y)
+                    box[2]=max(box[2],x);box[3]=max(box[3],y)
         result={key:{'x':self.notebook.winfo_rootx()+(box[0]+box[2])//2,
-                     'y':self.notebook.winfo_rooty()+box[1]+8} for key,box in positions.items()}
+                     'y':self.notebook.winfo_rooty()+(box[1]+box[3])//2} for key,box in positions.items()}
         self.tab_qa_cache=(size,result)
         return result
 

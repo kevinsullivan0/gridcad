@@ -57,7 +57,7 @@ def main():
     extracted=out/'extracted package with spaces'
     with zipfile.ZipFile(a.zip) as archive:archive.extractall(extracted)
     folder=extracted/'GridCAD';exe=folder/'GridCAD.exe';example=folder/'examples/rectangular'
-    statepath=out/'gui-state.json';checks=[];process=None
+    statepath=out/'gui-state.json';checks=[];process=None;main_window_handle=None
     # Neither launcher may accidentally borrow the CI machine's Python install.
     packaged_environment={k:v for k,v in os.environ.items() if not k.upper().startswith('PYTHON')}
     system32=Path(os.environ['SystemRoot'])/'System32'
@@ -194,6 +194,7 @@ def main():
         process=subprocess.Popen([str(exe),'--qa-state',str(statepath)],cwd=out,env=packaged_environment)
         wait(lambda s:'open_workbook' in s.get('controls',{}),'Extracted EXE launched without source cwd or Python installation dependency')
         app=Application(backend='win32').connect(process=process.pid)
+        main_window_handle=app.top_window().handle
         app.top_window().maximize();time.sleep(.7)
         screenshot('01-launched.png')
         click('general_help');wait(lambda s:s.get('help_document')=='docs/DESKTOP_MANUAL.md','Ordinary Help opens offline quick start')
@@ -207,6 +208,13 @@ def main():
         expected_links=[]
         for key,url in [('about_project','https://github.com/kevinsullivan0/gridcad'),
                         ('about_releases','https://github.com/kevinsullivan0/gridcad/releases')]:
+            # The real browser-handler child can take foreground focus. A
+            # click on an inactive Tk Text may only activate its window, so
+            # restore and verify the OS foreground before every link click.
+            import win32gui
+            window=app.top_window();window.set_focus()
+            wait(lambda s:win32gui.GetForegroundWindow()==window.handle,
+                 'GridCAD is the foreground window before hyperlink click: '+key)
             point=state()['about_links'][key]
             assert point['url']==url
             mouse.click(coords=(point['x'],point['y']))
@@ -505,7 +513,9 @@ def main():
         environment=dict(packaged_environment,LOCALAPPDATA=str(blocked_root))
         process=subprocess.Popen([str(exe),'--qa-state',str(statepath)],cwd=out,env=environment)
         wait(lambda s:'open_workbook' in s.get('controls',{}),'App relaunch with unwritable diagnostics location')
-        Application(backend='win32').connect(process=process.pid).top_window().maximize();time.sleep(.4)
+        relaunched_window=Application(backend='win32').connect(process=process.pid).top_window()
+        main_window_handle=relaunched_window.handle
+        relaunched_window.maximize();time.sleep(.4)
         load_book(cached);enter('range','D4:D4');click('check_recipes')
         # Keep one complete observed snapshot: a second read may transiently
         # return {} while the optional state file is atomically replaced.
@@ -520,7 +530,24 @@ def main():
                      'native_grabcad_open_recompose_save_verified':False,'signed':False}
         (out/'acceptance.json').write_text(json.dumps(result_json,indent=2),encoding='utf-8');print(json.dumps(result_json,indent=2))
     except Exception as exc:
-        screenshot('failure.png');(out/'acceptance.json').write_text(json.dumps({'status':'failed','error':str(exc),'checks':checks,'state':state()},indent=2),encoding='utf-8');raise
+        # Read-only failure evidence distinguishes a missing handoff from a
+        # duplicate/wrong URL and records foreground ownership without another
+        # click or focus change. Diagnostic collection must not hide the error.
+        browser_evidence={'browser_log':None,'foreground_hwnd':None,
+                          'main_hwnd':main_window_handle}
+        try:
+            browser_evidence['browser_log']=browser_log.read_text(encoding='utf-8') if browser_log.exists() else ''
+        except Exception as diagnostic_error:
+            browser_evidence['browser_log_error']=str(diagnostic_error)
+        try:
+            import win32gui
+            browser_evidence['foreground_hwnd']=win32gui.GetForegroundWindow()
+        except Exception as diagnostic_error:
+            browser_evidence['foreground_error']=str(diagnostic_error)
+        screenshot('failure.png')
+        (out/'acceptance.json').write_text(json.dumps({'status':'failed','error':str(exc),
+            'checks':checks,'state':state(),'browser_handoff_evidence':browser_evidence},indent=2),encoding='utf-8')
+        raise
     finally:
         if process and process.poll() is None:
             try:Application(backend='win32').connect(process=process.pid).top_window().close();process.wait(timeout=10)

@@ -423,10 +423,7 @@ class App:
         vscroll=ttk.Scrollbar(frame,orient='vertical',command=self.canvas.yview);vscroll.grid(row=0,column=1,sticky='ns')
         self.canvas.configure(xscrollcommand=hscroll.set,yscrollcommand=vscroll.set)
         self.resize_after=None
-        def resize(_):
-            if self.resize_after:self.root.after_cancel(self.resize_after)
-            self.resize_after=self.root.after(180,self.draw_geometry)
-        self.canvas.bind('<Configure>',resize)
+        self.canvas.bind('<Configure>',self.schedule_geometry_draw)
         self.canvas.bind('<Button-1>',self.click_geometry)
         ttk.Label(view, text='X → right, Y ↑ up • Samples: blue • Selected printed labels: dark • Other preserved bodies: gray. Click a sample for exact channels.', wraplength=460).grid(row=2,column=0,sticky='w')
         ttk.Label(self.geotab,text='Save creates a separate result. Check physical labels and validate in GrabCAD before printing.').grid(row=1,column=0,sticky='w',pady=5)
@@ -706,9 +703,7 @@ class App:
         self.stage_updates.put(description)
 
     def refresh_activity(self):
-        rendering = (getattr(self, 'render_future', None) is not None or
-                     getattr(self, 'render_pending', None) is not None or
-                     getattr(self, 'render_paint_pending', False))
+        rendering = self.geometry_busy()
         stage = self.file_stage if self.future is not None else (
             getattr(self, 'render_stage', '') or 'Rendering bounded geometry preview…' if rendering else '')
         self.activity.set(stage)
@@ -1126,7 +1121,25 @@ class App:
         if self.render_future is not None:self.render_future.cancel()
         self.render_stage=''
 
+    def geometry_busy(self):
+        return (getattr(self,'resize_after',None) is not None
+                or getattr(self,'render_future',None) is not None
+                or getattr(self,'render_pending',None) is not None
+                or getattr(self,'render_paint_pending',False))
+
+    def schedule_geometry_draw(self, _=None):
+        if self.resize_after is not None:self.root.after_cancel(self.resize_after)
+        def settled():
+            self.resize_after=None
+            self.draw_geometry()
+        self.resize_after=self.root.after(180,settled)
+        self.refresh_activity();self.update_save()
+
     def draw_geometry(self):
+        # A direct redraw supersedes the resize timer; do not lose its handle
+        # and allow it to clear a newly completed preview afterward.
+        if getattr(self,'resize_after',None) is not None:
+            self.root.after_cancel(self.resize_after)
         self.resize_after=None
         if not hasattr(self,'canvas'):return
         if not self.project:
@@ -1252,6 +1265,8 @@ class App:
         x=self.canvas.canvasx(event.x);y=self.canvas.canvasy(event.y)
         hits=self.canvas.find_overlapping(x,y,x,y)
         oid=next((self.canvas_ids[item] for item in reversed(hits) if item in self.canvas_ids),None)
+        if getattr(self,'qa_state',None):
+            self.last_geometry_click={'x':x,'y':y,'hit':oid,'busy':self.geometry_busy()}
         if oid:self.inspect_geometry(oid)
 
     def inspect_geometry(self,oid):
@@ -1280,7 +1295,7 @@ class App:
 
     def update_save(self):
         pending=self.proposal and self.proposal.get('label_material',{}).get('conflicts') and not self.proposal.get('label_material',{}).get('replacement_confirmed')
-        enabled=not pending and self.proposal is not None and self.future is None and not getattr(self,'render_failed',False) and not (getattr(self,'render_future',None) is not None or getattr(self,'render_pending',None) is not None or getattr(self,'render_paint_pending',False))
+        enabled=not pending and self.proposal is not None and self.future is None and not getattr(self,'render_failed',False) and not self.geometry_busy()
         self.save_button.configure(state='normal' if enabled else 'disabled')
 
     def save(self):
@@ -1381,8 +1396,8 @@ class App:
     def write_qa_state(self):
         focused=self.root.focus_get()
         focused_control=next((key for key,widget in self.controls.items() if widget==focused),None)
-        state={'selected_sample':getattr(self,'inspected_oid',None),'tab_positions':self.tab_qa_positions(),'geometry_samples':self.geometry_qa_samples(),'focused_control':focused_control,'app_version':diagnostics.VERSION,'about_links':self.about_link_qa_points(),'status':self.status.get(),'summary':self.summary.get(),'detail':self.detail.get(),'errors':self.errors,
-               'busy':self.future is not None or getattr(self,'render_future',None) is not None or getattr(self,'render_pending',None) is not None or getattr(self,'render_paint_pending',False),
+        state={'last_geometry_click':getattr(self,'last_geometry_click',None),'selected_sample':getattr(self,'inspected_oid',None),'tab_positions':self.tab_qa_positions(),'geometry_samples':self.geometry_qa_samples(),'focused_control':focused_control,'app_version':diagnostics.VERSION,'about_links':self.about_link_qa_points(),'status':self.status.get(),'summary':self.summary.get(),'detail':self.detail.get(),'errors':self.errors,
+               'busy':self.future is not None or self.geometry_busy(),
                'activity':self.activity.get(),'progress_visible':bool(self.progress.winfo_ismapped()),'workbook':str(self.workbook_path) if self.workbook_path else None,
                'project':str(self.project_path) if self.project_path else None,
                'range':self.cell_range.get(),'sheet':self.sheet.get(),'proposal':self.proposal is not None,
@@ -1403,8 +1418,7 @@ class App:
         self.root.after(250,self.write_qa_state)
 
     def close(self):
-        if (self.future is not None or getattr(self,'render_future',None) is not None
-                or getattr(self,'render_pending',None) is not None or getattr(self,'render_paint_pending',False)):
+        if self.future is not None or self.geometry_busy():
             messagebox.showinfo('GridCAD','Please let the current loading, rendering, or save operation finish before closing.',parent=self.root);return
         self.pool.shutdown(wait=False);self.root.destroy()
 

@@ -166,9 +166,11 @@ def main():
     def choose_top_left_rows_down():
         select_combo('mapping_corner',0);select_combo('orientation',0)
     def click_sample(oid):
-        sample=wait(lambda s:oid in s.get('geometry_samples',{}),
+        sample=wait(lambda s:not s.get('busy') and oid in s.get('geometry_samples',{}),
                     'Preview sample visible: '+oid)['geometry_samples'][oid]
-        mouse.click(coords=(sample['x']+sample['w']//2,sample['y']+sample['h']//2))
+        point=(sample['x']+sample['w']//2,sample['y']+sample['h']//2)
+        checks.append(f'Preview OS click target: {oid} at {point}; ready rectangle {sample}')
+        mouse.click(coords=point)
         time.sleep(.3)
     def select_tab(key):
         point=wait(lambda s:key in s.get('tab_positions',{}),'Visible notebook tab: '+key)['tab_positions'][key]

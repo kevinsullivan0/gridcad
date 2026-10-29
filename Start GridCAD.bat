@@ -13,6 +13,9 @@ if not exist "%~dp0tools\source_launcher.py" (
   exit /b 1
 )
 echo GridCAD source launcher
+rem Keep PowerShell 7 or user-installed modules out of this Windows PowerShell child.
+rem SETLOCAL makes this process-local; no registry or security policy is changed.
+set "PSModulePath=%SystemRoot%\System32\WindowsPowerShell\v1.0\Modules"
 "%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -Command ^
  "$ErrorActionPreference='Stop';" ^
  "function Test-OfficialPython($p) { if (-not (Test-Path -LiteralPath $p -PathType Leaf)) { return $false }; $s=Get-AuthenticodeSignature -LiteralPath $p; if ($s.Status -ne 'Valid' -or $s.SignerCertificate.Subject -notmatch '(^|,\s*)(CN|O)=Python Software Foundation(,|$)') { return $false }; $v=(Get-Item -LiteralPath $p).VersionInfo.ProductVersion; if ($v -notmatch '^3\.13\.' -or [version]($v -replace '[^0-9.].*$','') -lt [version]'3.13.16') { return $false }; & $p -I -c 'import sys,tkinter,ssl; assert sys.version_info[:2]==(3,13) and sys.maxsize>4294967296; r=tkinter.Tk(); r.withdraw(); r.update_idletasks(); r.destroy()' 2>$null; return $LASTEXITCODE -eq 0 };" ^

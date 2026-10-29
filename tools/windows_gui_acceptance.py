@@ -368,7 +368,8 @@ def main():
         wait(lambda s:'Not mapped' in s.get('detail',''),'Changing directions keeps source inspection available')
         choose_top_left_rows_down();click('preview')
         wait(lambda s:s.get('proposal') and not s.get('busy') and s.get('save_enabled'),'Correcting directions restores valid Save')
-        assert 'No project loaded' not in state()['detail']
+        assert 'Recipes!D4 requested' in state()['detail']
+        checks.append('Rebuilding a mapping refreshes the selected sample recipe without another click')
         check_tab_bounds(['geometry'],{'geometry':(300,140)})
         # Exercise the declared minimum window as well as the runner desktop.
         app.top_window().restore();app.top_window().move_window(x=0,y=0,width=960,height=680)
@@ -440,6 +441,8 @@ def main():
         click('replace_labels');click('label_review_confirm');click('preview')
         wait(lambda s:s.get('proposal') and not s.get('busy'),'Explicitly confirmed reference-material preview')
         wait(lambda s:s.get('save_enabled'),'Reference-material Save enables after actual conflict consent, without redundant review gates')
+        assert 'build a new mapping' not in state()['detail']
+        assert 'Not mapped' not in state()['detail']
         screenshot('10-reference-ready.png')
         destination=out/'reference copied result';click('save');dialog_path(destination)
         wait(lambda s:(destination/'audit.json').is_file() and not s.get('busy'),'Native UI saves explicit reference material copy');dismiss()
@@ -480,7 +483,13 @@ def main():
         assert state()['project'] is None and not state()['proposal'] and not state()['save_enabled']
         assert not state()['reference_choices'] and not state().get('geometry_samples')
         screenshot('10b-failed-project-cleared.png')
-        click('example');wait(lambda s:s.get('project')==str(example/'DO_NOT_PRINT.PRINT') and not s.get('busy'),
+        # Load example uses PyInstaller's bundled resources, not the separate
+        # top-level copies provided for manual/CLI use. Require the exact bundled
+        # path and identical public example bytes before exercising recovery.
+        bundled_example=folder/'_internal/examples/rectangular/DO_NOT_PRINT.PRINT'
+        assert hashlib.sha256(bundled_example.read_bytes()).digest()==hashlib.sha256(
+            (example/'DO_NOT_PRINT.PRINT').read_bytes()).digest()
+        click('example');wait(lambda s:s.get('project')==str(bundled_example) and not s.get('busy'),
                               'Valid example reloads after failed source replacement')
         click('preview');wait(lambda s:s.get('proposal') and not s.get('busy') and s.get('save_enabled'),
                               'Save becomes available again after source error recovery')

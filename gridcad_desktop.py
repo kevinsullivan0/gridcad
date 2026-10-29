@@ -1097,9 +1097,14 @@ class App:
             p=proposal['plan'];changes=sum(x['action']!='preserve_exact_mixer' for x in p['samples'])+sum(x['action']!='preserve_native_black' for x in p['labels'])
             self.summary.set(f"{len(p['samples'])} mapped samples • {len(p['labels'])} labels • {proposal['preserved_count']} unrelated bodies preserved • {changes} material changes. Check four corners and interior recipes; heed the preview detail notice.")
             for row in proposal['mapping']:
-                self.mapping_tree.insert('', 'end', iid=row['id'], values=(row['cell'],*row['percentages'],row['action'],row['id']))
+                self.mapping_tree.insert('', 'end', iid=row['id'], values=(row['cell'],*row['percentages'],self.recipe_action_text(row['action']),row['id']))
             if conflicts:
                 self.summary.set(self.summary.get()+' Label replacements: '+', '.join(x['name']+' ('+x['current_material']+')' for x in conflicts[:4])+(' …' if len(conflicts)>4 else '')+'.')
+            selected=getattr(self,'inspected_oid',None)
+            if selected in self.project['nodes']:
+                self.inspect_geometry(selected)
+            else:
+                self.detail.set('Cells matched. Click a sample to see its source material and requested worksheet recipe.')
             self.draw_geometry();self.status.set('Cells matched to samples. Click a sample to check its recipe, then save a separate result.')
         def work():
             proposal=core.propose(*args,**kwargs)
@@ -1288,10 +1293,15 @@ class App:
     def set_zoom(self,value):
         self.zoom=value;self.draw_geometry()
 
+    @staticmethod
+    def recipe_action_text(action):
+        return {'replace_uniform_color_picker':'Apply worksheet recipe',
+                'preserve_exact_mixer':'Keep matching recipe'}.get(action,'Update sample material')
+
     def mapping_detail(self,_):
         values=self.mapping_tree.selection()
         if values and self.proposal:
-            row=next(x for x in self.proposal['mapping'] if x['id']==values[0]);self.detail.set(f"{row['cell']}: {' / '.join(map(str,row['percentages']))}  |  {row['action']}  |  {row['id']}")
+            row=next(x for x in self.proposal['mapping'] if x['id']==values[0]);self.detail.set(f"{row['cell']}: {' / '.join(map(str,row['percentages']))}  |  {self.recipe_action_text(row['action'])}  |  {row['id']}")
 
     def update_save(self):
         pending=self.proposal and self.proposal.get('label_material',{}).get('conflicts') and not self.proposal.get('label_material',{}).get('replacement_confirmed')

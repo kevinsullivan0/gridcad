@@ -75,7 +75,7 @@ class PreviewRendererTests(unittest.TestCase):
         self.addCleanup(result['image'].close)
         self.assertEqual(draw.return_value.polygon.call_count,1)
         self.assertIn('Sampled top-surface preview: 1 of 3 triangles',result['notice'])
-        self.assertIn('verify physical labels in the source/native application',result['notice'])
+        self.assertIn('Check unclear labels in the original project',result['notice'])
 
     def test_large_overlapping_faces_obey_pixel_work_budget(self):
         with mock.patch.object(gui,'MAX_PREVIEW_PIXEL_WORK',400_000), \
@@ -84,13 +84,13 @@ class PreviewRendererTests(unittest.TestCase):
         self.addCleanup(result['image'].close)
         self.assertEqual(draw.return_value.polygon.call_count,2)
         self.assertEqual(result['shown'],2)
-        self.assertIn('raster-work budget',result['notice'])
+        self.assertIn('keep the preview responsive',result['notice'])
 
     def test_empty_surfaces_and_capped_raster_are_disclosed(self):
         request=self.request(self.app(0));request['requested']=(3600,2000)
         result=gui.raster_geometry(request,threading.Event());self.addCleanup(result['image'].close)
-        self.assertIn('1 bodies have no horizontal top facets',result['notice'])
-        self.assertIn('raster is capped',result['notice'])
+        self.assertIn('1 objects have no top-facing surface',result['notice'])
+        self.assertIn('image size is limited',result['notice'])
 
     def test_cancel_before_allocation_and_during_raster_closes_image(self):
         event=threading.Event();event.set()
@@ -223,7 +223,7 @@ class PreviewRendererTests(unittest.TestCase):
     def test_invalidation_clears_mapping_once_and_tracks_geometry_inputs(self):
         app=self.app();app.image_key=('synthetic',900,500,'Sample','Printed labels')
         app.revision=0;app.reviewed=Value(True);app.material_ack=Value(True)
-        app.replace_labels=Value(True);app.summary=Value();app.draw_geometry=mock.Mock()
+        app.replace_labels=Value(True);app.summary=Value();app.detail=Value();app.draw_geometry=mock.Mock()
         app.proposal={'mapping':[{'cell':'A1'}]};app.invalidate()
         self.assertIsNone(app.proposal);app.draw_geometry.assert_called_once()
         self.assertFalse(app.reviewed.get());app.invalidate();app.draw_geometry.assert_called_once()

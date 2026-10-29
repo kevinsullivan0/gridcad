@@ -1,3 +1,11 @@
+# GridCAD 0.2.0-rc.7 usability candidate
+
+The desktop preview lets you inspect samples before matching worksheet cells, including after an incomplete selection. Two controls choose the first cell corner and the direction of the next row. A valid mapping can be saved without review checkboxes or notes; the output records that physical label review has not been confirmed.
+
+Material choices distinguish original source assignments, EcoFlex worksheet recipes and printed-label material. Copying a saved material is offered only when the project contains a compatible assignment. Help and normal app messages use task-based instructions.
+
+This build remains a release candidate. Native GrabCAD validation and printing checks are separate; GridCAD outputs are not marked print-ready.
+
 ## GridCAD 0.2.0-rc.6 — Windows desktop candidate
 
 This small follow-up adds manual project and release navigation. Download **GridCAD-Windows-x64-v0.2.0-rc.6.zip**, extract the entire folder, and open `GridCAD.exe`. Keep `_internal` and `GridCAD-core.exe` beside it. No installer, Python, account or first-run download is needed.

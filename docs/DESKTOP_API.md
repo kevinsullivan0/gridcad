@@ -50,6 +50,10 @@ python3 ./desktop_cli.py inspect --project "/home/you/GridCAD work/original.PRIN
 
 These are separate shell alternatives, not commands to paste together. Native GrabCAD validation is still a separate Windows step. The portable CLI does not make a macOS/Linux desktop GUI or native acceptance claim.
 
+## Desktop candidate saving
+
+The desktop app saves a separate result after the mapping and material checks pass. It does not require review checkboxes or notes. `core.save_candidate(...)` uses the same writer checks and records `physical_mapping_reviewed=false`; the saved file still needs checking in GrabCAD before printing. This is separate from the explicitly reviewed CLI/Python route below, whose review arguments retain their existing meaning.
+
 ## Python API
 
 ```python

@@ -105,9 +105,9 @@ class ActivityTests(TestCase):
             app.save()
         _, work, done = app.run.call_args.args
         app.project_path = 'different.print'; app.workbook_path = 'different.xlsx'
-        with mock.patch('gridcad_desktop.core.save') as save:
+        with mock.patch('gridcad_desktop.core.save_candidate') as save:
             work()
-        save.assert_called_once_with('original.print', 'original.xlsx', {'plan': 'captured'}, 'new-result', 'review notes')
+        save.assert_called_once_with('original.print', 'original.xlsx', {'plan': 'captured'}, 'new-result')
         with mock.patch('gridcad_desktop.messagebox.showinfo') as notice:
             done({'changed_count': 3, 'unchanged_nonproject_payloads': 5})
             notice.assert_not_called()

@@ -1,55 +1,82 @@
-# GridCAD desktop quick start
+# GridCAD guide
 
-Extract the entire Windows ZIP into a fresh folder. Open `GridCAD.exe`. Keep `_internal` and `GridCAD-core.exe` beside it. No Python installation, administrator rights, browser, LLM, account, or first-run download is needed. This candidate is unsigned; organizational trust policies may restrict it. The app does not change security settings or send files anywhere.
+GridCAD applies the material recipes in an Excel worksheet to a rectangular group of samples in a supported GrabCAD PRINT project. It saves a new result and keeps your original files unchanged.
 
+## Open the app
 
-**If Windows shows a warning:** this candidate is unsigned; a checksum does not authenticate its publisher or establish safety. On your own PC, an **unrecognized app / Microsoft Defender SmartScreen** reputation warning may offer **More info → Run anyway**. If you trust this repository and have checked the download, you may choose that per-file option; it is your decision, not a requirement. Do not treat a **malware detection**, **Smart App Control block**, or **administrator/policy block** as the same warning. Do not disable protection, alter registry/Execution Policy, or work around an organization’s restrictions. On a managed computer, follow your administrator’s policy; if no allowed continuation is offered, stop. See [Microsoft’s SmartScreen guidance](https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/smartscreen-reputation) and [Smart App Control FAQ](https://support.microsoft.com/en-us/windows/security/threat-malware-protection/smart-app-control-frequently-asked-questions).
-## While work is running
+Extract the entire Windows ZIP into a new folder, then open `GridCAD.exe`. Keep `GridCAD-core.exe` and the `_internal` folder beside it. You do not need Python, administrator rights, an account, an AI assistant, or an internet connection.
 
-An animated, indeterminate activity bar and stage text remain visible while files are read, recipes checked, mappings validated, geometry rendered, or a separate result written. The bar does **not** claim a percentage or estimated finish time. Recipe validation and raster rendering run in the background; sample outlines arrive in bounded batches. Rapid view changes replace obsolete render requests rather than queueing unlimited work. Wait for the activity indicator to finish before reviewing or saving. Closing during an admitted operation asks you to wait; it does not interrupt a save. Errors clear the activity state and explain recovery. A failed replacement load clears the old source display so it cannot be mistaken for the failed input.
+This release is unsigned. If Windows or your organization blocks it, follow the applicable security policy. Do not disable protection to run GridCAD. A checksum can confirm that a download is complete, but it does not prove that software is safe.
 
-## Try the included example
+## Try an example
 
-Click **Load example**, then **Build mapping preview**. This newly invented 4 × 6 archive has simple extruded index labels, 12 mm pitch and 8 mm samples. Its worksheet is `Recipes!D4:I7`. It is a software demonstration, not a native GrabCAD-generated print project. **Do not print it.** For a vendor-neutral geometry starting point, the adjacent `import-geometry` folder contains individually named STL sample/label bodies, a shared-coordinate manifest and an import guide. Keep their relative millimetre positions; native import and the resulting project profile still need checking.
+Choose **Load example**, then **Match cells to samples**. The example contains 24 samples and recipes in `Recipes!D4:I7`. Click a blue sample to inspect it. The example is generated test data. Do not print it.
 
-## Convert a supported project
+## Convert your project
 
-1. **Open workbook** (`Ctrl+O`). Choose the exact tab and recipe rectangle. Each cell must contain six slash-separated percentages in **C/M/Y/K/W/T** order, for example `2/0/0/0/98/0`. Include every zero; the total must be exactly 100. Scalar values, holes and Excel errors are refused. The range initially suggested by the app is editable and must be checked.
-2. Use **Go to** or the row/column page buttons for long sheets. Click a cell, then drag or Shift-click the opposite corner (including across pages), or type an exact range such as `D4:X36`. **Check recipes** works without a project. A `ƒ` mark indicates a saved formula result. Recalculate and save in Excel before explicitly confirming such results; missing caches always fail. GridCAD does not run Excel formulas, macros or external links.
-3. **Open .PRINT** (`Ctrl+P`). Choose the repeated sample group and the complete printed-label container. These choices determine which bodies can change. Every other leaf is explicitly preserved. A gray or colored object is never treated as unfinished merely because of its color.
-4. Choose how worksheet rows and columns run across the XY geometry. The display has +X to the right and +Y upward. Use **Transpose mapping** when worksheet rows correspond to physical columns. For the recovered 33 × 21 workflow, the tested orientation is **Rows down; columns right**, with **Transpose mapping enabled**. This is not automatically selected for arbitrary files.
-5. **Build mapping preview** (`Ctrl+Enter`). Inspect the embedded dark glyph surfaces and blue sample outlines. Read the preview notice: large views sample top-surface triangles, which can omit glyph detail; use source/native inspection when labels are incomplete. The preview is not a physical-label proof. Zoom and scroll to read labels. Click samples for exact six-channel percentages; the **Exact assignments** tab lists every mapped cell and body. Check all four corners, representative interior labels, zero-heavy and clear-heavy recipes. The app does not recognize glyph text or infer orientation from symmetric grids.
-6. Record the label/corner checks in **Review notes**, confirm the mapping, and acknowledge the unverified native material profile. Any input change discards the mapping and confirmations. These confirmations are required because physical label meaning cannot be established by a hash or a plausible grid alone.
-7. **Save separate result** (`Ctrl+S`). The native dialog names a **new result folder**, rather than overwriting a project file. Inside it are `candidate_UNVERIFIED.PRINT`, `audit.json`, `assignments.json`, `reviewed_plan.json`, payload hashes and a warning. Existing output folders are refused. Keep original inputs and previous outputs.
+1. **Open workbook** (`Ctrl+O`). Choose the worksheet and the cells containing your recipes. Each cell needs six percentages in this order: cyan, magenta, yellow, black, white, clear (**C/M/Y/K/W/T**). For example, `2/0/0/0/98/0` means 2% cyan and 98% white. Include zero values; the total must be exactly 100.
+2. Select cells by dragging, by clicking the first cell and Shift-clicking the last, or by typing a range such as `D4:X36`. Use **Go to** and the row/column buttons to reach cells outside the current view. **Check recipes** checks their format and totals without needing a project.
+3. **Open .PRINT** (`Ctrl+P`). Choose the sample group and label group. Only the selected samples and labels can change; other objects stay unchanged. You can click samples in the preview before choosing a matching worksheet range.
+4. Match the worksheet to the preview. Choose the corner where the **first selected cell** belongs, then the direction in which the **next worksheet row** runs. These directions refer to the preview on screen. Check the corners and some interior samples against the labels in your original project. GridCAD cannot read the meaning of the printed labels for you.
+5. **Match cells to samples** (`Ctrl+Enter`). The worksheet must contain one recipe for each sample. Click a sample to see its current material and, when mapped, its requested worksheet recipe. The **Cell assignments** tab lists every cell and target sample. Changing an input clears the old mapping so it cannot be saved by mistake.
+6. **Save separate result** (`Ctrl+S`). Choose a new folder name. GridCAD checks the recipes, source files, material assignments and preserved project data before writing.
 
-## Inspect in GrabCAD before printing
+The result folder contains `candidate_UNVERIFIED.PRINT`, the cell assignments and the validation reports. Existing result folders are never overwritten. The filename marks a result that has not yet been validated in GrabCAD; it does not mean the file checks failed.
 
-Open the separate candidate in the ordinary Windows GrabCAD application. Check source scale, geometry/body count, tray settings and orientation, exact recipes at corners/interior samples, and the chosen label material. Recompose and save another native copy; compare it to the assignment manifest. File-level preservation and archive readback do not establish native material compatibility, loaded printer materials, process suitability or physical print quality. GridCAD never submits a print job.
+## Understand the preview
 
-## If an input is refused
+Blue outlines are samples. Dark shapes are the selected printed labels. Gray shapes are other objects that will be preserved. **Zoom +**, **Zoom −** and **Fit** help you inspect the view; scroll to reach enlarged areas.
 
-A **too large or complex** message reports an input resource ceiling. Export a smaller project or values-only workbook with the needed sheets, keeping your original. See [the exact limits](RECTANGULAR_SCHEMA.md#input-resource-ceilings). GridCAD does not truncate data or provide a bypass switch.
+Clicking a sample works even when no mapping exists or the selected cell count does not match. In that case GridCAD shows the source material and marks the sample as unmapped. To see requested percentages, select a complete matching range and build the mapping.
 
-Read the specific message. Choose a matching recipe rectangle, sample group, label container, transpose and orientation. Recalculate formula workbooks in Excel and save a values-only copy if needed. Existing conflicting materials, unknown versions, unsupported transforms, duplicate/instanced bodies, missing embedded STLs or irregular grids need separate investigation. Do not change version/unit fields or disable guards to force a file through. A failed save leaves originals untouched and attempts to remove only its own staged files.
+Large projects may show fewer surface details to keep the preview responsive. The notice explains any omitted detail. This affects only the display—not the original geometry or the saved result. Check unclear labels in the original project rather than guessing from a simplified preview.
 
-The **Help & optional tools** tab contains the schema, API and a copyable external-agent prompt. `GridCAD-core.exe` exposes the deterministic core on a Windows machine without installing Python. The portable source bundle runs on Python 3.10+ with the standard library. Other geometries require an explicit new adapter and evidence; nonrectangular lattice layouts and grids stacked in 3D are not implemented. Sample shapes such as pyramids can be used on supported rectangular layouts.
+## Materials
 
-## Copy a compatible existing material onto labels
+Sample recipes use the supported EcoFlex cyan, magenta, yellow, black, white and clear channels. A source sample may have a color-picker placeholder. GridCAD shows that source assignment separately from the requested recipe.
 
-In Geometry & review, choose **Copy from reference body**, then an unchanged reference body with the desired saved material. This supports existing PolyJet EcoFlex direct resins and validated CMYKWT mixers—not arbitrary printer families or invented materials. Build the preview. If labels already have different intentional assignments, use the replacement-review checkbox to inspect the full list and confirm; then build the preview again. Cancel or any input change removes that approval. Physical-label review and native-validation acknowledgment are still required before saving. Shared identities and inconsistent assignments are refused rather than silently repaired.
+Printed labels have a separate material choice. The default uses EcoFlex Black through the supported material profile, preserving a matching saved black material when available. GridCAD uses the material definition to display its name.
 
-## Understand an error or ask your own agent
+If the project contains a compatible saved material, you can choose it as the source for label material. This copies the complete assignment from that object; it does not require a separate reference file. If no compatible object exists, this option is unavailable. If labels already have a different intentional material, review and approve those replacements before rebuilding the mapping. Canceling keeps the existing assignments.
 
-Errors lead with a plain-language explanation, location and suggested correction. **View technical details** reveals the diagnostic code and original validation detail. **Copy debugging prompt** points your external agent to a local JSON report and matching source/agent instructions. **Open report folder** reveals that report. The app does not start an agent or upload anything. The report includes selected paths/object names, app version and traceback frames, but no workbook/project contents, cell values, local variables or environment dump. Review it before sharing; a remote agent cannot read the path unless you grant access or attach the report. If report saving or clipboard access fails, the original error remains visible with a manual fallback.
+## Formula cells
 
-### If you have not used an agent before
+A `ƒ` mark means that a cell contains a formula. GridCAD reads the last result saved by Excel; it does not calculate formulas. Recalculate and save the workbook in Excel before confirming that its saved results are current. A missing result or Excel error cannot be fixed by confirming it. A values-only copy avoids this extra step.
 
-You do not need one to open files, convert a grid or follow an error's suggested correction. Agent help is an optional extra. Open the assistant/coding agent you already use, click **Copy external-agent prompt** (or **Copy debugging prompt** on an error), and paste it into that conversation. If it cannot access your computer, attach the named report or grant file access deliberately; do not upload your whole project by default. Review paths and object names before sharing. Ask it to explain its proposed changes before modifying your original files.
+## While GridCAD is working
 
-## Ordinary help and optional agent settings
+The activity bar and status text show what GridCAD is doing: reading files, checking recipes, building a mapping, drawing the preview or saving. The bar does not show a percentage or predict when work will finish. You can change the view while it is drawing; the latest view replaces older requests.
 
-Use **Help** at the top of the window for this offline guide. **Quick start**, **Schema**, **Portable core / API**, **About** and **Third-party licenses** are available without a browser. Saved results are in the new folder you selected at **Save separate result**; your inputs stay where they were.
+Wait for a file operation to finish before starting another. Closing during an operation asks you to wait so that a save is not interrupted. If loading fails, the previous file's preview is cleared. Choose a valid file to try again.
 
-**Agent help & settings** is optional. Its checkbox includes or omits the local app folder path in copied prompts for this session only. Copy a prompt, paste it into the agent you already use, and grant access or attach only the files needed. GridCAD never launches an agent or connects an account. Generic chat apps may not have local file access.
+## If you cannot save
 
-**Detect installed agents** runs only when clicked. It checks a small set of known filenames and application registration metadata on local drives, without running an agent, scanning credentials or contacting the network. A match is not proof of identity, configuration or sign-in; no match is not proof of absence. Detection is not needed to use an agent manually. **Official agent information** lists neutral provider documentation; no affiliation or sponsorship is implied. Displaying these addresses does not open websites.
+- Open both files, select the sample and label groups, and choose the mapping directions.
+- Select one recipe cell per sample and build the mapping. Use the message shown if the count or shape does not match.
+- Resolve any listed material conflict. Rebuild the mapping after changing an input.
+- Wait for validation and preview activity to finish. A failed check must be corrected before saving.
+- Choose a new output folder. GridCAD will not replace an existing result.
+
+Saving records the selected mapping and the file checks. It does not record a physical-label review.
+
+## Check the result in GrabCAD
+
+Before printing, open the new result in the Windows GrabCAD application. Check the geometry, size, placement, sample count, corner and interior recipes, and label material. Recompose and save a separate native copy. Confirm the loaded printer materials and process settings.
+
+GridCAD's file checks do not establish GrabCAD compatibility, physical label correspondence or print quality. Every GridCAD result reports `print_ready=false`. Any native or printing validation must be recorded separately. GridCAD does not submit print jobs.
+
+## When a file is not supported
+
+GridCAD supports a specific rectangular-grid project format, not every CAD file or GrabCAD version. The **Supported files** guide lists the exact requirements and resource limits. Unsupported transforms, irregular grids, conflicting materials or oversized inputs are refused rather than silently changed.
+
+Keep the original. For a large file, export a smaller project or a values-only workbook containing just the sheets you need. Do not edit version numbers, units or material identities to force a file through.
+
+## Help and support
+
+The **Help** tab works offline. It includes this guide, supported-file requirements, a developer guide, version information and bundled licenses. **About** shows the installed version and links to GitHub and releases. Those links open your browser only when you choose them; GridCAD does not check for or install updates automatically.
+
+An error message explains what happened and what to try next. **View technical details** shows the diagnostic code and original validation detail. **Copy debugging prompt** creates text you can give to an assistant or developer. **Open report folder** shows the local report.
+
+Reports can contain file paths and selected object names. They do not include workbook or project contents, cell values, passwords or environment settings. Review a report before sharing it. GridCAD does not upload reports or launch an assistant.
+
+The optional assistant settings let you include the app folder path in copied support text and look for known installed assistants. Detection checks filenames and registration information only; it does not run those programs, connect accounts or prove that they are configured. You can use GridCAD without any assistant.

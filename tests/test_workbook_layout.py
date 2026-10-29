@@ -15,6 +15,7 @@ class WorkbookLayoutTests(unittest.TestCase):
         app=gui.App.__new__(gui.App)
         app.worktab=mock.Mock();app.controls={}
         for name in ('sheet','cell_range','transpose','cache'):setattr(app,name,mock.Mock())
+        app.black_label_choice='EcoFlexBlack (labels)'
         app.button=mock.Mock(side_effect=lambda *args,**kwargs:mock.Mock())
         frames=[]
         def frame(*args,**kwargs):
@@ -37,8 +38,9 @@ class WorkbookLayoutTests(unittest.TestCase):
         app.geotab=mock.Mock();app.controls={}
         labels=[]
         for name in ('sample','labels','orientation','label_mode','label_reference',
-                     'replace_labels','summary','preview_notice','reviewed','material_ack'):
+                     'replace_labels','summary','preview_notice','mapping_corner','mapping_direction','mapping_hint','label_choice','reference_note'):
             setattr(app,name,mock.Mock())
+        app.black_label_choice='EcoFlexBlack (labels)'
         app.button=mock.Mock(side_effect=lambda *args,**kwargs:mock.Mock())
         frames=[]
         def frame(*args,**kwargs):
@@ -56,11 +58,10 @@ class WorkbookLayoutTests(unittest.TestCase):
         self.assertEqual(frames[0].grid.call_args.kwargs['row'],0)
         self.assertEqual(frames[7].grid.call_args.kwargs['row'],1)
         self.assertEqual(app.controls['geometry_settings'].grid.call_args.kwargs['row'],0)
-        self.assertEqual(app.controls['reviewed'].grid.call_args.kwargs['row'],1)
-        self.assertEqual(frames[8].grid.call_args.kwargs['row'],2)
-        self.assertEqual(app.controls['material_ack'].grid.call_args.kwargs['row'],3)
+        self.assertNotIn('reviewed',app.controls)
+        self.assertNotIn('material_ack',app.controls)
+        self.assertNotIn('evidence',app.controls)
         for frame in frames:frame.pack.assert_not_called()
-        app.controls['material_ack'].pack.assert_not_called()
         # Arbitrarily long normal summaries/notices grow only scroll content,
         # never the outer geometry or the reserved review rows.
         for value in (app.summary,app.preview_notice):

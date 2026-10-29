@@ -6,6 +6,7 @@ from concurrent.futures import ThreadPoolExecutor
 import json
 import math
 import os
+import re
 from queue import SimpleQueue, Empty
 from pathlib import Path
 import sys
@@ -19,8 +20,89 @@ import desktop_core as core
 import diagnostics
 import agent_help
 
+# These choices describe the visible preview, not tray coordinate jargon.
+ROW_DIRECTIONS = {
+    'Top left': ('Down', 'Right'),
+    'Top right': ('Down', 'Left'),
+    'Bottom left': ('Up', 'Right'),
+    'Bottom right': ('Up', 'Left'),
+}
+
+
+def orientation_from_controls(corner, direction):
+    if direction not in ROW_DIRECTIONS.get(corner, ()):
+        return ''
+    vertical = 'down' if corner.startswith('Top') else 'up'
+    horizontal = 'right' if corner.endswith('left') else 'left'
+    column = horizontal if direction.lower() == vertical else vertical
+    return f'Rows {direction.lower()}; columns {column}'
+
+
+def controls_from_orientation(orientation):
+    for corner, directions in ROW_DIRECTIONS.items():
+        for direction in directions:
+            if orientation_from_controls(corner, direction) == orientation:
+                return corner, direction
+    return '', ''
+
+
+def material_display_name(material):
+    """Use native display metadata, never infer a resin from preview RGB."""
+    metadata=material.get('metadata',{})
+    display=metadata.get('displayName') if isinstance(metadata,dict) else None
+    if isinstance(display,str) and display.strip():return display
+    name=material.get('name')
+    return name if isinstance(name,str) and name.strip() else 'Unnamed material'
+
+
+def compatible_reference_info(project):
+    """Find saved reference assignments with a linear alias preflight.
+
+    This is display filtering, not conversion authority: the complete source is
+    checked again by the writer. Never offer color-picker placeholders as resin.
+    """
+    definitions, conflicting = {}, set()
+    for record in (*project['nodes'].values(), *project['bodies'].values()):
+        material=record.get('material')
+        if not isinstance(material,dict):continue
+        identity=material.get('id')
+        if not isinstance(identity,str):continue
+        if identity in definitions and definitions[identity]!=material:
+            conflicting.add(identity)
+        else:definitions[identity]=material
+    result={}
+    for oid in sorted(project['leaves']):
+        node=project['nodes'][oid];material=node.get('material',{})
+        if material.get('id') in conflicting:continue
+        if material.get('metadata',{}).get('materialType') not in ('base_material','cmykwt_dm_mixer'):continue
+        try:
+            # Alias consistency was checked once above against ALL assignments;
+            # the ordinary validator now checks this occurrence/body pair.
+            validated=core.op.native_reference_material({oid:node},{oid:project['bodies'][oid]},{oid},oid)
+        except core.op.ValidationError:continue
+        result[oid]={'name':node.get('name','Body'),'material_name':material_display_name(validated)}
+    return result
+
+
+def help_lines(text):
+    """Present bundled Markdown as offline text without interpreting HTML."""
+    code=False
+    for line in text.splitlines():
+        if line.startswith('```'):
+            code=not code
+            continue
+        if code:
+            yield line,'code'
+            continue
+        heading=line.startswith('#')
+        if heading:line=line.lstrip('#').strip()
+        line=re.sub(r'\[([^\]]+)\]\(([^)]+)\)',r'\1 (\2)',line)
+        line=line.replace('**','').replace('`','')
+        yield line,'heading' if heading else 'body'
+
+
 PROMPT = '''Use the installed GridCAD source folder (beside GridCAD.exe), or the exact release source:
-https://github.com/kevinsullivan0/gridcad/tree/v0.2.0-rc.6
+https://github.com/kevinsullivan0/gridcad/tree/v0.2.0-rc.7
 Do not assume the repository default branch matches this installed release.
 Read AGENTS.md, docs/DESKTOP_API.md, docs/RECTANGULAR_SCHEMA.md, and operator/README.md first.
 Use the portable deterministic core. Keep my original files untouched and all private
@@ -86,15 +168,15 @@ def raster_geometry(request, cancelled):
                 draw.polygon(points,fill='#293544' if oid in label_ids else '#b7c0c8')
         if cancelled.is_set():return None
         notice=(f'Sampled top-surface preview: {shown:,} of {available:,} triangles. '
-                'Glyph details may be missing; verify physical labels in the source/native application. '
+                'Some label detail is omitted. Check unclear labels in the original project. '
                 if shown<available else 'All available top-surface triangles shown. ')
         missing=sum(not len(record['top']) for oid,record in records.items() if oid not in selected)
-        if missing:notice+=f'{missing:,} bodies have no horizontal top facets and are not drawn as surfaces. '
-        notice+='Sample outlines are exact bounds, not shaded surfaces. Source geometry and conversion remain unchanged.'
+        if missing:notice+=f'{missing:,} objects have no top-facing surface to show. '
+        notice+='Sample outlines show their full size. Saved geometry is unchanged.'
         if w<request['requested'][0] or h<request['requested'][1]:
-            notice+=' Preview raster is capped for memory safety.'
+            notice+=' Preview image size is limited to control memory use.'
         if pixel_limited:
-            notice+=' Overlapping/large faces also exceeded the raster-work budget; some faces are omitted.'
+            notice+=' Some overlapping or large surfaces are omitted to keep the preview responsive.'
         result={'image':image,'notice':notice,'layout':(lo,factor,w,h),
                 'shown':shown,'pixel_limited':pixel_limited}
         image=None  # Ownership passes to the main-thread completion handler.
@@ -128,6 +210,7 @@ class App:
         self.dragging_cells = False
         self.container_ids = {}
         self.canvas_ids = {}
+        self.inspected_oid = None
         self.zoom = 1
         self.image_key = None
         self.revision = 0
@@ -136,6 +219,11 @@ class App:
         self.sheet = tk.StringVar(); self.cell_range = tk.StringVar(value='D4:I7')
         self.sample = tk.StringVar(); self.labels = tk.StringVar(); self.orientation = tk.StringVar()
         self.transpose = tk.BooleanVar(); self.cache = tk.BooleanVar()
+        self.mapping_corner = tk.StringVar(); self.mapping_direction = tk.StringVar()
+        self.mapping_hint = tk.StringVar(value='Choose where the first selected worksheet cell belongs in this preview.')
+        self.label_choice = tk.StringVar()
+        self.reference_note = tk.StringVar(value='No saved reference material is available yet.')
+        self.black_label_choice = material_display_name(core.op.EcoFlexMaterialProvider().direct_black()) + ' — labels'
         self.label_mode=tk.StringVar(value="Direct black");self.label_reference=tk.StringVar()
         self.replace_labels=tk.BooleanVar()
         self.reviewed = tk.BooleanVar(); self.material_ack = tk.BooleanVar()
@@ -159,6 +247,9 @@ class App:
         self.build()
         for variable in (self.cell_range, self.sample, self.labels, self.orientation, self.transpose, self.cache, self.label_mode, self.label_reference):
             variable.trace_add('write', lambda *_: self.invalidate())
+        self.orientation.trace_add('write', self.sync_mapping_controls)
+        self.label_mode.trace_add('write', self.sync_material_controls)
+        self.sync_material_controls()
         self.cell_range.trace_add('write', self.refresh_cell_selection)
         self.root.bind('<Control-o>', lambda _: self.choose_workbook())
         self.root.bind('<Control-p>', lambda _: self.choose_project())
@@ -184,7 +275,7 @@ class App:
         self.logo=ImageTk.PhotoImage(Image.open(resource('resources/gridcad.png')).resize((32,32),Image.Resampling.LANCZOS))
         tk.Label(header,image=self.logo,bg='#182a3c').pack(side='left',padx=(20,0))
         tk.Label(header, text='GRIDCAD', font=('Segoe UI', 23, 'bold'), bg='#182a3c', fg='white').pack(side='left', padx=22)
-        tk.Label(header, text='RECTANGULAR MATERIAL CONVERTER   /   '+core.VERSION, font=('Segoe UI', 10), bg='#182a3c', fg='#bdcbd8').pack(side='left', padx=10)
+        tk.Label(header, text='Worksheet-to-material converter   /   '+core.VERSION, font=('Segoe UI', 10), bg='#182a3c', fg='#bdcbd8').pack(side='left', padx=10)
         body = ttk.Frame(self.root, padding=12); body.pack(fill='both', expand=True)
         body.columnconfigure(0, weight=1); body.rowconfigure(1, weight=1)
         inputs = ttk.Frame(body); inputs.grid(row=0, column=0, sticky='ew')
@@ -193,9 +284,9 @@ class App:
         self.book_label.grid(row=0, column=1, sticky='ew')
         self.button(inputs, 'Load example', self.load_example, 'example').grid(row=0, column=2, padx=8)
         self.button(inputs, 'Open .PRINT…', self.choose_project, 'open_project').grid(row=1, column=0, sticky='ew', padx=(0,10), pady=3)
-        self.project_label = ttk.Label(inputs, text='Supported 2170 rectangular project', anchor='w')
+        self.project_label = ttk.Label(inputs, text='No PRINT project open', anchor='w')
         self.project_label.grid(row=1, column=1, sticky='ew')
-        self.button(inputs, 'Build mapping preview', self.preview, 'preview').grid(row=1, column=2, padx=8)
+        self.button(inputs, 'Match cells to samples', self.preview, 'preview').grid(row=1, column=2, padx=8)
         inputs.columnconfigure(1, weight=1)
         self.notebook = ttk.Notebook(body); self.notebook.grid(row=1, column=0, sticky='nsew', pady=(8,4))
         self.worktab = ttk.Frame(self.notebook, padding=12)
@@ -203,9 +294,9 @@ class App:
         self.maptab = ttk.Frame(self.notebook, padding=12)
         self.helptab = ttk.Frame(self.notebook, padding=12)
         self.notebook.add(self.worktab, text='  1  Worksheet  ')
-        self.notebook.add(self.geotab, text='  2  Geometry & review  ')
-        self.notebook.add(self.maptab, text='  Exact assignments  ')
-        self.notebook.add(self.helptab, text='  Help & optional tools  ')
+        self.notebook.add(self.geotab, text='  2  Preview  ')
+        self.notebook.add(self.maptab, text='  Cell assignments  ')
+        self.notebook.add(self.helptab, text='  Help  ')
         self.remember('tabs', self.notebook)
         self.build_workbook(); self.build_geometry(); self.build_mapping(); self.build_help()
         ttk.Label(body, textvariable=self.detail, wraplength=900).grid(row=2, column=0, sticky='ew', pady=3)
@@ -232,9 +323,8 @@ class App:
         ttk.Label(bar, text='Sheet').pack(side='left')
         sheet = self.remember('sheet', ttk.Combobox(bar, textvariable=self.sheet, state='readonly', width=22))
         sheet.pack(side='left', padx=6); sheet.bind('<<ComboboxSelected>>', lambda _: self.change_sheet())
-        ttk.Label(bar, text='Recipe rectangle').pack(side='left', padx=(10,0))
+        ttk.Label(bar, text='Selected cells').pack(side='left', padx=(10,0))
         self.remember('range', ttk.Entry(bar, textvariable=self.cell_range, width=17)).pack(side='left', padx=6)
-        self.remember('transpose', ttk.Checkbutton(bar, text='Transpose mapping', variable=self.transpose)).pack(side='left', padx=10)
         self.button(bar, 'Check recipes', self.check_recipes, 'check_recipes').pack(side='right')
         ttk.Label(self.worktab, text='Six explicit C / M / Y / K / W / T percentages, total exactly 100. Click one cell; drag or Shift-click to select a rectangle (also across pages).').grid(row=1,column=0,sticky='w',pady=(0,5))
         table = ttk.Frame(self.worktab); table.grid(row=2,column=0,sticky='nsew')
@@ -295,20 +385,29 @@ class App:
         self.geometry_config=configuration
         selectors = ttk.Frame(configuration); selectors.grid(row=0,column=0,sticky='ew')
         for i, (label, var, key, width) in enumerate([
-            ('Sample group',self.sample,'samples',20), ('Printed-label container',self.labels,'labels',22),
-            ('Worksheet directions in XY view',self.orientation,'orientation',28)]):
+            ('Sample group',self.sample,'samples',20), ('Label group',self.labels,'labels',22)]):
             ttk.Label(selectors, text=label).grid(row=i*2,column=0,sticky='w')
             cb = self.remember(key, ttk.Combobox(selectors,textvariable=var,state='readonly',width=width))
             cb.grid(row=i*2+1,column=0,sticky='ew',pady=(3,8)); selectors.columnconfigure(0,weight=1)
-            if key == 'orientation': cb['values'] = list(core.ORIENTATIONS)
+        ttk.Label(selectors, text='First selected cell appears at').grid(row=4,column=0,sticky='w')
+        corner=self.remember('mapping_corner',ttk.Combobox(selectors,textvariable=self.mapping_corner,values=list(ROW_DIRECTIONS),state='readonly',width=28))
+        corner.grid(row=5,column=0,sticky='ew',pady=(3,8))
+        corner.bind('<<ComboboxSelected>>',self.choose_mapping_corner)
+        ttk.Label(selectors, text='Next worksheet row moves').grid(row=6,column=0,sticky='w')
+        direction=self.remember('orientation',ttk.Combobox(selectors,textvariable=self.mapping_direction,state='readonly',width=28))
+        direction.grid(row=7,column=0,sticky='ew',pady=(3,8))
+        direction.bind('<<ComboboxSelected>>',self.choose_mapping_direction)
+        ttk.Label(selectors,textvariable=self.mapping_hint,wraplength=345).grid(row=8,column=0,sticky='ew',pady=(0,8))
         materialrow=ttk.Frame(configuration);materialrow.grid(row=1,column=0,sticky='ew',pady=(0,4))
-        ttk.Label(materialrow,text='Label material').pack(anchor='w')
-        mode=self.remember('label_mode',ttk.Combobox(materialrow,textvariable=self.label_mode,values=['Direct black','Copy from reference body'],state='readonly',width=24))
+        ttk.Label(materialrow,text='Samples: EcoFlex CMYKWT recipes from the worksheet.',wraplength=345).pack(anchor='w',pady=(0,6))
+        ttk.Label(materialrow,text='Printed-label material (separate from samples)').pack(anchor='w')
+        mode=self.remember('label_mode',ttk.Combobox(materialrow,textvariable=self.label_choice,values=[self.black_label_choice,'Copy from reference body'],state='readonly',width=24))
         mode.pack(fill='x',pady=3)
         reference=self.remember('label_reference',ttk.Combobox(materialrow,textvariable=self.label_reference,state='disabled',width=32))
         reference.pack(fill='x',pady=3)
-        mode.bind('<<ComboboxSelected>>',lambda _:reference.configure(state='readonly' if self.label_mode.get()!='Direct black' else 'disabled'))
-        self.remember('replace_labels',ttk.Checkbutton(configuration,text='Replace existing label materials with reference\n(after reviewing the listed materials)',variable=self.replace_labels,command=self.review_label_replacements)).grid(row=2,column=0,sticky='w')
+        ttk.Label(materialrow,textvariable=self.reference_note,wraplength=345).pack(anchor='w')
+        mode.bind('<<ComboboxSelected>>',self.choose_label_material)
+        self.remember('replace_labels',ttk.Checkbutton(configuration,text='Review replacements for existing label materials…',variable=self.replace_labels,command=self.review_label_replacements)).grid(row=2,column=0,sticky='w')
         ttk.Label(configuration, textvariable=self.summary, wraplength=345).grid(row=3,column=0,sticky='ew')
         ttk.Label(configuration, textvariable=self.preview_notice, wraplength=345).grid(row=4,column=0,sticky='ew')
         view=ttk.Frame(panes);view.grid(row=0,column=1,sticky='nsew')
@@ -330,12 +429,7 @@ class App:
         self.canvas.bind('<Configure>',resize)
         self.canvas.bind('<Button-1>',self.click_geometry)
         ttk.Label(view, text='X → right, Y ↑ up • Samples: blue • Selected printed labels: dark • Other preserved bodies: gray. Click a sample for exact channels.', wraplength=460).grid(row=2,column=0,sticky='w')
-        self.remember('reviewed',ttk.Checkbutton(self.geotab,text='I checked all four corners and representative interior printed labels against the mapped cells.',variable=self.reviewed,command=self.update_save)).grid(row=1,column=0,sticky='w',pady=(5,0))
-        row=ttk.Frame(self.geotab);row.grid(row=2,column=0,sticky='ew',pady=4)
-        ttk.Label(row,text='Review notes').pack(side='left')
-        self.evidence=self.remember('evidence',ttk.Entry(row));self.evidence.pack(side='left',fill='x',expand=True,padx=8)
-        self.evidence.bind('<KeyRelease>',lambda _:self.update_save())
-        self.remember('material_ack',ttk.Checkbutton(self.geotab,text='I understand this candidate still needs native GrabCAD validation before printing.',variable=self.material_ack,command=self.update_save)).grid(row=3,column=0,sticky='w')
+        ttk.Label(self.geotab,text='Save creates a separate result. Check physical labels and validate in GrabCAD before printing.').grid(row=1,column=0,sticky='w',pady=5)
         def reveal_focus(event):
             widget=event.widget
             top=widget.winfo_rooty()-configuration.winfo_rooty()
@@ -354,6 +448,54 @@ class App:
         bind_settings(configuration)
 
 
+    def sync_mapping_controls(self, *_):
+        corner,direction=controls_from_orientation(self.orientation.get())
+        self.mapping_corner.set(corner);self.mapping_direction.set(direction)
+        self.controls['orientation']['values']=ROW_DIRECTIONS.get(corner,())
+        if corner:
+            _,_,_,column=self.orientation.get().split()
+            self.mapping_hint.set(f'First cell: {corner.lower()}. Next row: {direction.lower()}. Next column: {column}.')
+        else:
+            self.mapping_hint.set('Choose where the first selected worksheet cell belongs in this preview.')
+
+    def choose_mapping_corner(self, _=None):
+        corner=self.mapping_corner.get()
+        choices=ROW_DIRECTIONS.get(corner,())
+        direction=self.mapping_direction.get()
+        # Retain the row axis, but reverse its direction when the corner changes.
+        if choices and direction not in choices:
+            direction=choices[0] if direction in ('Up','Down','') else choices[1]
+        self.transpose.set(False)
+        self.orientation.set(orientation_from_controls(corner,direction))
+
+    def choose_mapping_direction(self, _=None):
+        self.transpose.set(False)
+        self.orientation.set(orientation_from_controls(self.mapping_corner.get(),self.mapping_direction.get()))
+
+    def choose_label_material(self, _=None):
+        self.label_mode.set('Direct black' if self.label_choice.get()==self.black_label_choice else 'Copy from reference body')
+
+    def sync_material_controls(self, *_):
+        available=bool(self.reference_ids)
+        reference_mode=self.label_mode.get()!='Direct black' and available
+        choices=[self.black_label_choice]+(['Copy saved material from a body'] if available else [])
+        self.controls['label_mode']['values']=choices
+        self.label_choice.set('Copy saved material from a body' if reference_mode else self.black_label_choice)
+        reference=self.controls['label_reference']
+        if reference_mode:
+            reference.pack(fill='x',pady=3)
+            reference.configure(state='readonly')
+            self.reference_note.set('Optional: choose an existing body whose saved material should be copied onto labels.')
+        else:
+            reference.pack_forget()
+            self.reference_note.set('Optional saved-material copying is available.' if available else 'No compatible saved reference material in this project. Color-picker placeholders are not references.')
+        info=self.proposal.get('label_material',{}) if self.proposal else {}
+        replacement=self.controls['replace_labels']
+        if reference_mode and self.label_reference.get() and info.get('conflicts'):
+            replacement.grid()
+        else:
+            replacement.grid_remove()
+
     def build_mapping(self):
         ttk.Label(self.maptab,text='Exact requested recipes and target bodies',style='Heading.TLabel').pack(anchor='w',pady=(0,8))
         columns=('cell','C','M','Y','K','W','T','action','body')
@@ -371,9 +513,9 @@ class App:
         ttk.Label(self.helptab,text='Help is available offline: getting started, supported files, mapping and materials, common errors, and finding your output. Agent tools are optional; no agent is needed to use GridCAD.',wraplength=900).pack(anchor='w',pady=(0,8))
         bar=ttk.Frame(self.helptab);bar.pack(fill='x',pady=(0,8))
         self.button(bar,'Quick start',lambda:self.show_help('docs/DESKTOP_MANUAL.md')).pack(side='left',padx=4)
-        self.button(bar,'Schema',lambda:self.show_help('docs/RECTANGULAR_SCHEMA.md')).pack(side='left',padx=4)
-        self.button(bar,'Portable core / API',lambda:self.show_help('docs/DESKTOP_API.md')).pack(side='left',padx=4)
-        self.button(bar,'Copy external-agent prompt',self.copy_prompt,'copy_prompt').pack(side='left',padx=4)
+        self.button(bar,'Supported files',lambda:self.show_help('docs/RECTANGULAR_SCHEMA.md')).pack(side='left',padx=4)
+        self.button(bar,'Developer guide',lambda:self.show_help('docs/DESKTOP_API.md')).pack(side='left',padx=4)
+        self.button(bar,'Copy support prompt',self.copy_prompt,'copy_prompt').pack(side='left',padx=4)
         self.button(bar,'About',self.show_about,'about').pack(side='left',padx=4)
         self.button(bar,'Third-party licenses',self.show_licenses,'licenses').pack(side='left',padx=4)
         agentbar=ttk.Frame(self.helptab);agentbar.pack(fill='x',pady=(0,8))
@@ -390,7 +532,7 @@ class App:
                 return 'break'
             link.bind('<Return>',activate_link)
         helpbox=ttk.Frame(self.helptab);helpbox.pack(fill='both',expand=True)
-        self.help_text=self.remember('help_content',tk.Text(helpbox,wrap='word',font=('Consolas',10),padx=16,pady=12,background='#f8fafc',relief='flat'))
+        self.help_text=self.remember('help_content',tk.Text(helpbox,wrap='word',font=('Segoe UI',10),padx=16,pady=12,background='#f8fafc',relief='flat'))
         helpscroll=ttk.Scrollbar(helpbox,command=self.help_text.yview);helpscroll.pack(side='right',fill='y')
         self.help_text.configure(yscrollcommand=helpscroll.set)
         self.help_text.pack(fill='both',expand=True)
@@ -400,7 +542,10 @@ class App:
         self.help_document=name
         try:text=resource(name).read_text(encoding='utf-8')
         except OSError:text='Documentation will be included in the release folder.\n\n'+PROMPT
-        self.help_text.configure(state='normal');self.help_text.delete('1.0','end');self.help_text.insert('1.0',text);self.help_text.configure(state='disabled')
+        self.help_text.configure(state='normal');self.help_text.delete('1.0','end');self.help_text.tag_configure('heading',font=('Segoe UI',13,'bold'),spacing1=10,spacing3=5)
+        self.help_text.tag_configure('code',font=('Consolas',10))
+        for line,tag in help_lines(text):self.help_text.insert('end',line+'\n',tag)
+        self.help_text.configure(state='disabled')
 
     def set_help_text(self,text):
         self.help_text.configure(state='normal');self.help_text.delete('1.0','end');self.help_text.insert('1.0',text);self.help_text.configure(state='disabled')
@@ -412,7 +557,7 @@ class App:
                            'Releases: https://github.com/kevinsullivan0/gridcad/releases\n'
                            'Links open your browser only when clicked. No automatic update checks or downloads.\n\n'
                            'Exact installed source: '+diagnostics.SOURCE_URL+'\n\n'
-                           'Unsigned candidate. Native GrabCAD open/recompose/save and physical printing remain unverified. Originals are preserved; outputs remain separate candidates.\n\n'
+                           'Unsigned release candidate. Results have not been tested by opening, recomposing and saving them in GrabCAD, or by printing them. Your originals stay unchanged.\n\n'
                            'Original GridCAD code: MIT License, copyright 2026 Kevin Sullivan. Read LICENSE beside the application. Third-party runtime licenses remain separate; use the Third-party licenses button to read the bundled notices.')
 
         for tag,url in (
@@ -508,9 +653,12 @@ class App:
         had_proposal=self.proposal is not None
         self.revision+=1
         self.proposal=None;self.reviewed.set(False);self.material_ack.set(False);self.replace_labels.set(False)
+        if had_proposal:
+            self.detail.set('The cell assignment changed. Click a sample to inspect its original material, or build a new mapping.')
         if hasattr(self,'save_button'):self.save_button.configure(state='disabled')
+        if hasattr(self,'reference_note') and 'replace_labels' in self.controls:self.sync_material_controls()
         if hasattr(self,'mapping_tree'):self.mapping_tree.delete(*self.mapping_tree.get_children())
-        self.summary.set('Inputs changed. Build a fresh mapping preview before saving.')
+        self.summary.set('Inputs changed. Choose Match cells to samples before saving.')
         if hasattr(self,'canvas'):
             # Range dragging may invalidate many times. Remove stale mapping
             # labels once, but do not recreate unchanged geometry for each cell.
@@ -523,9 +671,13 @@ class App:
         requested=self.replace_labels.get()
         info=self.proposal.get('label_material',{}) if self.proposal else {}
         conflicts=info.get('conflicts',[])
-        if requested and not conflicts:
+        reference=self.reference_ids.get(self.label_reference.get())
+        valid_reference=(self.project is not None and self.label_mode.get()!='Direct black'
+                         and reference is not None and reference in self.project.get('leaves',())
+                         and info.get('reference_id')==reference)
+        if requested and (not conflicts or not valid_reference):
             self.replace_labels.set(False)
-            self.status.set('Build a reference-material preview first. Any existing assignments needing replacement will be listed for review.')
+            self.status.set('Choose a saved material from this project and match cells to samples first. Any label replacements will be listed for review.')
             return
         approved=False
         if requested:
@@ -533,7 +685,7 @@ class App:
             frame=ttk.Frame(dialog,padding=16);frame.pack(fill='both',expand=True);frame.columnconfigure(0,weight=1);frame.rowconfigure(2,weight=1)
             dialog.minsize(640,360)
             ttk.Label(frame,text='Replace these existing assignments?',style='Heading.TLabel').grid(row=0,column=0,sticky='w')
-            ttk.Label(frame,text='Reference: '+self.label_reference.get()+'\nEvery listed target will receive this complete saved material. Originals stay unchanged.',wraplength=700).grid(row=1,column=0,sticky='w',pady=8)
+            ttk.Label(frame,text='Copy material from: '+self.label_reference.get()+'\nThe labels below will receive this material. Your original file stays unchanged.',wraplength=700).grid(row=1,column=0,sticky='w',pady=8)
             tablebox=ttk.Frame(frame);tablebox.grid(row=2,column=0,sticky='nsew');tablebox.rowconfigure(0,weight=1);tablebox.columnconfigure(0,weight=1)
             table=ttk.Treeview(tablebox,columns=('object','material'),show='headings');table.heading('object',text='Label object');table.heading('material',text='Current material')
             table.column('object',width=300);table.column('material',width=350)
@@ -547,7 +699,7 @@ class App:
             self.button(buttons,'Confirm these replacements',accept,'label_review_confirm').pack(side='right',padx=8)
             dialog.bind('<Escape>',lambda _:dialog.destroy());dialog.grab_set();self.root.wait_window(dialog)
         self.invalidate();self.replace_labels.set(approved)
-        self.status.set('Build the preview again to bind this label-material choice to the selected inputs.')
+        self.status.set('Choose Match cells to samples to check the label replacement before saving.')
 
     def report_stage(self, description):
         """Worker-safe stage notification. Only the Tk poller touches widgets."""
@@ -711,7 +863,7 @@ class App:
             self.workbook_path=Path(path);self.book_label.configure(text=Path(path).name)
             self.controls['sheet']['values']=list(book);self.sheet.set(next(iter(book)))
             self.change_sheet();self.notebook.select(self.worktab)
-            self.status.set('Workbook loaded. Select the exact recipe rectangle; originals are unchanged.')
+            self.status.set('Workbook loaded. Select the cells containing your recipes. Your originals stay unchanged.')
             if after:after(book)
         def failed(exc):
             self.clear_workbook('Workbook could not be loaded. Choose another file to retry.')
@@ -725,7 +877,7 @@ class App:
     def load_project(self,path,after=None):
         if self.future is not None:return False
         self.operation_context={'project':str(path)}
-        self.project=None;self.project_path=None
+        self.project=None;self.project_path=None;self.inspected_oid=None
         self.container_ids={};self.reference_ids={}
         for key in ('samples','labels','label_reference'):
             self.controls[key]['values']=()
@@ -739,16 +891,23 @@ class App:
             self.controls['samples']['values']=groups;self.sample.set(groups[0])
             self.container_ids={f"{v['name']} ({len(v['leaves'])} bodies) [{i+1}]":oid for i,(oid,v) in enumerate(project['containers'].items())}
             self.controls['labels']['values']=list(self.container_ids);self.labels.set('');self.orientation.set('')
-            self.reference_ids={f"{project['nodes'][oid].get('name','Body')} — {project['nodes'][oid]['material'].get('name','material')} [{i+1}]":oid for i,oid in enumerate(sorted(project['leaves']))}
+            self.reference_ids={f"{info['name']} — {info['material_name']} [{i+1}]":oid for i,(oid,info) in enumerate(project.get('compatible_references',{}).items())}
+            native_black=[oid for oid in sorted(project['leaves']) if core.op.black(project['nodes'][oid]['material'])]
+            black=project['nodes'][native_black[0]]['material'] if native_black else core.op.EcoFlexMaterialProvider().direct_black()
+            self.black_label_choice=material_display_name(black)+' — labels'
             self.controls['label_reference']['values']=list(self.reference_ids);self.label_reference.set('');self.label_mode.set('Direct black');self.controls['label_reference'].configure(state='disabled')
-            self.detail.set('Project loaded. Select a mapped sample to inspect exact channels.')
-            self.notebook.select(self.geotab);self.draw_geometry();self.status.set('Geometry loaded. Explicitly choose the printed-label container and worksheet directions.')
+            self.detail.set('Project loaded. Click any sample to inspect its source material; mapping is only needed for requested recipe channels.')
+            self.notebook.select(self.geotab);self.draw_geometry();self.status.set('Geometry loaded. Choose the label group and where the first worksheet cell belongs in the preview.')
             if after:after()
         def failed(_):
             self.project_label.configure(text='Project not loaded — choose a supported source to retry.')
             self.detail.set('Project load failed. No previous geometry or mapping is active.')
             self.draw_geometry()
-        return self.run('Inspecting embedded meshes and source storage guards…',lambda:core.load_project(path),done,failed)
+        def work():
+            project=core.load_project(path)
+            project['compatible_references']=compatible_reference_info(project)
+            return project
+        return self.run('Opening the project and checking its geometry…',work,done,failed)
 
     def load_example(self):
         if self.future:return
@@ -764,7 +923,7 @@ class App:
                     self.transpose.set(False)
                     self.labels.set(next(k for k in self.container_ids if k.startswith('Printed labels ')))
                     self.orientation.set('Rows down; columns right')
-                    self.status.set('Synthetic example loaded. Build a preview and inspect the corner cell labels. DO NOT PRINT.')
+                    self.status.set('Example loaded. Choose Match cells to samples, then click a sample to see its recipe. This example is not for printing.')
                 self.load_project(folder/'DO_NOT_PRINT.PRINT',finish)
             self.root.after_idle(next_step)
         self.load_workbook(workbook_path,after=workbook_ready)
@@ -937,7 +1096,7 @@ class App:
         def done(proposal):
             if revision!=self.revision:
                 self.status.set('Inputs changed during preview. Build the mapping again.');return
-            self.proposal=proposal;self.notebook.select(self.geotab)
+            self.proposal=proposal;self.sync_material_controls();self.notebook.select(self.geotab)
             material=proposal.get('label_material',{});conflicts=material.get('conflicts',[])
             pending=conflicts and not material.get('replacement_confirmed')
             p=proposal['plan'];changes=sum(x['action']!='preserve_exact_mixer' for x in p['samples'])+sum(x['action']!='preserve_native_black' for x in p['labels'])
@@ -946,7 +1105,7 @@ class App:
                 self.mapping_tree.insert('', 'end', iid=row['id'], values=(row['cell'],*row['percentages'],row['action'],row['id']))
             if conflicts:
                 self.summary.set(self.summary.get()+' Label replacements: '+', '.join(x['name']+' ('+x['current_material']+')' for x in conflicts[:4])+(' …' if len(conflicts)>4 else '')+'.')
-            self.draw_geometry();self.status.set('Mapping checked. When preview activity finishes, inspect samples and the detail notice; record physical-label verification before saving.')
+            self.draw_geometry();self.status.set('Cells matched to samples. Click a sample to check its recipe, then save a separate result.')
         def work():
             proposal=core.propose(*args,**kwargs)
             # Exercise the complete writer refusal rules before requesting user
@@ -954,10 +1113,10 @@ class App:
             # review or use it to write a candidate.
             material=proposal.get('label_material',{})
             if not (material.get('conflicts') and not material.get('replacement_confirmed')):
-                self.report_stage('Checking source preservation and material-writer rules…')
-                core.op.prepare(args[0]['path'],args[1],core.confirm(proposal,'Structural preflight only; user physical-label review is still pending.'))
+                self.report_stage('Checking materials and original geometry…')
+                core.op.prepare(args[0]['path'],args[1],core.candidate_plan(proposal))
             return proposal
-        self.run('Constructing and checking the rectangular mapping…',work,done)
+        self.run('Matching worksheet cells to samples…',work,done)
 
     def cancel_render(self):
         """Supersede pending pixels and overlay callbacks without blocking Tk."""
@@ -1074,7 +1233,7 @@ class App:
                     if self.render_future is None and self.render_pending is None:self.render_stage=''
                     self.refresh_activity();self.update_save();return
                 oid=record['id'];a=xy(record['bounds'][0]);b=xy(record['bounds'][1])
-                item=self.canvas.create_rectangle(a[0],b[1],b[0],a[1],outline='#1976ad',fill='#e6f1f8',width=1)
+                item=self.canvas.create_rectangle(a[0],b[1],b[0],a[1],outline='#1976ad',fill='#8ec9f0' if oid==getattr(self,'inspected_oid',None) else '#e6f1f8',width=2 if oid==getattr(self,'inspected_oid',None) else 1)
                 self.canvas_ids[item]=oid
                 if oid in mapping and abs(b[0]-a[0])>=27 and abs(a[1]-b[1])>=17:
                     item=self.canvas.create_text(*xy(record['center']),text=mapping[oid]['cell'],font=('Consolas',8),fill='#174260')
@@ -1088,11 +1247,28 @@ class App:
         self.root.after(1,batch);self.refresh_activity();self.update_save()
 
     def click_geometry(self,event):
-        hit=self.canvas.find_closest(self.canvas.canvasx(event.x),self.canvas.canvasy(event.y))
-        oid=self.canvas_ids.get(hit[0]) if hit else None
-        if oid and self.proposal:
-            row=next((x for x in self.proposal['mapping'] if x['id']==oid),None)
-            if row:self.detail.set(f"{self.sheet.get()}!{row['cell']}   C/M/Y/K/W/T = {' / '.join(map(str,row['percentages']))}   |   {oid}")
+        # Only actual sample bounds count. Nearest-item lookup can select a
+        # distant object, or the background raster/text instead of the sample.
+        x=self.canvas.canvasx(event.x);y=self.canvas.canvasy(event.y)
+        hits=self.canvas.find_overlapping(x,y,x,y)
+        oid=next((self.canvas_ids[item] for item in reversed(hits) if item in self.canvas_ids),None)
+        if oid:self.inspect_geometry(oid)
+
+    def inspect_geometry(self,oid):
+        if not self.project or oid not in self.project['nodes']:return
+        self.inspected_oid=oid
+        for item,target in self.canvas_ids.items():
+            if self.canvas.type(item)=='rectangle':
+                self.canvas.itemconfigure(item,fill='#8ec9f0' if target==oid else '#e6f1f8',width=2 if target==oid else 1)
+        node=self.project['nodes'][oid]
+        material=node.get('material',{})
+        name=material.get('metadata',{}).get('displayName') or material.get('name','Unknown material')
+        row=next((x for x in self.proposal['mapping'] if x['id']==oid),None) if self.proposal else None
+        source=f"{node.get('name','Sample')} | Source material: {name} | Object ID: {oid}"
+        if row:
+            self.detail.set(source+f" | {self.sheet.get()}!{row['cell']} requested C/M/Y/K/W/T = {' / '.join(map(str,row['percentages']))}")
+        else:
+            self.detail.set(source+' | Not mapped to a worksheet recipe. Select the recipe cells, then choose Match cells to samples to see requested percentages.')
 
     def set_zoom(self,value):
         self.zoom=value;self.draw_geometry()
@@ -1104,7 +1280,7 @@ class App:
 
     def update_save(self):
         pending=self.proposal and self.proposal.get('label_material',{}).get('conflicts') and not self.proposal.get('label_material',{}).get('replacement_confirmed')
-        enabled=not pending and self.proposal is not None and self.reviewed.get() and self.material_ack.get() and bool(self.evidence.get().strip()) and self.future is None and not getattr(self,'render_failed',False) and not (getattr(self,'render_future',None) is not None or getattr(self,'render_pending',None) is not None or getattr(self,'render_paint_pending',False))
+        enabled=not pending and self.proposal is not None and self.future is None and not getattr(self,'render_failed',False) and not (getattr(self,'render_future',None) is not None or getattr(self,'render_pending',None) is not None or getattr(self,'render_paint_pending',False))
         self.save_button.configure(state='normal' if enabled else 'disabled')
 
     def save(self):
@@ -1112,15 +1288,29 @@ class App:
         if str(self.save_button['state'])=='disabled':return
         out=filedialog.asksaveasfilename(parent=self.root,title='Name a NEW result folder (contains PRINT and audit)',initialfile='GridCAD-result',filetypes=[('New result folder','*')],confirmoverwrite=True)
         if not out:return
-        proposal=self.proposal;evidence=self.evidence.get().strip()
+        proposal=self.proposal
         project_path,workbook_path=self.project_path,self.workbook_path
         def done(audit):
-            self.status.set(f"Saved {audit['changed_count']} material changes, {audit['unchanged_nonproject_payloads']} payloads preserved. Result: {out}")
-            self.root.after_idle(lambda:messagebox.showinfo('GridCAD — separate result saved',f"{out}\ncandidate_UNVERIFIED.PRINT\n\nFile-level preservation and recipe readback passed. Reopen, inspect, recompose and save in native GrabCAD before printing.",parent=self.root))
-        self.run('Writing a separate candidate and verifying every preserved payload…',lambda:core.save(project_path,workbook_path,proposal,out,evidence),done)
+            self.status.set(f"Saved {audit['changed_count']} material changes. Original geometry and files were preserved. Result: {out}")
+            self.root.after_idle(lambda:messagebox.showinfo('GridCAD — separate result saved',f"{out}\ncandidate_UNVERIFIED.PRINT\n\nThe saved recipes and original geometry passed the file checks. Open and check the result in GrabCAD before printing.",parent=self.root))
+        self.run('Saving a separate result and checking the output…',lambda:core.save_candidate(project_path,workbook_path,proposal,out),done)
 
     def callback_error(self,exc_type,exc,traceback):
         self.errors.append(str(exc));self.show_error(exc)
+
+    def geometry_qa_samples(self):
+        """Read-only visible sample rectangles for genuine OS mouse checks."""
+        if not self.canvas.winfo_ismapped():return {}
+        result={};left=self.canvas.canvasx(0);top=self.canvas.canvasy(0)
+        for item,oid in self.canvas_ids.items():
+            if self.canvas.type(item)!='rectangle':continue
+            x1,y1,x2,y2=self.canvas.coords(item)
+            x1=max(x1,left);y1=max(y1,top)
+            x2=min(x2,left+self.canvas.winfo_width());y2=min(y2,top+self.canvas.winfo_height())
+            if x2-x1<2 or y2-y1<2:continue
+            result[oid]={'x':int(self.canvas.winfo_rootx()+x1-left),'y':int(self.canvas.winfo_rooty()+y1-top),
+                         'w':int(x2-x1),'h':int(y2-y1)}
+        return result
 
     def worksheet_qa_cells(self):
         """Optional QA metadata: real visible cell bounds and painted selection.
@@ -1162,10 +1352,35 @@ class App:
                          'url':self.help_text.get(*bounds)}
         return result
 
+    def tab_qa_positions(self):
+        """Discover actual themed tab extents; never change the selected tab."""
+        positions={}
+        names=('worktab','geotab','maptab','helptab')
+        # Ttk does not expose a tab bounding-box command. Hit-test a bounded
+        # strip of the actual widget instead of assuming font-dependent widths.
+        size=(self.notebook.winfo_width(),self.notebook.winfo_height(),self.notebook.winfo_rootx(),self.notebook.winfo_rooty())
+        if getattr(self,'tab_qa_cache',None) and self.tab_qa_cache[0]==size:return self.tab_qa_cache[1]
+        row=None
+        for y in range(0,min(45,size[1]),2):
+            try:self.notebook.index(f'@10,{y}');row=y;break
+            except tk.TclError:continue
+        if row is not None:
+            for x in range(size[0]):
+                try:index=self.notebook.index(f'@{x},{row}')
+                except tk.TclError:continue
+                if index>=len(names):continue
+                key=names[index]
+                if key not in positions:positions[key]=[x,row,x,row]
+                else:positions[key][2]=x
+        result={key:{'x':self.notebook.winfo_rootx()+(box[0]+box[2])//2,
+                     'y':self.notebook.winfo_rooty()+box[1]+8} for key,box in positions.items()}
+        self.tab_qa_cache=(size,result)
+        return result
+
     def write_qa_state(self):
         focused=self.root.focus_get()
         focused_control=next((key for key,widget in self.controls.items() if widget==focused),None)
-        state={'focused_control':focused_control,'app_version':diagnostics.VERSION,'about_links':self.about_link_qa_points(),'status':self.status.get(),'summary':self.summary.get(),'detail':self.detail.get(),'errors':self.errors,
+        state={'selected_sample':getattr(self,'inspected_oid',None),'tab_positions':self.tab_qa_positions(),'geometry_samples':self.geometry_qa_samples(),'focused_control':focused_control,'app_version':diagnostics.VERSION,'about_links':self.about_link_qa_points(),'status':self.status.get(),'summary':self.summary.get(),'detail':self.detail.get(),'errors':self.errors,
                'busy':self.future is not None or getattr(self,'render_future',None) is not None or getattr(self,'render_pending',None) is not None or getattr(self,'render_paint_pending',False),
                'activity':self.activity.get(),'progress_visible':bool(self.progress.winfo_ismapped()),'workbook':str(self.workbook_path) if self.workbook_path else None,
                'project':str(self.project_path) if self.project_path else None,
@@ -1173,6 +1388,8 @@ class App:
                'save_enabled':str(self.save_button['state'])!='disabled',
                'transpose':self.transpose.get(), 'labels':self.labels.get(),
                'label_choices':list(self.container_ids), 'orientation':self.orientation.get(),
+               'mapping_corner':self.mapping_corner.get(),'mapping_direction':self.mapping_direction.get(),
+               'reference_available':bool(self.reference_ids),'material_choice':self.label_choice.get(),
                'label_mode':self.label_mode.get(),'label_reference':self.label_reference.get(),'reference_choices':list(self.reference_ids),
                'diagnostic':self.last_diagnostic,'help_document':self.help_document,'license_files':self.license_files,'agent_detection':self.agent_detection,'agent_include_path':self.include_app_path.get(),
                'worksheet_cells':self.worksheet_qa_cells(),

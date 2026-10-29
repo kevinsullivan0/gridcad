@@ -523,9 +523,17 @@ def prepare(project, xlsx, plan):
     if reviewed_ids and 'axes' in plan: fail('Reviewed-ID material-only plans must omit axes; no translation-rank mapping proof is used.')
     if not reviewed_ids and 'axes' not in plan: fail('Identity-compose lattice mode requires explicit axes.')
     if plan['allow_unverified_material_profile'] is not True: fail('Explicit unverified material-profile acknowledgement required.')
-    keys(plan['review'], ('geometry_and_labels_confirmed','evidence'), ('mapping_sha256',))
-    if plan['review']['geometry_and_labels_confirmed'] is not True or not isinstance(plan['review']['evidence'], str) or not plan['review']['evidence'].strip():
+    keys(plan['review'], ('geometry_and_labels_confirmed','evidence'), ('mapping_sha256','mode'))
+    candidate_only = plan['review'].get('mode') == 'desktop_unverified_candidate'
+    if 'mode' in plan['review'] and not candidate_only:
+        fail('Unknown mapping review mode.')
+    if candidate_only:
+        if not reviewed_ids or plan['review']['geometry_and_labels_confirmed'] is not False:
+            fail('An unverified desktop candidate must not claim physical-label review.')
+    elif plan['review']['geometry_and_labels_confirmed'] is not True:
         fail('Actual geometry/printed labels must be reviewed before conversion.')
+    if not isinstance(plan['review']['evidence'], str) or not plan['review']['evidence'].strip():
+        fail('Mapping evidence or candidate limitations must be recorded.')
     if reviewed_ids and not re.fullmatch(r'[0-9a-f]{64}', str(plan['review'].get('mapping_sha256',''))):
         fail('Reviewed-ID mode needs the source-bound independently reviewed mapping digest.')
     if plan['formula_cache_policy'] not in ('reject', 'confirmed_current_cache'): fail('Unknown formula cache policy.')
@@ -820,7 +828,9 @@ def apply(project, xlsx, plan, out_dir):
                  'mapping_mode':'reviewed_exact_ids' if plan['placement_profile']==REVIEWED_ID_PROFILE else 'identity_compose_lattice_check',
                  'mapping_sha256':mapping_digest(plan),
                  'placement_interpretation':'not_interpreted_source_transforms_preserved' if plan['placement_profile']==REVIEWED_ID_PROFILE else 'restricted_identity_compose_lattice',
-                 'physical_mapping_automatically_verified':False}
+                 'physical_mapping_automatically_verified':False,
+                 'physical_mapping_reviewed':plan['review']['geometry_and_labels_confirmed'],
+                 'review_mode':plan['review'].get('mode','explicit_review')}
         manifest = [{k:v for k,v in item.items() if k!='reference_material'} for item in assignments]
         (temp/'audit.json').write_text(report_json(audit))
         (temp/'assignments.json').write_text(report_json(manifest))

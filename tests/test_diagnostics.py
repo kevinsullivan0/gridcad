@@ -11,7 +11,7 @@ class DiagnosticsTests(unittest.TestCase):
         self.assertIn('Recalculate',x.remedy);self.assertNotIn('GCD101',x.text());self.assertIn('GCD101',x.text(details=True))
     def test_dimension_expected_actual_and_recovery(self):
         x=d.describe(ValueError('Geometry has 6 × 4 positions in this orientation; worksheet is 4 × 6. Check transpose and orientation.'))
-        self.assertEqual(x.code,'GCD201');self.assertIn('6 × 4',x.actual);self.assertIn('Transpose',x.remedy)
+        self.assertEqual(x.code,'GCD201');self.assertIn('6 × 4',x.actual);self.assertIn('first-cell corner',x.remedy);self.assertIn('next worksheet row',x.remedy);self.assertNotIn('Transpose',x.remedy)
     def test_report_minimizes_input_data_and_prompt_explains_access(self):
         with tempfile.TemporaryDirectory() as t:
             try:raise ValueError('D4: private recipe value SENTINEL_PRIVATE_CONTENT')

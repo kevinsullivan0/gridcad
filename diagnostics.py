@@ -7,7 +7,7 @@ import re
 import tempfile
 import traceback
 
-VERSION='0.2.0-rc.6'
+VERSION='0.2.0-rc.7'
 SOURCE_URL='https://github.com/kevinsullivan0/gridcad/tree/v'+VERSION
 
 @dataclass
@@ -51,39 +51,39 @@ def describe(exc, context=None):
     if cell:where=' → '.join(str(x) for x in [Path(str(c.get('workbook',''))).name,c.get('sheet'),cell.group(1)] if x)
     elif c.get('project'):where=Path(str(c['project'])).name
     if 'reference' in low and c.get('reference_body'):where+=' → '+str(c['reference_body'])
-    code,title,help='GCD900','This operation could not be completed.','Keep your originals. Check the selected inputs; use the optional debugging prompt if this persists.'
+    code,title,help='GCD900','This operation could not be completed.','Check the selected files and settings, then try again. If the problem continues, copy the debugging prompt to ask for help.'
     expected=actual=''
     if isinstance(exc,PermissionError):code,title,help='GCD002','GridCAD cannot access this location.','Choose a folder you can write to, or close the file in the application holding it. Do not change security protections.'
     elif isinstance(exc,FileNotFoundError):code,title,help='GCD001','A selected file or folder is no longer available.','Choose the existing input again, or choose an existing parent folder for the new result.'
     elif raw in RESOURCE_DESCRIPTIONS:
-        code,title,help='GCD206','This file is too large or complex to open safely.','Export a smaller project or values-only workbook containing the needed objects or sheets. Keep your original; do not bypass the limit. See Help → Supported schema for the documented ceilings.'
+        code,title,help='GCD206','This file is too large or complex to open safely.','Keep the original and export a smaller project or a values-only workbook with just the sheets you need. See Help → Supported files for the limits.'
         actual=RESOURCE_DESCRIPTIONS[raw]
     elif 'formula uses a saved result' in low:code,title,help='GCD101','This cell uses a saved formula result.','Recalculate and save the workbook in Excel, then confirm current formula results; alternatively use a values-only copy.'
     elif 'missing value, formula cache' in low:code,title,help='GCD102','This cell has no usable recipe value.','Fill the selected cell or fix its Excel error. For formulas, recalculate and save in Excel; confirming cannot restore a missing result.'
     elif any(x in low for x in ['input changed','source hash differs','workbook hash','archive hash','source-material hash']):
-        code,title,help='GCD402','The inputs have changed since this mapping was reviewed.','Reopen the current files and build a fresh preview. Review it again; do not reuse the old plan or change its hashes.'
+        code,title,help='GCD402','The input files have changed since the mapping was built.','Reopen the current files and build the mapping again. The old mapping cannot be used with changed files.'
     elif any(x in low for x in ['saved recipe mismatch','worksheet disagrees','readback mismatch','preservation','unexpected non-material']):
         code,title,help='GCD403','The result did not pass its safety checks.','Keep the original files and do not use this candidate. Use the debugging report to investigate; do not edit recipes or disable checks to hide the mismatch.'
     elif 'selected group has' in low:
-        code,title,help='GCD205','The number of selected cells does not match the sample group.','Select the matching recipe rectangle or sample group, then rebuild the preview. Do not change individual recipe percentages to fix a count mismatch.'
+        code,title,help='GCD205','The number of selected cells does not match the sample group.','Select the matching recipe rectangle or sample group, then choose Match cells to samples. Do not change individual recipe percentages to fix a count mismatch.'
         match=re.search(r'Selected group has (\d+) bodies; the worksheet rectangle has (\d+) recipes',raw)
         if match:expected=match.group(1)+' recipe cells for the selected bodies';actual=match.group(2)+' selected recipe cells'
     elif cell or 'channel' in low or 'recipe' in low:
         code,title,help='GCD103','A recipe is not in the supported format.','Edit the indicated cell to six C/M/Y/K/W/T percentages separated by slashes, including zeros, totaling exactly 100. Save and reopen the workbook.'
         expected='Six explicit percentages, each 0–100, totaling 100.'
     elif 'transpose and orientation' in low:
-        code,title,help='GCD201','The selected cells do not fit the grid in this direction.','Check the recipe rectangle and worksheet directions. Use Transpose only when rows and columns are exchanged.'
+        code,title,help='GCD201','The selected cells do not fit the grid in this direction.','Check the selected cells, the first-cell corner and the direction of the next worksheet row in the preview.'
         m=re.search(r'Geometry has (.*?) positions.*worksheet is (.*?)\.',raw)
         if m:actual='Grid: '+m.group(1)+'; selected cells: '+m.group(2)
     elif 'overlap' in low or 'touch' in low:code,title,help='GCD202','The selected objects cannot be distinguished safely.','Choose separate sample and label groups. If sample footprints overlap or touch, separate them in the source project; GridCAD will not guess.'
-    elif any(x in low for x in ['lattice','grid position','planar','anchor']):code,title,help='GCD203','The sample positions do not make one unambiguous rectangular grid.','Select one complete evenly spaced grid at a common height, with no missing or duplicate positions. Correct placement in the source CAD tool rather than increasing tolerance.'
-    elif 'reference' in low and ('material' in low or 'label' in low):code,title,help='GCD301','The label material reference cannot be used safely.','Select an unchanged body with a complete supported native material assignment. If its saved assignments disagree, resolve that in GrabCAD and reopen the file.'
+    elif any(x in low for x in ['lattice','grid position','planar','anchor']):code,title,help='GCD203','The samples do not form a complete rectangular grid.','Select one evenly spaced grid at a common height, with no missing or duplicate positions. Correct sample placement in the original CAD project if needed.'
+    elif 'reference' in low and ('material' in low or 'label' in low):code,title,help='GCD301','This object cannot supply the label material.','Choose an object in this project with a supported saved material. If the project contains conflicting assignments, correct them in GrabCAD and reopen it.'
     elif any(x in low for x in ['intentional','conflict','replacement confirmation']):code,title,help='GCD302','Some selected objects already have a different material.','Review the listed label replacements and explicitly confirm them if intended. Otherwise choose another group or resolve the assignment in GrabCAD.'
     elif 'shared material' in low:code,title,help='GCD303','This material identity is shared with other objects.','Resolve the shared assignment in the source application. GridCAD will not risk changing an unselected object.'
     elif 'output directory' in low or 'file exists' in low:code,title,help='GCD401','That result folder already exists.','Choose a new folder name. Your existing result will not be overwritten.'
-    elif any(x in low for x in ['version','profile','compose','transform','scaling','stl','unsupported']):code,title,help='GCD204','This project uses a storage or geometry format GridCAD cannot safely handle.','Check the supported schema. Keep the original unchanged; do not edit version numbers or transforms to force acceptance. Use the debugging prompt for an adapter review.'
+    elif any(x in low for x in ['version','profile','compose','transform','scaling','stl','unsupported']):code,title,help='GCD204','This project uses a storage or geometry format GridCAD cannot safely handle.','See Help → Supported files. Keep the original unchanged; do not edit version numbers or geometry settings to force it to open. Copy the debugging prompt if you need help.'
     elif 'open ' in low and ('first' in low or 'both' in low):code,title,help='GCD010','Choose the required input files first.','Open the workbook and project, or use Load example to try the workflow.'
-    elif 'choose' in low or 'select' in low:code,title,help='GCD011','One of the required selections is missing or does not match.','Check the worksheet range, sample group, label container and worksheet directions, then build the preview again.'
+    elif 'choose' in low or 'select' in low:code,title,help='GCD011','One of the required selections is missing or does not match.','Check the selected cells, sample group, label group and first-cell position, then choose Match cells to samples.'
     return Diagnostic(code,title,help,where,expected,actual,raw)
 
 # Only these settings may enter the local report. No workbook/project bytes, cell

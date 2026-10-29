@@ -9,7 +9,7 @@ import sys
 import zipfile
 
 ROOT=Path(__file__).resolve().parents[1]
-VERSION='0.2.0-rc.6'
+VERSION='0.2.0-rc.7'
 
 
 def digest(path):return hashlib.sha256(path.read_bytes()).hexdigest()

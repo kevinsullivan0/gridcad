@@ -22,7 +22,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parent / 'operator'))
 from gridcad_operator import operator as op
 
-VERSION = '0.2.0-rc.6'
+VERSION = '0.2.0-rc.7'
 PROFILE = 'rectangular-2170-mesh-review-v1'
 TOLERANCE = 0.0001  # mm, fixed; never enlarged to make an input fit.
 MAX_PROJECT_BYTES = 2 * 1024**3
@@ -546,3 +546,26 @@ def confirm(proposal, evidence):
 def save(project_path, workbook_path, proposal, output_directory, evidence):
     plan = confirm(proposal, evidence)
     return op.apply(project_path, workbook_path, plan, output_directory)
+
+
+def candidate_plan(proposal):
+    """Bind a desktop candidate without inventing a physical-label attestation.
+
+    The same exhaustive writer validation applies. This mode records the limit
+    explicitly rather than treating a checkbox or free-text note as proof.
+    """
+    plan = copy.deepcopy(proposal['plan'])
+    plan['review'] = {
+        'mode': 'desktop_unverified_candidate',
+        'geometry_and_labels_confirmed': False,
+        'evidence': (f"{PROFILE}; worksheet-derived mapping; "
+                     f"orientation={proposal['orientation']}; transpose={proposal['transpose']}. "
+                     'Physical label correspondence has not been independently verified. '
+                     'Save requested for a separate candidate; native validation remains required.'),
+    }
+    plan['review']['mapping_sha256'] = op.mapping_digest(plan)
+    return plan
+
+
+def save_candidate(project_path, workbook_path, proposal, output_directory):
+    return op.apply(project_path, workbook_path, candidate_plan(proposal), output_directory)

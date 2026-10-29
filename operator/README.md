@@ -6,6 +6,8 @@ A small assistant-operated CLI for inspecting an XLSX and a GrabCAD `.PRINT`, ch
 
 This is a cleanup of an actual-file conversion method, not a universal importer. The source/storage profiles are narrowly limited to the observed GrabCAD 1.117.12.3985 / internal 2170 serialization described below. The material-only route consumes externally reviewed exact IDs rather than inferring their physical mapping. Two successful file-level conversions do not establish compatibility with all 2170 projects or native print readiness.
 
+The desktop app also uses this writer for separate unverified candidates. Its explicit `desktop_unverified_candidate` review mode keeps `geometry_and_labels_confirmed=false` and records `physical_mapping_reviewed=false` in the audit. It preserves every source, recipe, material and output check. The reviewed operator commands below continue to require their stated review evidence.
+
 ## Operator workflow
 
 The ordinary desktop app needs none of these commands. For optional operator use on **Windows PowerShell**, open the extracted Windows package's `GridCAD` folder (the one containing `GridCAD.exe`, `GridCAD-core.exe` and `_internal`). The bundled core includes Python; no installation, activation script or execution-policy change is needed. Replace these illustrative paths with your own. Keep actual inputs, private plans, renders, reports and outputs **outside the app/source package**.

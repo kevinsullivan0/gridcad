@@ -7,7 +7,7 @@ import zipfile
 def package(root, destination):
     destination.parent.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(destination, 'w', compression=zipfile.ZIP_DEFLATED) as archive:
-        for name in ('Start GridCAD.bat','tools/source_launcher.py','docs/SOURCE_LAUNCHER.md'):
+        for name in ('Start GridCAD from source.bat','tools/source_launcher.py','docs/SOURCE_LAUNCHER.md'):
             archive.write(root/name,name)
     return destination
 

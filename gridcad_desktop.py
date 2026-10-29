@@ -20,6 +20,21 @@ import desktop_core as core
 import diagnostics
 import agent_help
 
+
+def write_launch_ready(root, destination, token):
+    """Tell the launcher that this process has a mapped, initialized GUI.
+
+    This is startup evidence only, never a conversion/print-readiness claim.
+    """
+    if not destination or not token or not root.winfo_viewable():
+        return False
+    destination=Path(destination)
+    temporary=destination.with_suffix('.tmp')
+    temporary.write_text(json.dumps({'pid':os.getpid(),'version':diagnostics.VERSION,
+                                     'token':token}),encoding='utf-8')
+    os.replace(temporary,destination)
+    return True
+
 # These choices describe the visible preview, not tray coordinate jargon.
 ROW_DIRECTIONS = {
     'Top left': ('Down', 'Right'),
@@ -102,7 +117,7 @@ def help_lines(text):
 
 
 PROMPT = '''Use the installed GridCAD source folder (beside GridCAD.exe), or the exact release source:
-https://github.com/kevinsullivan0/gridcad/tree/v1.0.0
+https://github.com/kevinsullivan0/gridcad/tree/v1.0.1
 Do not assume the repository default branch matches this installed release.
 Read AGENTS.md, docs/DESKTOP_API.md, docs/RECTANGULAR_SCHEMA.md, and operator/README.md first.
 Use the portable deterministic core. Keep my original files untouched and all private
@@ -1443,12 +1458,25 @@ class App:
 def main():
     parser=argparse.ArgumentParser(description='GridCAD deterministic rectangular desktop converter')
     parser.add_argument('--qa-state',help=argparse.SUPPRESS)
+    parser.add_argument('--launch-ready',help=argparse.SUPPRESS)
+    parser.add_argument('--launch-token',help=argparse.SUPPRESS)
     args=parser.parse_args()
     if sys.platform=='win32':
         import ctypes
         try:ctypes.windll.shcore.SetProcessDpiAwareness(1)
         except OSError:pass
-    root=tk.Tk();App(root,args.qa_state);root.mainloop()
+    root=tk.Tk();App(root,args.qa_state)
+    if args.launch_ready and args.launch_token:
+        def report_ready():
+            try:
+                if not write_launch_ready(root,args.launch_ready,args.launch_token):
+                    root.after(100,report_ready)
+            except OSError:
+                # Startup is usable even if an external observer lost its path.
+                # The launcher will report an unconfirmed start, not open twice.
+                pass
+        root.after(100,report_ready)
+    root.mainloop()
 
 
 if __name__=='__main__':main()

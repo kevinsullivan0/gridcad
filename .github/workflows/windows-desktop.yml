@@ -25,6 +25,12 @@ jobs:
         run: python -m unittest discover -s tests -v
       - name: Source launcher regression
         run: python -m unittest discover -s tests -p "test_*launcher*.py" -v
+      - name: Parse Windows launcher before building
+        shell: pwsh
+        run: |
+          $parseErrors=$null
+          [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $pwd 'tools/windows_launcher.ps1'), [ref]$null, [ref]$parseErrors) | Out-Null
+          if ($parseErrors.Count) { throw ($parseErrors | Out-String) }
       - name: Build offline Windows portable distribution
         run: python tools/build_windows.py
       # The 3.13 installer can service an existing same-version installation.
@@ -37,9 +43,24 @@ jobs:
       - name: Install GUI observation tools
         run: python -m pip install --disable-pip-version-check -r requirements-desktop-build.txt
       - name: Source launcher first-run, repeat and recovery acceptance
-        run: python tools/windows_launcher_acceptance.py --zip dist/GridCAD-Source-Windows-v1.0.0.zip --out launcher-qa --install-fixture
+        run: python tools/windows_launcher_acceptance.py --zip dist/GridCAD-Source-Windows-v1.0.1.zip --out launcher-qa --install-fixture
       - name: Real extracted-package Windows GUI acceptance
-        run: python tools/windows_gui_acceptance.py --zip dist/GridCAD-Windows-x64-v1.0.0.zip --out desktop-qa
+        run: python tools/windows_gui_acceptance.py --zip dist/GridCAD-Windows-x64-v1.0.1.zip --out desktop-qa
+      - name: Combined distribution artifact contract
+        shell: pwsh
+        run: |
+          $env:GRIDCAD_DISTRIBUTION_ZIP='dist/GridCAD-Windows-x64-v1.0.1.zip'
+          python -m unittest discover -s tests -p test_distribution_journey.py -v
+      - name: One-download install, shortcut and source recovery journey
+        run: python tools/windows_distribution_acceptance.py --zip dist/GridCAD-Windows-x64-v1.0.1.zip --out distribution-qa --source
+      - name: Archive distribution journey evidence
+        if: always()
+        shell: pwsh
+        run: |
+          if (Test-Path distribution-qa) {
+            $files = @(Get-ChildItem distribution-qa -File | Where-Object { $_.Extension -in '.png','.log','.json' })
+            if ($files.Count) { Compress-Archive -LiteralPath $files.FullName -DestinationPath dist/GridCAD-distribution-evidence.zip -Force }
+          }
       - name: Package source launcher add-on
         if: always()
         shell: pwsh

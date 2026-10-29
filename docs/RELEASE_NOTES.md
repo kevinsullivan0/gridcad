@@ -1,3 +1,11 @@
+# GridCAD 1.0.1
+
+One complete Windows download now contains the EXE, source fallback and toolkit. `Start GridCAD.bat` copies verified included files into a versioned folder in your account and offers a Desktop shortcut that survives deletion of the download. Earlier versions and your project files are not overwritten.
+
+The launcher waits for an actual visible GUI readiness record, distinguishes an exited app from a live but unconfirmed process, and avoids starting a duplicate. A source fallback retains explicit consent for verified Python/Pillow setup and remembers a successful source method for later offline use. Installation, cancellation, repeat launch, shortcut relocation, source recovery and preservation are exercised against the exact hosted Windows artifact; that evidence is not Smart App Control or native GrabCAD certification.
+
+## Earlier release notes
+
 # GridCAD 1.0.0
 
 Named single-file PRINT exports, optional conversion reports, and a complete Windows source-launcher package. The advanced evidence-bundle interface remains available. Original files, identities, geometry and material validation retain the same protections. Native GrabCAD/printer acceptance remains a separate check; a stable app version does not certify a print job.

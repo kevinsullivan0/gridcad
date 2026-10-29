@@ -4,14 +4,16 @@
 
 ## Download and start
 
-**[Download GridCAD 1.0 for Windows](https://github.com/kevinsullivan0/gridcad/releases/download/v1.0.0/GridCAD-Source-Windows-v1.0.0.zip)** · [All downloads and checksums](https://github.com/kevinsullivan0/gridcad/releases/tag/v1.0.0)
+**[Download GridCAD for Windows](https://github.com/kevinsullivan0/gridcad/releases/download/v1.0.1/GridCAD-Windows-x64-v1.0.1.zip)** · [Release and checksums](https://github.com/kevinsullivan0/gridcad/releases/tag/v1.0.1)
 
 1. Download the ZIP and choose **Extract All…** in File Explorer.
-2. Open the extracted **GridCAD** folder and double-click **Start GridCAD.bat**. Keep the whole folder together.
-3. On first use, follow the setup prompts. If needed, the launcher offers to install official Python for your Windows account and GridCAD's image library. Setup checks the downloads before using them. No administrator rights or security-setting changes are requested.
-4. Once setup finishes, the normal GridCAD window opens. Later launches reuse the setup and work offline. Keep the progress window open while using the app.
+2. Open the extracted **GridCAD** folder and double-click **Start GridCAD.bat**.
+3. Follow the short setup prompts. GridCAD copies the included app into your account and offers a Desktop shortcut. No administrator rights are needed.
+4. Use the shortcut next time. Once setup finishes, you may delete the downloaded ZIP and extracted folder; the installed copy stays in place.
 
-An [offline EXE package](https://github.com/kevinsullivan0/gridcad/releases/download/v1.0.0/GridCAD-Windows-x64-v1.0.0.zip) is also available. It includes its own runtime, but the executable is unsigned and Windows may block it. The source launcher is an alternative way to run the same application, not a way to bypass an organization's security policy. [Setup and troubleshooting](https://github.com/kevinsullivan0/gridcad/blob/v1.0.0/docs/SOURCE_LAUNCHER.md).
+This **one download includes both launch methods**. GridCAD first checks that its included Windows app actually opens. If Windows cannot start it, the launcher offers the same interface through verified Python; it asks before downloading any required Python or image-library components. Once either method is set up, it works offline. Keep the progress window open while using the app.
+
+The EXE is unsigned. GridCAD does not disable Windows protections or bypass an organization's policy. [Setup, recovery, updates and removal](https://github.com/kevinsullivan0/gridcad/blob/v1.0.1/docs/SOURCE_LAUNCHER.md).
 
 ## Convert a project
 
@@ -25,22 +27,22 @@ An [offline EXE package](https://github.com/kevinsullivan0/gridcad/releases/down
 
 ## What it supports
 
-- Windows x64. The source launcher uses official Python 3.13 with Tk; the downloadable EXE package includes its runtime.
+- Windows x64. The included EXE has its own runtime; the alternate source method uses verified official Python 3.13 with Tk.
 - Rectangular grids with distinguishable samples, including mixed shapes and heights. Irregular, triangular, hexagonal and stacked 3D layouts need other adapters.
 - Six-channel C/M/Y/K/W/T worksheet recipes totaling exactly 100%. Formula cells need current results saved by Excel.
 - The reviewed GrabCAD Print 1.117.12.3985 storage profile, schema 2170, with validated geometry, identities and materials. A matching version header alone is not sufficient.
 - Supported EcoFlex sample recipes and complete compatible label-material assignments already present in the project.
 
-Unsupported inputs are explained rather than silently changed. Large previews may omit display detail; the saved geometry is not simplified. [User guide](https://github.com/kevinsullivan0/gridcad/blob/v1.0.0/docs/DESKTOP_MANUAL.md) · [Supported files and limits](https://github.com/kevinsullivan0/gridcad/blob/v1.0.0/docs/RECTANGULAR_SCHEMA.md).
+Unsupported inputs are explained rather than silently changed. Large previews may omit display detail; the saved geometry is not simplified. [User guide](https://github.com/kevinsullivan0/gridcad/blob/v1.0.1/docs/DESKTOP_MANUAL.md) · [Supported files and limits](https://github.com/kevinsullivan0/gridcad/blob/v1.0.1/docs/RECTANGULAR_SCHEMA.md).
 
 ## Help, updates and verification
 
 The app's **Help** tab includes the offline guide, version, licenses, and links to this repository and releases. Updates are manual. Errors explain what happened and what to try next; optional local diagnostic reports can help a developer or your agent investigate. Nothing is uploaded automatically.
 
-Compare a download's SHA256 with its exact filename in [SHA256SUMS.txt](https://github.com/kevinsullivan0/gridcad/releases/download/v1.0.0/SHA256SUMS.txt). A matching checksum confirms download consistency, not publisher identity or safety. If you prefer your agent to download and verify it, point it to [the installation guide for agents](https://github.com/kevinsullivan0/gridcad/blob/v1.0.0/docs/AGENT_INSTALL.md).
+Compare a download's SHA256 with its exact filename in [SHA256SUMS.txt](https://github.com/kevinsullivan0/gridcad/releases/download/v1.0.1/SHA256SUMS.txt). A matching checksum confirms download consistency, not publisher identity or safety. If you prefer your agent to download and verify it, point it to [the installation guide for agents](https://github.com/kevinsullivan0/gridcad/blob/v1.0.1/docs/AGENT_INSTALL.md).
 
 ## Advanced toolkit
 
-The release includes the deterministic Python core, command-line tools, examples, schema and agent instructions. The ordinary GUI needs no agent. An agent can use the toolkit for more specialized work, but new geometries or material profiles require their own validation rather than assuming the GUI already supports them. [Developer guide](https://github.com/kevinsullivan0/gridcad/blob/v1.0.0/docs/DESKTOP_API.md) · [Contributor contract](https://github.com/kevinsullivan0/gridcad/blob/v1.0.0/AGENTS.md) · [Exact release source](https://github.com/kevinsullivan0/gridcad/tree/v1.0.0).
+The release includes the deterministic Python core, command-line tools, examples, schema and agent instructions. The ordinary GUI needs no agent. An agent can use the toolkit for more specialized work, but new geometries or material profiles require their own validation rather than assuming the GUI already supports them. [Developer guide](https://github.com/kevinsullivan0/gridcad/blob/v1.0.1/docs/DESKTOP_API.md) · [Contributor contract](https://github.com/kevinsullivan0/gridcad/blob/v1.0.1/AGENTS.md) · [Exact release source](https://github.com/kevinsullivan0/gridcad/tree/v1.0.1).
 
 GridCAD's original code is MIT licensed, copyright 2026 Kevin Sullivan. Dependencies retain their own licenses. Private inputs and vendor software are not bundled.

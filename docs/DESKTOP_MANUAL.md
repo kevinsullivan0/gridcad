@@ -4,8 +4,9 @@ GridCAD applies the material recipes in an Excel worksheet to a rectangular grou
 
 ## Open the app
 
-Extract the entire Windows source ZIP into a new folder, then double-click `Start GridCAD.bat`. On first use it offers to install Python and the image library if needed; later launches reuse that setup offline. No administrator rights, account or AI assistant are required. The separate EXE package includes its own runtime: open `GridCAD.exe` and keep its complete folder together.
+Download the complete Windows ZIP, choose **Extract All…**, then double-click **Start GridCAD.bat** in its GridCAD folder. Setup copies the included app into your account and offers a Desktop shortcut. Use that shortcut afterward; the installed copy does not depend on keeping your Downloads folder. Both the EXE and alternate source interface are in the same download. The EXE needs no Python installation; if it cannot start, the alternate method asks before installing verified Python and the image library. No administrator rights, account or AI assistant are required.
 
+See [Setup and recovery](SOURCE_LAUNCHER.md) for installed locations, manual updates, source startup and removal. Keep the progress window open while using the app.
 This release is unsigned. If Windows or your organization blocks it, follow the applicable security policy. Do not disable protection to run GridCAD. A checksum can confirm that a download is complete, but it does not prove that software is safe.
 
 ## Try an example

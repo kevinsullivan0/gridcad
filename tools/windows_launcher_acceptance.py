@@ -67,7 +67,7 @@ def acceptance(args):
     with zipfile.ZipFile(args.zip) as z:z.extractall(out/'package with spaces')
     app=out/'package with spaces/GridCAD'
     root=Path(__file__).resolve().parents[1]
-    assert (app/'Start GridCAD.bat').read_bytes()==(root/'Start GridCAD.bat').read_bytes(), 'Packaged launcher missing or stale'
+    assert (app/'Start GridCAD from source.bat').read_bytes()==(root/'Start GridCAD from source.bat').read_bytes(), 'Packaged launcher missing or stale'
     assert (app/'tools/source_launcher.py').read_bytes()==(root/'tools/source_launcher.py').read_bytes(), 'Packaged helper missing or stale'
     env=os.environ.copy();env['LOCALAPPDATA']=str(out/'local app data')
     state=Path(env['LOCALAPPDATA'])/'GridCAD/SourceLauncher'
@@ -77,7 +77,7 @@ def acceptance(args):
 
     def run(label):
         log=(out/(label+'.log')).open('w',encoding='utf-8')
-        process=subprocess.Popen([os.environ['COMSPEC'],'/d','/c',str(app/'Start GridCAD.bat')],
+        process=subprocess.Popen([os.environ['COMSPEC'],'/d','/c',str(app/'Start GridCAD from source.bat')],
                                  cwd=app,env=env,stdin=subprocess.PIPE,stdout=log,stderr=subprocess.STDOUT,text=True)
         try:
             # Explicit consent is supplied only in this disposable CI acceptance run.
@@ -111,7 +111,7 @@ def acceptance(args):
 
     if args.install_fixture:
         before=Path(os.environ['LOCALAPPDATA'])/'GridCAD/Python313'
-        declined=subprocess.run([os.environ['COMSPEC'],'/d','/c',str(app/'Start GridCAD.bat')],cwd=app,env=env,input='N\n\n',capture_output=True,text=True,timeout=30)
+        declined=subprocess.run([os.environ['COMSPEC'],'/d','/c',str(app/'Start GridCAD from source.bat')],cwd=app,env=env,input='N\n\n',capture_output=True,text=True,timeout=30)
         (out/'00-install-declined.log').write_text(declined.stdout+declined.stderr,encoding='utf-8')
         assert declined.returncode==2 and not before.exists()
         checks.append('Declining Python installation leaves the dedicated runtime absent')

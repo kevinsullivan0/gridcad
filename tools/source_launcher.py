@@ -174,7 +174,12 @@ def main():
     with setup_lock(base):
         env = ensure_environment(base, setup_approved=args.setup_approved)
     say('Opening GridCAD. Keep this window open while you use the app.')
-    result = subprocess.call([str(environment_python(env)), '-E', '-s', str(app / 'gridcad_desktop.py')], cwd=app)
+    command=[str(environment_python(env)), '-E', '-s', str(app / 'gridcad_desktop.py')]
+    ready=os.environ.get('GRIDCAD_LAUNCH_READY_FILE')
+    token=os.environ.get('GRIDCAD_LAUNCH_TOKEN')
+    if ready and token:
+        command.extend(['--launch-ready',ready,'--launch-token',token])
+    result = subprocess.call(command, cwd=app)
     if result:
         say(f'\nGridCAD closed unexpectedly (code {result}). Keep the details above for troubleshooting, then try again.')
     return result

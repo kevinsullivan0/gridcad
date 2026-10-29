@@ -14,5 +14,5 @@ class LauncherPackageTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             result=module.package(root,Path(td)/'addon.zip')
             with zipfile.ZipFile(result) as z:
-                self.assertEqual(set(z.namelist()),{'Start GridCAD.bat','tools/source_launcher.py','docs/SOURCE_LAUNCHER.md'})
+                self.assertEqual(set(z.namelist()),{'Start GridCAD from source.bat','tools/source_launcher.py','docs/SOURCE_LAUNCHER.md'})
                 for name in z.namelist():self.assertEqual(z.read(name),(root/name).read_bytes())

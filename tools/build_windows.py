@@ -9,7 +9,7 @@ import sys
 import zipfile
 
 ROOT=Path(__file__).resolve().parents[1]
-VERSION='1.0.0'
+VERSION='1.0.1'
 
 
 def digest(path):return hashlib.sha256(path.read_bytes()).hexdigest()
@@ -21,11 +21,25 @@ def zip_folder(folder,destination):
             if path.is_file():z.write(path,Path(folder.name)/path.relative_to(folder))
 
 
+def create_install_manifest(folder, version):
+    """Hash every explicitly assembled app file before installation/copying."""
+    folder=Path(folder)
+    records=[]
+    for path in sorted(folder.rglob('*')):
+        if path.is_symlink():raise RuntimeError('App package cannot contain links: '+str(path))
+        if path.is_file() and path.name!='INSTALL_MANIFEST.json':
+            records.append({'path':path.relative_to(folder).as_posix(),
+                            'size':path.stat().st_size,'sha256':digest(path)})
+    target=folder/'INSTALL_MANIFEST.json'
+    target.write_text(json.dumps({'version':version,'files':records},indent=2),encoding='utf-8')
+    return target
+
+
 def package_source(root, destination):
     """Build a complete launcher distribution from explicit public sources."""
     root=Path(root);destination=Path(destination)
     destination.parent.mkdir(parents=True,exist_ok=True)
-    files=[root/name for name in ('Start GridCAD.bat','gridcad_desktop.py',
+    files=[root/name for name in ('Start GridCAD from source.bat','gridcad_desktop.py',
         'desktop_core.py','desktop_cli.py','diagnostics.py','agent_help.py',
         'README.md','AGENTS.md','LICENSE','VERSION.txt','tools/source_launcher.py')]
     for directory in ('resources','docs','operator','examples/rectangular','examples/pyramid','examples/mixed'):
@@ -51,7 +65,7 @@ def main():
         raise RuntimeError('Unused AVIF codec unexpectedly bundled; review the exclusion before release.')
     for source in ['resources','docs','examples/rectangular','examples/pyramid','examples/mixed','operator']:
         shutil.copytree(ROOT/source,folder/source,dirs_exist_ok=True,ignore=shutil.ignore_patterns('__pycache__','*.pyc'))
-    for name in ['Start GridCAD.bat','VERSION.txt','README.md','AGENTS.md','LICENSE','desktop_core.py','desktop_cli.py','diagnostics.py','gridcad_desktop.py','agent_help.py']:
+    for name in ['Start GridCAD.bat','Start GridCAD from source.bat','VERSION.txt','README.md','AGENTS.md','LICENSE','desktop_core.py','desktop_cli.py','diagnostics.py','gridcad_desktop.py','agent_help.py']:
         shutil.copy2(ROOT/name,folder/name)
     shutil.copytree(ROOT/'tools',folder/'tools',ignore=shutil.ignore_patterns('__pycache__','*.pyc'))
     notices=folder/'THIRD_PARTY_NOTICES';notices.mkdir(exist_ok=True)
@@ -81,6 +95,7 @@ def main():
     (folder/'BUILD_PROVENANCE.json').write_text(json.dumps({'python':sys.version,'platform':sys.platform,'packages':packages,'runtime_download_at_first_launch':False,'signed':False},indent=2),encoding='utf-8')
     entries=[{'path':str(p.relative_to(folder)).replace('\\','/'),'size':p.stat().st_size,'sha256':digest(p)} for p in sorted(folder.rglob('*')) if p.is_file()]
     (folder/'PACKAGE_MANIFEST.json').write_text(json.dumps(entries,indent=2),encoding='utf-8')
+    create_install_manifest(folder,VERSION)
     destination=ROOT/f'dist/GridCAD-Windows-x64-v{VERSION}.zip';zip_folder(folder,destination)
     portable=ROOT/'dist/GridCAD-portable-core';portable.mkdir(exist_ok=True)
     for name in ['desktop_core.py','desktop_cli.py','diagnostics.py','AGENTS.md','LICENSE']:

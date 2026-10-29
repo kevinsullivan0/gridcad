@@ -1,37 +1,59 @@
-# Start GridCAD from source
+# Setup, startup and recovery
 
-The Windows x64 source launcher opens the included GridCAD interface. After one successful setup, it works offline without reinstalling packages.
+## One download, one starting point
 
-## First use
+1. Download the complete **GridCAD-Windows-x64-v1.0.1.zip** from the release. In File Explorer, choose **Extract All…**. Do not open a single file from inside the ZIP.
+2. In the extracted **GridCAD** folder, double-click **Start GridCAD.bat**.
+3. Setup shows where it will copy the included app. Press **Enter** to continue or type **N** to cancel. No administrator rights are needed.
+4. Press **Enter** to create a Desktop shortcut, or type **N** to skip it. An unrelated existing Desktop item is not replaced. Shortcut creation is optional; the app still opens if it cannot create one.
+5. GridCAD opens. Keep the progress window open while using the app. On later launches use **GridCAD** on the Desktop or `Start GridCAD.bat` in the installed folder.
 
-1. Extract the complete GridCAD source bundle to a folder you can write to. Keep its folders and files together. `Start GridCAD.bat` must be beside `gridcad_desktop.py`, with the helper at `tools/source_launcher.py`. If you received a separate launcher add-on, extract it into the complete GridCAD app folder. The portable core alone does not include the interface.
-2. Double-click **Start GridCAD.bat**. The progress window checks for verified Python, then opens GridCAD. Keep that window open while using the app; it closes normally when you close GridCAD.
-3. If official Python is needed, the launcher explains the download and asks permission to install Python and Pillow for your account. Type **Y** and press Enter to agree, or press Enter to cancel. If suitable Python is already installed, it asks before setting up or repairing GridCAD's private Pillow environment instead.
-4. Setup shows three short stages: prepare the environment, download and verify Pillow, and check the required components. A download may take a few minutes. Keep the window open until GridCAD appears.
+Both the EXE and the source interface are included in this download. A healthy EXE opens without internet or a separate Python installation. Once setup finishes, the installed app is independent of the downloaded ZIP and extracted folder; you may remove those download copies.
 
-On later launches, a healthy setup opens GridCAD without another installation prompt or download. The launcher keeps its progress window open so application errors remain visible. Ordinary package-installation chatter is omitted on success; package failures show the captured diagnostic details.
+## If the Windows app cannot start
 
-The launcher uses official Windows x64 Python 3.13.16 or a newer 3.13 maintenance version with Tk. It checks known Python installation locations and registry entries, not arbitrary programs on PATH. An existing installation is used only after its Python Software Foundation publisher signature and runtime requirements pass validation. Before running a downloaded installer, it requires both the pinned SHA256 and a valid Python Software Foundation signature. Pillow uses a pinned wheel and SHA256; no source build or unchecked dependency download is allowed.
+The launcher waits up to 45 seconds for the visible GridCAD interface to confirm startup. An exited process, an actual launch error and a still-running process are different outcomes:
 
-Installation does not request administrator rights or change PATH, file associations, shortcuts or Windows security policy. Consent applies to the current setup attempt; no persistent approval or launch preference is saved.
+- **Could not start, or exited before ready:** the launcher displays the observed error or exit code and offers the source method. It does not claim that every crash is a Windows security block.
+- **Still running without confirmation:** no second copy is started. Check the taskbar and any Windows prompt. Let startup finish, or close that GridCAD process before retrying. A slow computer can need more time than the initial check.
+- **Closed unexpectedly after opening:** keep the exit code and log. Your existing saved files are not removed. Retry or use the alternate source method.
+- **Missing or changed app files:** setup refuses to overwrite them. Extract a fresh complete download. If the installed version folder was changed, preserve any files you added, rename that version folder, then run setup again.
+- **Already open or starting:** check the taskbar and existing setup window. Repeated clicks do not start a competing setup or duplicate app through this launcher.
 
-## If setup or launch stops
+For a deliberate source launch, open a command prompt in the installed app folder and run:
 
-- **You canceled:** no installation starts at that prompt. An existing private environment is left unchanged. Double-click again when you are ready.
-- **A download or package step failed:** read the details in the window, check the connection, then try again. A completed, healthy setup works offline; a first setup or repair needs internet.
-- **Another setup is running:** let it finish, then try again. The launcher releases its setup lock if that process closes unexpectedly.
-- **An earlier setup was interrupted:** after you approve another setup attempt, its partial environment is preserved in an `incomplete-*` folder and a fresh environment is prepared. Original app and input files remain untouched.
-- **GridCAD closed unexpectedly:** keep the exit code and diagnostic text visible in the window for troubleshooting. Press a key to close the window when finished.
-- **Files are missing:** extract the complete bundle again and keep its original folder layout.
+```bat
+"Start GridCAD.bat" -Source
+```
 
-If Windows blocks the BAT, Python or an image-library component, keep the exact warning and blocked filename for troubleshooting. Keep Windows protections enabled. The launcher does not disable Smart App Control, remove download security marks, create antivirus exclusions or bypass PowerShell execution policy. Hosted Windows tests do not establish compatibility with every Smart App Control configuration.
+Or double-click **Start GridCAD from source.bat** in that folder. This explicit secondary entry is for recovery; ordinary use needs only the main launcher. A successful source startup through the main launcher is remembered after the app closes normally, so later launches reuse it rather than repeatedly testing the EXE.
 
-## Storage and removal
+## Source setup consent and downloads
 
-The private environment and small internal readiness/locking records are in `%LOCALAPPDATA%\GridCAD\SourceLauncher`. They let repeated launches reuse the verified setup safely; they are not project exports. The temporary package-requirements file is removed after the installation attempt. The launcher creates no shortcuts, export reports or saved launch preferences.
+The source method opens exactly the same included GUI. If needed, it explains and asks before installing official Windows x64 Python 3.13.16 (or using a verified newer 3.13 maintenance version with Tk) and its pinned Pillow image library. Type **Y** to agree, or press Enter to cancel. Canceling leaves an existing environment unchanged. Setup shows three stages: prepare the private environment, download/verify Pillow, then check Python, Tk and Pillow. A download may take a few minutes.
 
-After closing GridCAD, delete `%LOCALAPPDATA%\GridCAD\SourceLauncher` to remove the environment and its preserved partial setups. The next launch will ask before rebuilding it. Delete `Start GridCAD.bat` and `tools/source_launcher.py` to remove the launcher itself. If Python was installed for this launcher and no other software needs it, uninstall Python through **Settings → Apps → Installed apps**. Do not delete a shared Python installation manually.
+Python is discovered only in known installation locations and registry records, not arbitrary PATH programs. An existing installation must pass Python Software Foundation publisher-signature and runtime checks. A downloaded installer must match its pinned SHA256 and a valid Python Software Foundation signature before running. Pillow uses a pinned wheel/hash, without unchecked dependencies or a source build.
 
-Python installer: https://www.python.org/downloads/release/python-31316/
+A healthy completed setup works offline and does not repeat installation prompts. Network failures show the captured error and a retry action. If setup was interrupted, its partial environment is preserved in an `incomplete-*` folder before a consented fresh attempt. The setup lock releases if its process closes unexpectedly.
 
-Pillow package: https://pypi.org/project/Pillow/13.0.0/
+No launcher disables Smart App Control, removes download security marks, creates antivirus exclusions, changes PowerShell policy, changes PATH/file associations, or requests administrator rights. If Windows or your organization blocks BAT, PowerShell, Python or an image component, keep the exact warning and blocked filename for troubleshooting and follow the applicable policy. Hosted Windows tests do not establish compatibility with every Smart App Control configuration.
+
+## Where things live
+
+- Installed app: `%LOCALAPPDATA%\GridCAD\Apps\1.0.1`.
+- Main launcher diagnostics: `%LOCALAPPDATA%\GridCAD\Launcher\last-launch.log`. It records version, installed location, launch method and observed failures, not project contents. Small per-version launch preferences live beside it; temporary readiness records are removed after each launch.
+- Private source environment: `%LOCALAPPDATA%\GridCAD\SourceLauncher`. Readiness/locking records and preserved interrupted setups are internal setup files, not PRINT exports.
+- Dedicated Python, if GridCAD needed to install it: `%LOCALAPPDATA%\GridCAD\Python313` (or an already suitable verified Python installation may be reused).
+- Optional Desktop shortcut: **GridCAD**. It points to the installed app folder, not Downloads.
+
+Save projects in your normal project/documents folder, outside the installation. Normal conversion saves create only the chosen PRINT file unless you request a report. Original inputs and existing outputs are never overwritten.
+
+## Update, roll back or remove
+
+Updates are manual: download the newer complete Windows ZIP, extract it, and run its main launcher. Each version gets its own folder. A completed older version is not overwritten; if you approve the Desktop shortcut update it points to the newer version. There is no background updater or automatic network check. To roll back, run `Start GridCAD.bat` inside the older version's folder; you may keep using it without changing any project files.
+
+To remove a version, close GridCAD, delete that explicitly named version folder under `%LOCALAPPDATA%\GridCAD\Apps`, and delete its Desktop shortcut if it points there. Keep your project files and any other versions. Interrupted app-copy folders named `incomplete-*` under Apps may be deleted after checking you did not put your own files there.
+
+To remove all GridCAD source setup data, also delete `%LOCALAPPDATA%\GridCAD\SourceLauncher` and `%LOCALAPPDATA%\GridCAD\Launcher` after closing the app. This removes its private image-library environment, logs and preferences, not your projects. If a dedicated Python was installed and no other software needs it, uninstall that Python through **Settings → Apps → Installed apps**. Do not delete or uninstall a shared Python installation blindly. No uninstaller removes unknown files automatically.
+
+A separate source-only ZIP is available for people who intentionally do not want the bundled EXE; use its **Start GridCAD from source.bat**. The ordinary Windows download already includes that fallback, so most users need only one ZIP.

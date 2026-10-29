@@ -7,7 +7,7 @@ import re
 import tempfile
 import traceback
 
-VERSION='1.0.0'
+VERSION='1.0.1'
 SOURCE_URL='https://github.com/kevinsullivan0/gridcad/tree/v'+VERSION
 
 @dataclass

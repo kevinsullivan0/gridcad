@@ -5,7 +5,9 @@ DO_NOT_PRINT demo. No private workbook, vendor runtime, or printer is used.
 See REGRESSION_PROVENANCE.md for source hashes and coverage boundaries.
 """
 import copy
+import builtins
 import itertools
+import os
 from pathlib import Path
 import stat
 import tempfile
@@ -58,6 +60,13 @@ class TempTest(unittest.TestCase):
             warnings.simplefilter("ignore", UserWarning)
             with zipfile.ZipFile(path, "w") as z:
                 for key, value in entries:
+                    if isinstance(key,str):
+                        # ZipInfo sanitizes backslashes on Windows at creation.
+                        # These refusal fixtures must contain the requested raw
+                        # member name, not an already repaired safe path.
+                        info=zipfile.ZipInfo(key)
+                        info.filename=key;info.orig_filename=key
+                        key=info
                     z.writestr(key, value)
         return path
 
@@ -167,6 +176,11 @@ class WorkbookSafeguards(TempTest):
 
 
 class ArchiveSafeguards(TempTest):
+    def test_archive_fixture_preserves_requested_raw_names_on_windows(self):
+        with patch.object(zipfile.os,'sep','\\'):
+            path=self.archive([('project.json','{}'),('x\\y','x')])
+            with zipfile.ZipFile(path) as archive:
+                self.assertEqual(archive.infolist()[1].orig_filename,'x\\y')
     def test_unsafe_windows_and_traversal_names_rejected(self):
         for name in ("../outside", "/absolute", "x\\y", "C:drive", "a//b", "a/./b", "NUL.txt", "a/COM1", "trailing.", "a?b"):
             with self.subTest(name=name):
@@ -293,6 +307,18 @@ class GeometryAndCandidateSafeguards(TempTest):
     def test_synthetic_fixture_hashes(self):
         self.assertEqual(file_hash(SOURCE), "76973f60dc4a77e698e074c39ecf78bfe16253302235e122ad076a6c4e04dff0")
         self.assertEqual(file_hash(WORKBOOK), "3efba8b6aaec3098d30351bf7708631e1a0671c49c9c464b4cf3ede239e50c21")
+
+    def test_candidate_flush_uses_writable_descriptor_for_windows(self):
+        real_open=builtins.open;real_fsync=os.fsync;opened=[]
+        def track(*args,**kwargs):
+            handle=real_open(*args,**kwargs);opened.append(handle);return handle
+        def flush(descriptor):
+            handle=next((h for h in reversed(opened) if not h.closed and h.fileno()==descriptor),None)
+            self.assertIsNotNone(handle)
+            self.assertTrue(handle.writable(),'Windows fsync requires a write-capable descriptor.')
+            return real_fsync(descriptor)
+        with patch('builtins.open',side_effect=track),patch('gridcad.candidate_writer.os.fsync',side_effect=flush):
+            self.write()
 
     def test_unique_orientation_still_needs_explicit_review(self):
         self.assertEqual(len(self.proposal["orientation_candidates"]), 1)

@@ -1,0 +1,201 @@
+{
+  "baseline_commit": "b9e1c009a0a9dc0aba44007a35598bf6230c7a67",
+  "case": "mixed-grid",
+  "repeats": 5,
+  "samples": {
+    "baseline": [
+      {
+        "seconds": {
+          "load_project": 0.12104923099832376,
+          "workbook": 0.005172436001885217,
+          "propose": 0.13999453299766174,
+          "save": 0.9114525099976163
+        },
+        "cpu_seconds": {
+          "load_project": 0.121043291,
+          "workbook": 0.0051750349999999945,
+          "propose": 0.13992543200000002,
+          "save": 0.9112562579999999
+        },
+        "peak_rss_bytes": 57556992,
+        "identity": {
+          "candidate_sha256": "e5ba00e4cc93c6362872d3861465343f909ffc072006bda0eeb65e71b14ce0cb",
+          "mapping_sha256": "a2619b7840ca6efcb60e21bf0c8ef8fd14be5ddd129ab5136b85c539428a2fea"
+        }
+      },
+      {
+        "seconds": {
+          "load_project": 0.1737489369988907,
+          "workbook": 0.006999439003266161,
+          "propose": 0.14725583200197434,
+          "save": 1.2478663990004861
+        },
+        "cpu_seconds": {
+          "load_project": 0.17377568,
+          "workbook": 0.007002295000000047,
+          "propose": 0.14419452900000002,
+          "save": 1.247804888
+        },
+        "peak_rss_bytes": 57561088,
+        "identity": {
+          "candidate_sha256": "e5ba00e4cc93c6362872d3861465343f909ffc072006bda0eeb65e71b14ce0cb",
+          "mapping_sha256": "a2619b7840ca6efcb60e21bf0c8ef8fd14be5ddd129ab5136b85c539428a2fea"
+        }
+      },
+      {
+        "seconds": {
+          "load_project": 0.1170922459969006,
+          "workbook": 0.006403356001101201,
+          "propose": 0.14761586299937335,
+          "save": 0.9402530879997357
+        },
+        "cpu_seconds": {
+          "load_project": 0.11709330400000001,
+          "workbook": 0.006406320999999993,
+          "propose": 0.147463292,
+          "save": 0.9397421530000001
+        },
+        "peak_rss_bytes": 57556992,
+        "identity": {
+          "candidate_sha256": "e5ba00e4cc93c6362872d3861465343f909ffc072006bda0eeb65e71b14ce0cb",
+          "mapping_sha256": "a2619b7840ca6efcb60e21bf0c8ef8fd14be5ddd129ab5136b85c539428a2fea"
+        }
+      },
+      {
+        "seconds": {
+          "load_project": 0.1316308060013398,
+          "workbook": 0.008355761998245725,
+          "propose": 0.14641807199950563,
+          "save": 0.99523031499848
+        },
+        "cpu_seconds": {
+          "load_project": 0.131623093,
+          "workbook": 0.00835834399999999,
+          "propose": 0.146074955,
+          "save": 0.993967136
+        },
+        "peak_rss_bytes": 57556992,
+        "identity": {
+          "candidate_sha256": "e5ba00e4cc93c6362872d3861465343f909ffc072006bda0eeb65e71b14ce0cb",
+          "mapping_sha256": "a2619b7840ca6efcb60e21bf0c8ef8fd14be5ddd129ab5136b85c539428a2fea"
+        }
+      },
+      {
+        "seconds": {
+          "load_project": 0.12656335300198407,
+          "workbook": 0.005648828002449591,
+          "propose": 0.15875951599809923,
+          "save": 1.100471046000166
+        },
+        "cpu_seconds": {
+          "load_project": 0.126558725,
+          "workbook": 0.0056517940000000155,
+          "propose": 0.15860737200000002,
+          "save": 1.098311104
+        },
+        "peak_rss_bytes": 57556992,
+        "identity": {
+          "candidate_sha256": "e5ba00e4cc93c6362872d3861465343f909ffc072006bda0eeb65e71b14ce0cb",
+          "mapping_sha256": "a2619b7840ca6efcb60e21bf0c8ef8fd14be5ddd129ab5136b85c539428a2fea"
+        }
+      }
+    ],
+    "candidate": [
+      {
+        "seconds": {
+          "load_project": 0.18455335899852798,
+          "workbook": 0.011920857003133278,
+          "propose": 0.18532796799991047,
+          "save": 0.9826411780013586
+        },
+        "cpu_seconds": {
+          "load_project": 0.184300882,
+          "workbook": 0.01192413400000003,
+          "propose": 0.184423807,
+          "save": 0.9816042819999999
+        },
+        "peak_rss_bytes": 52518912,
+        "identity": {
+          "candidate_sha256": "e5ba00e4cc93c6362872d3861465343f909ffc072006bda0eeb65e71b14ce0cb",
+          "mapping_sha256": "a2619b7840ca6efcb60e21bf0c8ef8fd14be5ddd129ab5136b85c539428a2fea"
+        }
+      },
+      {
+        "seconds": {
+          "load_project": 0.13456473200130858,
+          "workbook": 0.0055775389992049895,
+          "propose": 0.16146868099895073,
+          "save": 0.8368669369992858
+        },
+        "cpu_seconds": {
+          "load_project": 0.134567019,
+          "workbook": 0.005580184000000016,
+          "propose": 0.161475025,
+          "save": 0.836806387
+        },
+        "peak_rss_bytes": 51175424,
+        "identity": {
+          "candidate_sha256": "e5ba00e4cc93c6362872d3861465343f909ffc072006bda0eeb65e71b14ce0cb",
+          "mapping_sha256": "a2619b7840ca6efcb60e21bf0c8ef8fd14be5ddd129ab5136b85c539428a2fea"
+        }
+      },
+      {
+        "seconds": {
+          "load_project": 0.11397365199809428,
+          "workbook": 0.007650117000594037,
+          "propose": 0.16716721400007373,
+          "save": 0.8397886749989993
+        },
+        "cpu_seconds": {
+          "load_project": 0.11397585299999999,
+          "workbook": 0.007652808000000011,
+          "propose": 0.16716372499999999,
+          "save": 0.8397907149999999
+        },
+        "peak_rss_bytes": 51179520,
+        "identity": {
+          "candidate_sha256": "e5ba00e4cc93c6362872d3861465343f909ffc072006bda0eeb65e71b14ce0cb",
+          "mapping_sha256": "a2619b7840ca6efcb60e21bf0c8ef8fd14be5ddd129ab5136b85c539428a2fea"
+        }
+      },
+      {
+        "seconds": {
+          "load_project": 0.12948302199947648,
+          "workbook": 0.007527153997216374,
+          "propose": 0.13163711199740646,
+          "save": 0.8166549599991413
+        },
+        "cpu_seconds": {
+          "load_project": 0.129485452,
+          "workbook": 0.007530164000000006,
+          "propose": 0.13164228799999997,
+          "save": 0.8153983160000001
+        },
+        "peak_rss_bytes": 51179520,
+        "identity": {
+          "candidate_sha256": "e5ba00e4cc93c6362872d3861465343f909ffc072006bda0eeb65e71b14ce0cb",
+          "mapping_sha256": "a2619b7840ca6efcb60e21bf0c8ef8fd14be5ddd129ab5136b85c539428a2fea"
+        }
+      },
+      {
+        "seconds": {
+          "load_project": 0.1434076149998873,
+          "workbook": 0.006383469997672364,
+          "propose": 0.15538504700089106,
+          "save": 0.8599743400009174
+        },
+        "cpu_seconds": {
+          "load_project": 0.14340155599999999,
+          "workbook": 0.0063864019999999855,
+          "propose": 0.155380456,
+          "save": 0.859972669
+        },
+        "peak_rss_bytes": 51179520,
+        "identity": {
+          "candidate_sha256": "e5ba00e4cc93c6362872d3861465343f909ffc072006bda0eeb65e71b14ce0cb",
+          "mapping_sha256": "a2619b7840ca6efcb60e21bf0c8ef8fd14be5ddd129ab5136b85c539428a2fea"
+        }
+      }
+    ]
+  }
+}

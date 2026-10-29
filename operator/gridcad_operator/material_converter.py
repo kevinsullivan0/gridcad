@@ -8,6 +8,7 @@ from __future__ import annotations
 import copy
 import hashlib
 import math
+import sys
 from decimal import Decimal
 from pathlib import Path
 from uuid import uuid4
@@ -150,7 +151,9 @@ class EcoFlexMaterialProvider:
         self.version = copy.deepcopy(VERSION if version is None else version)
         self.channel_resin_ids = copy.deepcopy(CHANNEL_RESIN_IDS if channel_resin_ids is None else channel_resin_ids)
         self.resin_names = tuple(RESIN_NAMES if resin_names is None else resin_names)
-        self._source_path = Path(__file__)
+        # Frozen distributions carry the exact reviewed source as package data
+        # beside the bundled bytecode. Keep the source-integrity check active.
+        self._source_path = Path(__file__).with_suffix('.py') if getattr(sys, 'frozen', False) else Path(__file__)
         self._source_sha256 = hashlib.sha256(self._source_path.read_bytes()).hexdigest()
         self.check_integrity()
 

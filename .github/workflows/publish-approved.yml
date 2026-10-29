@@ -1,0 +1,19 @@
+name: Publish verified GridCAD release
+on:
+  push:
+    branches: [release/v1.0-polish]
+    paths: ['.github/release-approved.json']
+permissions: {}
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Verify immutable Windows artifacts and publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: python tools/publish_approved_release.py

@@ -12,6 +12,14 @@
 4. Try **Load example**, then **Match cells to samples**. The synthetic example is a software demonstration—**do not print it**.
 5. For your files, open the workbook and project; click, drag or Shift-click the recipe cells; choose sample and label groups, the starting corner and the next-row direction. Click any preview sample to inspect its material; choose **Match cells to samples** to see its worksheet recipe. Save a valid mapping to a **new result folder**, then check the result and physical labels before printing. Originals remain unchanged.
 
+### Source launcher
+
+**[Download the RC7 source launcher](https://github.com/kevinsullivan0/gridcad/releases/download/v0.2.0-rc.7/GridCAD-RC7-source-launcher.zip)** · [Launcher checksum](https://github.com/kevinsullivan0/gridcad/releases/download/v0.2.0-rc.7/GridCAD-source-launcher-SHA256.txt)
+
+Extract All, open **GridCAD-source-launcher**, and double-click **Start GridCAD.bat**. It runs the same RC7 interface from Python source instead of the packaged EXE. If compatible official Python is missing, setup asks permission to download and verify it before installing it for your account. First setup needs internet; later launches reuse the environment and work offline. Keep the console window open while using GridCAD.
+
+Installation, offline reuse and recovery were tested on hosted Windows. This does not disable security protections or guarantee compatibility with Smart App Control.
+
 **Unsigned release candidate:** follow your normal application-trust policy. Do not disable security protection, bypass malware/policy blocks or change administrator settings to run it. On a managed device, follow your administrator's policy. A checksum proves download consistency, not safety or publisher identity.
 
 **Before printing:** native GrabCAD open/recompose/save and physical printing remain unverified. Every output retains `print_ready=false`; inspect and validate it in native GrabCAD first. GridCAD never submits printer jobs.
@@ -30,7 +38,7 @@ Preview work is bounded and may be sampled; its notice explains reduced detail. 
 
 ## Verify and get help
 
-Compare the download's SHA256 with the exact filename in [SHA256SUMS.txt](https://github.com/kevinsullivan0/gridcad/releases/download/v0.2.0-rc.7/SHA256SUMS.txt). On Windows, an optional check is:
+For the packaged EXE download, compare its SHA256 with the exact filename in [SHA256SUMS.txt](https://github.com/kevinsullivan0/gridcad/releases/download/v0.2.0-rc.7/SHA256SUMS.txt). On Windows, an optional check is:
 
 ```powershell
 Get-FileHash ".\GridCAD-Windows-x64-v0.2.0-rc.7.zip" -Algorithm SHA256

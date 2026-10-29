@@ -1,3 +1,5 @@
+> Historical 0.2 RC1 snapshot, not current installation or release guidance. See [current release notes](RELEASE_NOTES.md) and the root README.
+
 # GridCAD 0.2 RC1 — Windows desktop candidate
 
 The desktop replaces the local browser launcher for the bounded rectangular labeled-grid workflow. It includes native file dialogs and controls, paged addressed Excel previews, explicit formula-cache policy, transpose/orientation selection, actual embedded-glyph geometry with zoom/pan, exact assignments, user review notes, and separate result bundles with preservation audits.

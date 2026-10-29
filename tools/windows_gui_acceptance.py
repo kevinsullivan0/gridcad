@@ -187,20 +187,51 @@ def main():
     def geometry_tab():select_tab('geotab')
     def worksheet_tab():select_tab('worktab')
     def enter(key,text):
-        click(key);keyboard.send_keys('^a');keyboard.send_keys(str(text),with_spaces=True,vk_packet=True);time.sleep(.2)
+        click(key);keyboard.send_keys('^a',vk_packet=False);keyboard.send_keys(str(text),with_spaces=True,vk_packet=True);time.sleep(.2)
     def dialog_path(path):
-        # Long native-dialog paths can lose the first VK_PACKET keystroke on
-        # the hosted Windows desktop. Paste one complete Unicode string via
-        # the real clipboard and keyboard, rather than racing character input.
-        import win32clipboard
-        time.sleep(.7);keyboard.send_keys('%n');keyboard.send_keys('^a')
+        # Observe the real foreground edit control. Unicode packet characters
+        # with a Ctrl modifier can arrive as literal 'v'; use virtual keys and
+        # require native filename read-back before accepting the file dialog.
+        import ctypes
+        from ctypes import wintypes
+        import win32clipboard, win32gui, win32process
+        class GUIThreadInfo(ctypes.Structure):
+            _fields_=[('cbSize',wintypes.DWORD),('flags',wintypes.DWORD),
+                      ('hwndActive',wintypes.HWND),('hwndFocus',wintypes.HWND),
+                      ('hwndCapture',wintypes.HWND),('hwndMenuOwner',wintypes.HWND),
+                      ('hwndMoveSize',wintypes.HWND),('hwndCaret',wintypes.HWND),
+                      ('rcCaret',wintypes.RECT)]
+        time.sleep(.7)
+        keyboard.send_keys('%n',vk_packet=False);time.sleep(.2)
+        info=GUIThreadInfo();info.cbSize=ctypes.sizeof(info)
+        get_info=ctypes.windll.user32.GetGUIThreadInfo
+        get_info.argtypes=[wintypes.DWORD,ctypes.POINTER(GUIThreadInfo)]
+        get_info.restype=wintypes.BOOL
+        if not get_info(0,ctypes.byref(info)) or not info.hwndFocus:
+            raise AssertionError('Native file dialog has no observable foreground focus')
+        assert win32process.GetWindowThreadProcessId(info.hwndFocus)[1]==process.pid
+        assert win32gui.GetClassName(info.hwndFocus)=='Edit',win32gui.GetClassName(info.hwndFocus)
+        edit=Desktop(backend='uia').window(handle=info.hwndFocus).wrapper_object()
         win32clipboard.OpenClipboard()
         try:
             win32clipboard.EmptyClipboard()
             win32clipboard.SetClipboardText(str(path))
         finally:win32clipboard.CloseClipboard()
-        keyboard.send_keys('^v');time.sleep(.3)
-        keyboard.send_keys('{ENTER}');time.sleep(.5)
+        observed=[]
+        for attempt in range(2):
+            edit.click_input()
+            keyboard.send_keys('^a',vk_packet=False)
+            keyboard.send_keys('^v',vk_packet=False)
+            deadline=time.monotonic()+3
+            while time.monotonic()<deadline:
+                value=edit.get_value()
+                if value==str(path):break
+                time.sleep(.1)
+            observed.append(value)
+            if value==str(path):break
+        checks.append('Native filename field read-back before Enter: '+repr(observed))
+        assert value==str(path),'Native filename input did not receive complete clipboard path: '+repr(observed)
+        keyboard.send_keys('{ENTER}',vk_packet=False);time.sleep(.5)
     def dismiss():
         time.sleep(.3)
         if 'diagnostic_close' in state().get('controls',{}):

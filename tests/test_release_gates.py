@@ -30,5 +30,14 @@ class ReleaseGatesTests(unittest.TestCase):
         self.assertIn("'^v'",block)
         self.assertNotIn('keyboard.send_keys(str(path)',block)
 
+    def test_native_paste_uses_virtual_keys_and_reads_back_before_enter(self):
+        source=(ROOT/'tools/windows_gui_acceptance.py').read_text()
+        start=source.index('    def dialog_path(path):')
+        end=source.index('    def dismiss():',start)
+        block=source[start:end]
+        self.assertTrue("keyboard.send_keys('^v',vk_packet=False)" in block,'Ctrl+V must use virtual keys, not Unicode packets')
+        self.assertTrue('edit.get_value()' in block,'Read the actual native filename field before accepting the dialog')
+        self.assertLess(block.index('edit.get_value()'),block.index("keyboard.send_keys('{ENTER}'"))
+
 
 if __name__=='__main__':unittest.main()

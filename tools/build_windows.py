@@ -1,0 +1,135 @@
+"""Build explicit public deliverables; never glob private workspaces into a release."""
+from pathlib import Path
+import hashlib
+import importlib.metadata
+import json
+import shutil
+import subprocess
+import sys
+import zipfile
+
+ROOT=Path(__file__).resolve().parents[1]
+VERSION='1.0.1'
+
+
+def digest(path):return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def zip_folder(folder,destination):
+    with zipfile.ZipFile(destination,'w',zipfile.ZIP_DEFLATED,compresslevel=9) as z:
+        for path in sorted(folder.rglob('*')):
+            if path.is_file():z.write(path,Path(folder.name)/path.relative_to(folder))
+
+
+def write_version_resource(path, version):
+    parts=tuple(int(part) for part in version.split('.'))
+    if len(parts)!=3 or any(part<0 or part>65535 for part in parts):
+        raise ValueError('Windows version must contain three 16-bit integers')
+    numbers=parts+(0,)
+    text=("VSVersionInfo(ffi=FixedFileInfo(filevers="+repr(numbers)+", prodvers="+repr(numbers)+
+          ", mask=0x3f, flags=0, OS=0x40004, fileType=0x1, subtype=0, date=(0,0)), kids=["+
+          "StringFileInfo([StringTable('040904B0', ["+
+          "StringStruct('CompanyName', 'Kevin Sullivan'), "+
+          "StringStruct('FileDescription', 'GridCAD material conversion'), "+
+          "StringStruct('FileVersion', '"+version+".0'), "+
+          "StringStruct('ProductName', 'GridCAD'), "+
+          "StringStruct('ProductVersion', '"+version+"'), "+
+          "StringStruct('LegalCopyright', 'Copyright (c) 2026 Kevin Sullivan; MIT licensed')"+
+          "])]), VarFileInfo([VarStruct('Translation', [1033, 1200])])])")
+    path=Path(path);path.parent.mkdir(parents=True,exist_ok=True)
+    path.write_text(text,encoding='utf-8')
+    return path
+
+
+def create_install_manifest(folder, version):
+    """Hash every explicitly assembled app file before installation/copying."""
+    folder=Path(folder)
+    records=[]
+    for path in sorted(folder.rglob('*')):
+        if path.is_symlink():raise RuntimeError('App package cannot contain links: '+str(path))
+        if path.is_file() and path.name!='INSTALL_MANIFEST.json':
+            records.append({'path':path.relative_to(folder).as_posix(),
+                            'size':path.stat().st_size,'sha256':digest(path)})
+    target=folder/'INSTALL_MANIFEST.json'
+    target.write_text(json.dumps({'version':version,'files':records},indent=2),encoding='utf-8')
+    return target
+
+
+def package_source(root, destination):
+    """Build a complete launcher distribution from explicit public sources."""
+    root=Path(root);destination=Path(destination)
+    destination.parent.mkdir(parents=True,exist_ok=True)
+    files=[root/name for name in ('Start GridCAD from source.bat','gridcad_desktop.py',
+        'desktop_core.py','desktop_cli.py','diagnostics.py','agent_help.py',
+        'README.md','AGENTS.md','LICENSE','VERSION.txt','tools/source_launcher.py')]
+    for directory in ('resources','docs','operator','examples/rectangular','examples/pyramid','examples/mixed'):
+        files.extend(p for p in (root/directory).rglob('*') if p.is_file()
+                     and '__pycache__' not in p.parts and p.suffix not in ('.pyc','.pyo'))
+    with zipfile.ZipFile(destination,'w',zipfile.ZIP_DEFLATED,compresslevel=9) as archive:
+        for path in sorted(set(files)):
+            if path.is_symlink():raise RuntimeError('Source package cannot contain symlinks: '+str(path))
+            archive.write(path,Path('GridCAD')/path.relative_to(root))
+    return destination
+
+
+def main():
+    if sys.platform!='win32':raise SystemExit('Build this distribution on Windows; no cross-build claims.')
+    subprocess.run([sys.executable,'tools/make_desktop_examples.py','examples/rectangular'],cwd=ROOT,check=True)
+    for shape in ['pyramid','mixed']:
+        subprocess.run([sys.executable,'tools/make_desktop_examples.py','examples/'+shape,'--shape',shape],cwd=ROOT,check=True)
+    write_version_resource(ROOT/'build/windows-version.txt',VERSION)
+    # Supported multi-entry onedir bundle: both launchers share one _internal.
+    subprocess.run([sys.executable,'-m','PyInstaller','--clean','--noconfirm',
+                    'tools/GridCAD.spec'],cwd=ROOT,check=True)
+    folder=ROOT/'dist/GridCAD'
+    if any(p.name.lower().startswith('_avif') for p in folder.rglob('*') if p.is_file()):
+        raise RuntimeError('Unused AVIF codec unexpectedly bundled; review the exclusion before release.')
+    for source in ['resources','docs','examples/rectangular','examples/pyramid','examples/mixed','operator']:
+        shutil.copytree(ROOT/source,folder/source,dirs_exist_ok=True,ignore=shutil.ignore_patterns('__pycache__','*.pyc'))
+    for name in ['Start GridCAD.bat','Start GridCAD from source.bat','VERSION.txt','README.md','AGENTS.md','LICENSE','desktop_core.py','desktop_cli.py','diagnostics.py','gridcad_desktop.py','agent_help.py']:
+        shutil.copy2(ROOT/name,folder/name)
+    shutil.copytree(ROOT/'tools',folder/'tools',ignore=shutil.ignore_patterns('__pycache__','*.pyc'))
+    notices=folder/'THIRD_PARTY_NOTICES';notices.mkdir(exist_ok=True)
+    for package in ['pillow','pyinstaller']:
+        dist=importlib.metadata.distribution(package)
+        for item in dist.files or []:
+            if any(k in str(item).lower() for k in ('license','copying','notice')) and dist.locate_file(item).is_file():
+                target=notices/package/Path(str(item)).name;target.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(dist.locate_file(item),target)
+    prefix=Path(sys.base_prefix)
+    import tkinter, ssl
+    if not ssl.OPENSSL_VERSION.startswith('OpenSSL 3.5.9 '):
+        raise RuntimeError('Review bundled OpenSSL notices for runtime version '+ssl.OPENSSL_VERSION)
+    interp=tkinter.Tcl()
+    tcl_version=interp.call('info','patchlevel')
+    if tcl_version!='8.6.15':
+        raise RuntimeError('Review bundled Tcl license for runtime version '+str(tcl_version))
+    required_notices=[(prefix/'LICENSE.txt','Python-LICENSE.txt'),
+                      (prefix/'tcl/tk8.6/license.terms','Tk-license.terms'),
+                      (ROOT/'resources/licenses/tcl8.6.15-license.terms','Tcl-license.terms'),
+                      (ROOT/'resources/licenses/openssl-3.5.9-LICENSE.txt','OpenSSL-LICENSE.txt'),
+                      (ROOT/'resources/licenses/openssl-3.5.9-AUTHORS.md','OpenSSL-AUTHORS.md')]
+    for source,target in required_notices:
+        if not source.is_file():raise RuntimeError('Required runtime license missing: '+str(source))
+        shutil.copy2(source,notices/target)
+    (notices/'SOURCES.txt').write_text('Tcl 8.6.15 license: https://github.com/tcltk/tcl/blob/core-8-6-15/license.terms\nPython and Tk notices copied from the pinned official Python runtime.\nOpenSSL 3.5.9: https://github.com/openssl/openssl/tree/openssl-3.5.9 (LICENSE.txt and AUTHORS.md; no NOTICE file in this tagged source root).\n',encoding='utf-8')
+    packages={d.metadata['Name']:d.version for d in importlib.metadata.distributions() if d.metadata['Name']}
+    (folder/'BUILD_PROVENANCE.json').write_text(json.dumps({'python':sys.version,'platform':sys.platform,'packages':packages,'runtime_download_at_first_launch':False,'signed':False},indent=2),encoding='utf-8')
+    entries=[{'path':str(p.relative_to(folder)).replace('\\','/'),'size':p.stat().st_size,'sha256':digest(p)} for p in sorted(folder.rglob('*')) if p.is_file()]
+    (folder/'PACKAGE_MANIFEST.json').write_text(json.dumps(entries,indent=2),encoding='utf-8')
+    create_install_manifest(folder,VERSION)
+    destination=ROOT/f'dist/GridCAD-Windows-x64-v{VERSION}.zip';zip_folder(folder,destination)
+    portable=ROOT/'dist/GridCAD-portable-core';portable.mkdir(exist_ok=True)
+    for name in ['desktop_core.py','desktop_cli.py','diagnostics.py','AGENTS.md','LICENSE']:
+        shutil.copy2(ROOT/name,portable/name)
+    for source in ['operator','docs','examples/rectangular','examples/pyramid','examples/mixed']:
+        shutil.copytree(ROOT/source,portable/source,dirs_exist_ok=True,ignore=shutil.ignore_patterns('__pycache__','*.pyc'))
+    (portable/'tools').mkdir(exist_ok=True)
+    shutil.copy2(ROOT/'tools/make_desktop_examples.py',portable/'tools/make_desktop_examples.py')
+    zip_folder(portable,ROOT/f'dist/GridCAD-portable-core-v{VERSION}.zip')
+    package_source(ROOT,ROOT/f'dist/GridCAD-Source-Windows-v{VERSION}.zip')
+    sums=''.join(digest(p)+'  '+p.name+'\n' for p in sorted((ROOT/'dist').glob('*.zip')))
+    (ROOT/'dist/SHA256SUMS.txt').write_text(sums,encoding='utf-8')
+    print(sums)
+
+
+if __name__=='__main__':main()

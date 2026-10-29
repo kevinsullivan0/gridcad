@@ -1,5 +1,5 @@
 {
-  "status": "REVIEW_REVISION_3_NOT_PUBLISHED",
+  "status": "DESKTOP_PORTABILITY_REVISION_4",
   "prior_package_sha256": "fed5192d38930a7550656158b63b13193a40efc061fb9b8c06cd31d7a6f04f32",
   "private_identifiers_scanned": 13338,
   "private_identifiers_found": 0,
@@ -28,8 +28,8 @@
     },
     {
       "path": "README.md",
-      "bytes": 11787,
-      "sha256": "b1e1ab4d041260d3be7bf7f7c422fd4f342385a966cf0b06633b06d5e62438e5"
+      "bytes": 12175,
+      "sha256": "88afae4cb2b435f33e630d59c85f28eadd5658964d24b9f7782370a36b9cf280"
     },
     {
       "path": "REVIEW.md",
@@ -73,18 +73,23 @@
     },
     {
       "path": "gridcad_operator/material_converter.py",
-      "bytes": 10514,
-      "sha256": "186c01cd34e6ace8636001f68c78c10fcc2f6ed7bd56effa5a3bee0ba11cfb76"
+      "bytes": 10755,
+      "sha256": "035c8274fa306133b7d1fd914542e4a08e14d5612a7b0690a305690a31bfefb2"
     },
     {
       "path": "gridcad_operator/operator.py",
-      "bytes": 35510,
-      "sha256": "da362b348beb49c20ef52b36c941c295aba111cd2c0a3868578f469654789751"
+      "bytes": 35670,
+      "sha256": "884c15405874d18c9b819ee5837b4abc199a680ba7c4f8f7fdf0e1f119c288a5"
     },
     {
       "path": "tests/test_operator.py",
-      "bytes": 20962,
-      "sha256": "4bbd0cc81aea9e20df5a3c48d255e088f422eb0b93a3229fcecd0986e30bc296"
+      "bytes": 21286,
+      "sha256": "778f5d876f759f11fe405d4fb262c362fdf506e0ae202af9ad9afeb0b5036c5a"
     }
+  ],
+  "desktop_portability_changes": [
+    "Writable staging handles retain fsync on Windows",
+    "Frozen converter includes source and retains source-integrity check",
+    "Race test checks actual collision target across platform filename ordering"
   ]
 }

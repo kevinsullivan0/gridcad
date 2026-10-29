@@ -15,6 +15,7 @@ import stat
 import tempfile
 from decimal import Decimal as D
 import xml.etree.ElementTree as ET
+from xml.parsers import expat
 import zipfile
 
 from .core import CHANNELS, FIELDS, ValidationError, validate_recipe
@@ -84,6 +85,10 @@ def archive(path):
             fail('Archive has too many or duplicate entries.')
         if sum(i.file_size for i in infos) > 2 * 1024**3: fail('Expanded archive exceeds 2 GiB.')
         for i in infos:
+            # These are the supported PRINT/XLSX storage methods. Reject other
+            # decoders before any member is opened, regardless of declared size.
+            if i.compress_type not in (zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED):
+                fail('Unsupported archive compression; use stored or deflated ZIP members.')
             name = PurePosixPath(i.filename)
             if name.is_absolute() or '..' in name.parts or '\\' in i.filename:
                 fail('Unsafe archive member name.')
@@ -124,41 +129,164 @@ def index(document):
     return nodes, leaves, bodies
 
 
-def xml(raw):
-    if b'<!DOCTYPE' in raw.upper() or b'<!ENTITY' in raw.upper(): fail('DTD/entities refused.')
-    return ET.fromstring(raw)
+# Bounds apply while opening inputs, including the direct operator/selected-sheet
+# route. They are ceilings, never instructions to truncate or repair a workbook.
+WORKBOOK_BYTES = 64 * 1024**2
+WORKBOOK_PART_BYTES = 16 * 1024**2
+WORKBOOK_CELLS = 100000
+WORKBOOK_STRINGS = 100000
+WORKBOOK_SHEETS = 128
+WORKBOOK_TEXT = 16 * 1024**2
+WORKBOOK_XML_NODES = 1000000
+WORKBOOK_XML_DEPTH = 128
+WORKBOOK_XML_ATTRIBUTES = 128
+WORKBOOK_XML_NAME = 1024
+
+
+class _WorkbookXML(ET.TreeBuilder):
+    def __init__(self, budget):
+        super().__init__()
+        self.budget, self.depth = budget, 0
+
+    def doctype(self, name, pubid, system):
+        # Expat decodes the actual XML encoding before this callback: unlike a
+        # raw byte scan, this also refuses UTF-16 internal/external declarations.
+        fail('Workbook XML DTD/entities refused.')
+
+    def start(self, tag, attrs):
+        self.depth += 1
+        self.budget['nodes'] += 1
+        if self.depth > WORKBOOK_XML_DEPTH or self.budget['nodes'] > WORKBOOK_XML_NODES:
+            fail('Resource limit: workbook XML exceeds 128 levels or 1,000,000 elements.')
+        for local, ceiling, label in [('c', WORKBOOK_CELLS, 'stored cells'), ('si', WORKBOOK_STRINGS, 'shared strings')]:
+            if tag == '{'+NS['m']+'}'+local:
+                self.budget[local] = self.budget.get(local, 0) + 1
+                if self.budget[local] > ceiling:
+                    fail('Resource limit: workbook exceeds 100,000 '+label+'.')
+        # Namespace expansion can amplify tiny XML into very large distinct
+        # element/attribute names. Charge decoded names, not only source text.
+        self._text(len(tag) + sum(len(k) + len(v) for k, v in attrs.items()))
+        return super().start(tag, attrs)
+
+    def end(self, tag):
+        result = super().end(tag)
+        self.depth -= 1
+        return result
+
+    def _text(self, size):
+        self.budget['text'] += size
+        if self.budget['text'] > WORKBOOK_TEXT:
+            fail('Resource limit: workbook XML text exceeds 16,777,216 characters.')
+
+    def data(self, data):
+        self._text(len(data))
+        return super().data(data)
+
+
+def _preflight_xml_names(raw):
+    # Namespace expansion happens inside Expat before TreeBuilder.start receives
+    # attributes. Inspect unexpanded names first, without constructing a tree,
+    # so URI x attribute/name amplification cannot precede our budget checks.
+    parser = expat.ParserCreate()
+    def start(name, attrs):
+        if len(attrs) > WORKBOOK_XML_ATTRIBUTES:
+            fail('Resource limit: workbook XML exceeds 128 attributes per element.')
+        if (len(name) > WORKBOOK_XML_NAME or any(len(k) > WORKBOOK_XML_NAME for k in attrs)
+                or any(len(v) > WORKBOOK_XML_NAME for k, v in attrs.items()
+                       if k == 'xmlns' or k.startswith('xmlns:'))):
+            fail('Resource limit: workbook XML name or namespace exceeds 1,024 characters.')
+    def doctype(*args):
+        fail('Workbook XML DTD/entities refused.')
+    parser.StartElementHandler = start
+    parser.StartDoctypeDeclHandler = doctype
+    parser.Parse(raw, True)
+
+
+def xml(raw, budget=None):
+    budget = budget if budget is not None else {'nodes': 0, 'text': 0}
+    try:
+        _preflight_xml_names(raw)
+        return ET.fromstring(raw, parser=ET.XMLParser(target=_WorkbookXML(budget)))
+    except ValidationError:
+        raise
+    except (ET.ParseError, expat.ExpatError, ValueError) as exc:
+        raise ValidationError('Malformed or unsupported-encoding workbook XML.') from exc
 
 
 def workbook(path, selected=None):
-    """Read stored XML only; never execute macros, formulas, links, or a calculation engine."""
+    """Read bounded stored XML; never execute macros, formulas or links."""
     with archive(path) as z:
         names = z.namelist()
+        if sum(i.file_size for i in z.infolist()) > WORKBOOK_BYTES:
+            fail('Resource limit: workbook exceeds 64 MiB expanded. Use a smaller values-only workbook.')
         if any('vbaproject' in n.lower() or n.startswith('xl/externalLinks/') for n in names):
             fail('Macro/external-link workbook refused; supply a values-only copy.')
-        book = xml(z.read('xl/workbook.xml'))
+        budget = {'nodes': 0, 'text': 0}
+        def part(member):
+            if z.getinfo(member).file_size > WORKBOOK_PART_BYTES:
+                fail('Resource limit: workbook XML part exceeds 16 MiB. Use a smaller values-only workbook.')
+            return xml(z.read(member), budget)
+        book = part('xl/workbook.xml')
         tabs = book.find('m:sheets', NS)
-        rels = {r.get('Id'): r for r in xml(z.read('xl/_rels/workbook.xml.rels'))}
-        strings = [''.join(n.itertext()) for n in xml(z.read('xl/sharedStrings.xml'))] if 'xl/sharedStrings.xml' in names else []
-        result = {}
+        if tabs is None: fail('Workbook has no worksheet list.')
+        if len(tabs) > WORKBOOK_SHEETS:
+            fail('Resource limit: workbook exceeds 128 worksheets.')
+        rels = {}
+        for rel in part('xl/_rels/workbook.xml.rels'):
+            key = rel.get('Id')
+            if not key or key in rels: fail('Missing or duplicate workbook relationship ID.')
+            rels[key] = rel
+        sheets, titles, ids, targets = [], set(), set(), set()
         for tab in tabs:
-            title = tab.get('name')
-            if selected is not None and title != selected: continue
-            rel = rels[tab.get(REL)]
+            title, sheet_id = tab.get('name'), tab.get('sheetId')
+            if not title or title in titles or not sheet_id or sheet_id in ids:
+                fail('Missing or duplicate worksheet name/ID.')
+            titles.add(title); ids.add(sheet_id)
+            rel = rels.get(tab.get(REL))
+            if rel is None: fail('Missing worksheet relationship.')
             if rel.get('TargetMode') == 'External': fail('External worksheet refused.')
-            target = PurePosixPath(rel.get('Target'))
+            raw_target = rel.get('Target')
+            if not raw_target or '\\' in raw_target: fail('Invalid worksheet target.')
+            target = PurePosixPath(raw_target)
             member = str(target).lstrip('/') if target.is_absolute() else str(PurePosixPath('xl') / target)
             if '..' in PurePosixPath(member).parts: fail('Parent-relative worksheet target refused.')
+            if member in targets: fail('Duplicate worksheet target refused.')
+            targets.add(member); sheets.append((title, member))
+        strings = []
+        if 'xl/sharedStrings.xml' in names:
+            tree = part('xl/sharedStrings.xml')
+            if len(tree) > WORKBOOK_STRINGS:
+                fail('Resource limit: workbook exceeds 100,000 shared strings.')
+            strings = [''.join(n.itertext()) for n in tree]
+            del tree
+        result, cell_count, value_text = {}, 0, 0
+        for title, member in sheets:
+            if selected is not None and title != selected: continue
             cells = {}
-            for c in xml(z.read(member)).findall('m:sheetData/m:row/m:c', NS):
+            tree = part(member)
+            for c in tree.iterfind('m:sheetData/m:row/m:c', NS):
+                cell_count += 1
+                if cell_count > WORKBOOK_CELLS:
+                    fail('Resource limit: workbook exceeds 100,000 stored cells. Use a smaller values-only workbook.')
                 address = c.get('r')
                 if address in cells: fail('Duplicate worksheet address.')
                 v = c.find('m:v', NS)
                 value = v.text if v is not None else None
                 kind = c.get('t')
-                if kind == 's' and value is not None: value = strings[int(value)]
+                if kind == 's' and value is not None:
+                    try:
+                        index = int(value)
+                        if index < 0: raise ValueError()
+                        value = strings[index]
+                    except (ValueError, IndexError) as exc:
+                        raise ValidationError('Invalid workbook shared-string reference.') from exc
                 if kind == 'inlineStr': value = ''.join(c.find('m:is', NS).itertext())
+                value_text += len(value) if value is not None else 0
+                if value_text > WORKBOOK_TEXT:
+                    fail('Resource limit: stored cell text exceeds 16,777,216 characters.')
                 cells[address] = {'value': value, 'formula': c.find('m:f', NS) is not None, 'type': kind}
             result[title] = cells
+            del tree
         if selected is not None and selected not in result: fail('Exact worksheet name not found.')
         return result
 
@@ -211,6 +339,50 @@ def matches_mixer(material, requested):
         return material['name'] == material['vendorMaterialId']
     except (KeyError, ValueError, TypeError, IndexError):
         return False
+
+
+def same_material_definition(left, right):
+    """Exact complete native assignment, allowing only per-target identity to differ."""
+    return {k:v for k,v in left.items() if k != 'id'} == {k:v for k,v in right.items() if k != 'id'}
+
+
+def native_reference_material(nodes, bodies, leaves, reference):
+    if reference not in leaves or reference not in bodies:
+        fail('Choose an existing reference object in this project; the selected reference is missing.')
+    node, body = nodes[reference], bodies[reference]
+    def reference_fail(message):
+        fail('Reference object "'+str(node.get('name') or reference)+'": '+message)
+    material = node.get('material')
+    if not isinstance(material, dict) or material != body.get('material') or not appearance_matches(body, material):
+        reference_fail('The reference object has conflicting material settings. Reassign and save it in GrabCAD before using it.')
+    if (material.get('printerFamily') != 'PolyJet' or not isinstance(material.get('id'), str)
+            or not material['id'] or not isinstance(material.get('properties'), dict)
+            or not isinstance(material.get('metadata'), dict) or not isinstance(material.get('uiColor'), str)):
+        reference_fail('The reference material is incomplete or from an unsupported printer family. Choose a saved PolyJet EcoFlex material.')
+    rgba = material.get('threeDAppearance', {})
+    if any(type(rgba.get(k)) not in (int, D) or not D(rgba[k]).is_finite() or not 0 <= rgba[k] <= 255 for k in ('r','g','b','a')):
+        reference_fail('The reference material has invalid preview colors. Reassign and save it in GrabCAD.')
+    for other in list(nodes.values()) + list(bodies.values()):
+        assigned = other.get('material')
+        if isinstance(assigned, dict) and assigned.get('id') == material['id'] and assigned != material:
+            reference_fail('The same material identity has conflicting saved definitions. Resolve the assignment in GrabCAD before copying it.')
+    meta = material['metadata']; mode = meta.get('materialType')
+    if mode == 'base_material':
+        valid = (type(meta.get('resinId')) is int and
+                 (meta.get('resinId'), material.get('name')) in zip(RESIN_IDS, RESIN_NAMES) and
+                 material.get('name') == material.get('vendorMaterialId') and
+                 not any(k.startswith('cmykwt_dm_') for k in meta))
+    elif mode == 'cmykwt_dm_mixer':
+        try:
+            requested = validate_recipe([meta['cmykwt_dm_'+f] for f in FIELDS])
+            valid = matches_mixer(material, requested)
+        except (KeyError, ValueError, TypeError, ValidationError):
+            valid = False
+    else:
+        valid = False
+    if not valid:
+        reference_fail('This reference is not a supported saved EcoFlex direct material or six-channel mixer. Choose a compatible assigned object, not a color-picker placeholder.')
+    return copy.deepcopy(material)
 
 
 def appearance_matches(body, material):
@@ -320,7 +492,7 @@ def mapping_digest(plan):
     A hash proves binding, not that label/geometry review occurred. The operator
     must independently establish the expected recipes and IDs before using it.
     """
-    return fingerprint({
+    binding = {
         'archive_sha256':plan['archive_sha256'], 'workbook_sha256':plan['workbook_sha256'],
         'sheet':plan['sheet'], 'range':plan['range'],
         'samples':[{'cell':s['cell'], 'occurrence_id':s['occurrence_id'], 'tray_body_id':s['tray_body_id'],
@@ -329,7 +501,15 @@ def mapping_digest(plan):
         'labels':[{'occurrence_id':s['occurrence_id'], 'tray_body_id':s['tray_body_id']}
                   for s in sorted(plan['labels'], key=lambda s:s['occurrence_id'])],
         'preserve_occurrence_ids':sorted(plan['preserve_occurrence_ids']),
-    })
+    }
+    # Preserve historical black-plan digests, but bind every new reference
+    # policy decision to review, not merely the target membership.
+    if any(s.get('action') in ('copy_native_reference','preserve_reference_material') for s in plan['labels']):
+        binding['label_material_bindings'] = [
+            {k:s.get(k) for k in ('occurrence_id','tray_body_id','source_material_sha256','action',
+                                 'reference_occurrence_id','reference_material_sha256','replacement_confirmed')}
+            for s in sorted(plan['labels'],key=lambda s:s['occurrence_id'])]
+    return fingerprint(binding)
 
 
 def prepare(project, xlsx, plan):
@@ -343,9 +523,17 @@ def prepare(project, xlsx, plan):
     if reviewed_ids and 'axes' in plan: fail('Reviewed-ID material-only plans must omit axes; no translation-rank mapping proof is used.')
     if not reviewed_ids and 'axes' not in plan: fail('Identity-compose lattice mode requires explicit axes.')
     if plan['allow_unverified_material_profile'] is not True: fail('Explicit unverified material-profile acknowledgement required.')
-    keys(plan['review'], ('geometry_and_labels_confirmed','evidence'), ('mapping_sha256',))
-    if plan['review']['geometry_and_labels_confirmed'] is not True or not isinstance(plan['review']['evidence'], str) or not plan['review']['evidence'].strip():
+    keys(plan['review'], ('geometry_and_labels_confirmed','evidence'), ('mapping_sha256','mode'))
+    candidate_only = plan['review'].get('mode') == 'desktop_unverified_candidate'
+    if 'mode' in plan['review'] and not candidate_only:
+        fail('Unknown mapping review mode.')
+    if candidate_only:
+        if not reviewed_ids or plan['review']['geometry_and_labels_confirmed'] is not False:
+            fail('An unverified desktop candidate must not claim physical-label review.')
+    elif plan['review']['geometry_and_labels_confirmed'] is not True:
         fail('Actual geometry/printed labels must be reviewed before conversion.')
+    if not isinstance(plan['review']['evidence'], str) or not plan['review']['evidence'].strip():
+        fail('Mapping evidence or candidate limitations must be recorded.')
     if reviewed_ids and not re.fullmatch(r'[0-9a-f]{64}', str(plan['review'].get('mapping_sha256',''))):
         fail('Reviewed-ID mode needs the source-bound independently reviewed mapping digest.')
     if plan['formula_cache_policy'] not in ('reject', 'confirmed_current_cache'): fail('Unknown formula cache policy.')
@@ -426,13 +614,38 @@ def prepare(project, xlsx, plan):
         prepared.append({'role':'sample', 'cell':entry['cell'], 'occurrence_id':oid,
                          'tray_body_id':body['id'], 'recipe':requested, 'action':action})
     if len(uniform) > 1: fail('Heterogeneous color-picker assignments need explicit external resolution.')
+    # Preparation does not mutate the source document. Validate each reference
+    # once per call, retaining per-label checks and independent returned copies.
+    reference_cache = {}
+    native_black_available = None
     for entry in plan['labels']:
-        keys(entry, ('occurrence_id','tray_body_id','source_material_sha256','action'), ('reference_occurrence_id',))
-        minimal = {k:v for k,v in entry.items() if k != 'reference_occurrence_id'}
+        keys(entry, ('occurrence_id','tray_body_id','source_material_sha256','action'), ('reference_occurrence_id','reference_material_sha256','replacement_confirmed'))
+        minimal = {k:v for k,v in entry.items() if k not in ('reference_occurrence_id','reference_material_sha256','replacement_confirmed')}
         oid, node, body = target(minimal, ('occurrence_id','tray_body_id','source_material_sha256','action'))
         action = entry['action']
         item = {'role':'label','occurrence_id':oid,'tray_body_id':body['id'],'action':action}
-        if action == 'preserve_native_black':
+        if action in ('copy_native_reference','preserve_reference_material'):
+            reference = entry.get('reference_occurrence_id')
+            if reference not in reference_cache:
+                validated = native_reference_material(nodes, bodies, leaves, reference)
+                reference_cache[reference] = (validated, fingerprint(validated))
+            validated, reference_sha256 = reference_cache[reference]
+            material = copy.deepcopy(validated)
+            if entry.get('reference_material_sha256') != reference_sha256:
+                fail('The reference material changed after review. Rebuild the preview and review the selected reference again.')
+            item.update(reference_material=material, reference_occurrence_id=reference,
+                        reference_material_sha256=reference_sha256,
+                        replacement_confirmed=entry.get('replacement_confirmed') is True)
+            if action == 'preserve_reference_material':
+                if not same_material_definition(node['material'], material) or not appearance_matches(body, material):
+                    fail('A label marked unchanged does not match the chosen reference material. Rebuild the preview.')
+            else:
+                if not appearance_matches(body, node['material']):
+                    fail('A label has conflicting material appearance. Resolve its saved assignment in GrabCAD before replacing it.')
+                if node['material'].get('metadata', {}).get('materialType') != 'color_picker' and entry.get('replacement_confirmed') is not True:
+                    fail('Some labels already have assigned materials. Review those objects and explicitly confirm replacing their assignments.')
+                changed.add(oid)
+        elif action == 'preserve_native_black':
             if not black(node['material']) or not appearance_matches(body, node['material']):
                 fail('Planned preserved label is not consistent direct EcoFlex Black.')
         elif action in ('assign_from_picker_using_native_black','assign_from_picker_using_unverified_black'):
@@ -442,11 +655,17 @@ def prepare(project, xlsx, plan):
                 if reference not in leaves or nodes[reference]['material'] != bodies[reference]['material'] or not black(nodes[reference]['material']):
                     fail('Native black reference must be an existing matching direct-black leaf.')
                 item['reference_material'] = copy.deepcopy(nodes[reference]['material'])
-            elif any(black(nodes[reference]['material']) for reference in leaves):
-                fail('Native black is available: reference its complete object instead of the minimal converter.')
+            else:
+                if native_black_available is None:
+                    native_black_available = any(black(nodes[ref]['material']) for ref in leaves)
+                if native_black_available:
+                    fail('Native black is available: reference its complete object instead of the minimal converter.')
             changed.add(oid)
         else: fail('Unknown label action.')
         prepared.append(item)
+    for item in prepared:
+        if item.get('reference_occurrence_id') in changed:
+            fail('The chosen reference object would also change in this conversion. Choose a reference whose material will stay unchanged.')
     preserved = plan['preserve_occurrence_ids']
     if len(set(preserved)) != len(preserved) or set(preserved)&seen or seen|set(preserved) != leaves:
         fail('Plan must explicitly cover every leaf as sample, label, or preserved unrelated object.')
@@ -496,6 +715,50 @@ def stripped(document, changed):
     return d
 
 
+
+def _same_nonmaterial(before, after, changed):
+    """For validated project JSON, compare exactly the fields retained by stripped().
+
+    Ignore only the same validated target objects' material fields and their
+    exact tray appearance RGBA fields. Other keys, list order, identities and
+    values remain compared. Keep stripped()'s independent-copy API unchanged.
+    """
+    ignored = []
+    for document in (before, after):
+        nodes, _, bodies = index(document)
+        skip = {}
+        def ignore(target, keys):
+            removed = skip.setdefault(id(target), set())
+            for key in keys:
+                target[key]  # Match stripped()'s required-field refusal.
+                if key in removed:
+                    # A shared alias would encounter a second pop of the same
+                    # field in stripped(); retain that fail-closed behavior.
+                    raise KeyError(key)
+                removed.add(key)
+        for oid in changed:
+            ignore(nodes[oid], ('material',))
+            ignore(bodies[oid], ('material',))
+            appearance = bodies[oid]['properties']['threeDAppearance']['value']
+            ignore(appearance, ('r', 'g', 'b', 'a'))
+        ignored.append(skip)
+
+    def equal(left, right):
+        if isinstance(left, dict) and isinstance(right, dict):
+            left_skip, right_skip = ignored[0].get(id(left)), ignored[1].get(id(right))
+            if left_skip or right_skip:
+                left_keys = left.keys() - (left_skip or ())
+                right_keys = right.keys() - (right_skip or ())
+            else:
+                left_keys, right_keys = left.keys(), right.keys()
+            return left_keys == right_keys and all(equal(left[key], right[key]) for key in left_keys)
+        if isinstance(left, list) and isinstance(right, list):
+            return len(left) == len(right) and all(equal(a, b) for a, b in zip(left, right))
+        return left == right
+
+    return equal(before, after)
+
+
 def apply(project, xlsx, plan, out_dir):
     out_dir = Path(out_dir)
     if out_dir.exists() or out_dir.is_symlink(): fail('Output directory must not exist; nothing is overwritten.')
@@ -512,7 +775,7 @@ def apply(project, xlsx, plan, out_dir):
         nodes[oid]['material'] = copy.deepcopy(material)
         bodies[oid]['material'] = copy.deepcopy(material)
         bodies[oid]['properties']['threeDAppearance']['value'].update(material['threeDAppearance'])
-    if stripped(before, changed) != stripped(after, changed): fail('Unexpected non-material mutation.')
+    if not _same_nonmaterial(before, after, changed): fail('Unexpected non-material mutation.')
     temp = Path(tempfile.mkdtemp(prefix='.gridcad-operator-', dir=out_dir.parent))
     published, owns_dir = [], False
     try:
@@ -521,20 +784,38 @@ def apply(project, xlsx, plan, out_dir):
         with archive(project) as src, zipfile.ZipFile(candidate, 'x') as dst:
             dst.comment = src.comment
             for info in src.infolist():
-                raw = exact_json(after).encode() if info.filename=='project.json' else src.read(info)
-                dst.writestr(info, raw)
-                if info.filename!='project.json': payloads.append({'name':info.filename,'sha256':hashlib.sha256(raw).hexdigest()})
-        if project_document(candidate) != after: fail('Saved project readback mismatch.')
+                if info.filename == 'project.json':
+                    dst.writestr(info, exact_json(after).encode())
+                else:
+                    # Preserve metadata and payload bytes without holding a
+                    # potentially 512 MiB member in memory. Reading to EOF still
+                    # checks its source CRC; destination is independently read below.
+                    h = hashlib.sha256()
+                    with src.open(info) as reader, dst.open(info, 'w') as writer:
+                        for block in iter(lambda: reader.read(1024 * 1024), b''):
+                            writer.write(block)
+                            h.update(block)
+                    payloads.append({'name':info.filename,'sha256':h.hexdigest()})
+        saved_document = project_document(candidate)
+        if saved_document != after: fail('Saved project readback mismatch.')
         with archive(project) as src, archive(candidate) as dst:
             if src.namelist()!=dst.namelist() or src.comment!=dst.comment or dst.testzip() is not None: fail('Archive structure/CRC differs.')
             for p in payloads:
-                if hashlib.sha256(dst.read(p['name'])).hexdigest()!=p['sha256']: fail('Non-project payload changed.')
-        saved_nodes, _, saved_bodies = index(project_document(candidate))
+                h = hashlib.sha256()
+                with dst.open(p['name']) as reader:
+                    for block in iter(lambda: reader.read(1024 * 1024), b''):
+                        h.update(block)
+                if h.hexdigest()!=p['sha256']: fail('Non-project payload changed.')
+        saved_nodes, _, saved_bodies = index(saved_document)
         for item in assignments:
             oid = item['occurrence_id']
             if saved_nodes[oid]['material'] != saved_bodies[oid]['material']: fail('Saved desired/actual mismatch.')
             if item['role']=='sample' and not matches_mixer(saved_nodes[oid]['material'], item['recipe']): fail('Saved recipe mismatch.')
-            if item['role']=='label' and not black(saved_nodes[oid]['material']): fail('Saved label is not direct black.')
+            if item['role']=='label':
+                if item['action'] in ('copy_native_reference','preserve_reference_material'):
+                    if not same_material_definition(saved_nodes[oid]['material'], item['reference_material']):
+                        fail('Saved label does not exactly match the complete chosen reference material.')
+                elif not black(saved_nodes[oid]['material']): fail('Saved label is not direct black.')
             if not appearance_matches(saved_bodies[oid], saved_nodes[oid]['material']): fail('Saved material/appearance mismatch.')
         if digest(project)!=plan['archive_sha256'] or digest(xlsx)!=plan['workbook_sha256']: fail('Input changed during conversion.')
         audit = {'status':'UNVERIFIED_CANDIDATE', 'source_sha256':plan['archive_sha256'],
@@ -547,7 +828,9 @@ def apply(project, xlsx, plan, out_dir):
                  'mapping_mode':'reviewed_exact_ids' if plan['placement_profile']==REVIEWED_ID_PROFILE else 'identity_compose_lattice_check',
                  'mapping_sha256':mapping_digest(plan),
                  'placement_interpretation':'not_interpreted_source_transforms_preserved' if plan['placement_profile']==REVIEWED_ID_PROFILE else 'restricted_identity_compose_lattice',
-                 'physical_mapping_automatically_verified':False}
+                 'physical_mapping_automatically_verified':False,
+                 'physical_mapping_reviewed':plan['review']['geometry_and_labels_confirmed'],
+                 'review_mode':plan['review'].get('mode','explicit_review')}
         manifest = [{k:v for k,v in item.items() if k!='reference_material'} for item in assignments]
         (temp/'audit.json').write_text(report_json(audit))
         (temp/'assignments.json').write_text(report_json(manifest))
@@ -555,7 +838,9 @@ def apply(project, xlsx, plan, out_dir):
         (temp/'reviewed_plan.json').write_text(exact_json(plan)+'\n')
         (temp/'UNVERIFIED.txt').write_text('DO NOT PRINT YET. File-level audit passed; native material semantics and GrabCAD open/recompose/save acceptance remain unverified. See audit.json and operator instructions.\n')
         for path in temp.iterdir():
-            with path.open('rb') as f: os.fsync(f.fileno())
+            # Windows FlushFileBuffers requires a writable handle. The staged
+            # files are ours; opening r+b preserves their bytes and fsync guard.
+            with path.open('r+b') as f: os.fsync(f.fileno())
         out_dir.mkdir()  # Exclusive directory reservation; even an empty existing directory is refused.
         owns_dir = True
         for path in sorted(temp.iterdir()):

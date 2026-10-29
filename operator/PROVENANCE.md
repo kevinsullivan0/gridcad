@@ -1,3 +1,5 @@
+> Historical snapshot of the earlier operator review; licensing and desktop release status below are not current. See the root README and LICENSE for the current release.
+
 # Provenance and publication boundary
 
 This package is prepared for source review only; it has not been pushed or published.

@@ -575,7 +575,9 @@ def write_candidate_copy(grid,source,mapping,witness,material_provider,output,*,
         material_provider.check_integrity()
         if file_hash(source)!=inv['sha256']:
             raise ValidationError('Input changed during copy; no output published.')
-        with open(temp,'rb') as f: os.fsync(f.fileno())
+        # Windows FlushFileBuffers needs a write-capable file handle. Keep the
+        # flush guarantee rather than suppressing its failure on read-only rb.
+        with open(temp,'r+b') as f: os.fsync(f.fileno())
         os.link(temp,output)  # Atomic create, never replace, including publication races.
         timings['archive_write_preservation_readback_seconds']=time.perf_counter()-phase
         timings['total_seconds']=time.perf_counter()-start

@@ -178,13 +178,19 @@ class OperatorTests(unittest.TestCase):
     def test_publication_race_never_overwrites_or_deletes_foreign_file(self):
         import os
         real_link=os.link
+        collisions=[]
         def collision(source,destination):
+            collisions.append(Path(destination))
             Path(destination).write_bytes(b'foreign concurrent file')
             return real_link(source,destination)
         with patch('gridcad_operator.operator.os.link',side_effect=collision):
             with self.assertRaises(FileExistsError):apply(self.project,self.book,self.plan,self.out)
-        self.assertEqual((self.out/'UNVERIFIED.txt').read_bytes(),b'foreign concurrent file')
-        self.assertFalse((self.out/'candidate_UNVERIFIED.PRINT').exists())
+        # WindowsPath ordering is case-insensitive; the first staged filename
+        # differs from POSIX. The invariant is preservation of whichever foreign
+        # file won the exclusive-create race, not one platform's sort order.
+        self.assertEqual(len(collisions),1)
+        self.assertEqual(collisions[0].read_bytes(),b'foreign concurrent file')
+        self.assertEqual(list(self.out.iterdir()),collisions)
     def test_ancestor_shared_sample_material_identity_refused(self):
         def change(doc):
             n,_,_=index(doc)

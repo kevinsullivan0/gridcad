@@ -1,0 +1,276 @@
+{
+  "pass1": [
+    {
+      "seconds": {
+        "mesh": 2.3211297519992513
+      },
+      "cpu_seconds": {
+        "mesh": 2.3202704049999996
+      },
+      "peak_rss_bytes": 57802752,
+      "identity": {
+        "bounds": [
+          [
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            1.0,
+            1.0,
+            2.0
+          ]
+        ],
+        "triangles": 600000,
+        "mesh_sha256": "2a337b7657ff7ca7660d3521486609eac6d95efb0f4163279991f1c5c08e6606",
+        "top_length": 1800000,
+        "top_sha256": "2e0f6b87880ecc898eed64c271f175d16429da88fef9d791f82b5f29a172c1b9"
+      }
+    },
+    {
+      "seconds": {
+        "mesh": 2.1084317439999722
+      },
+      "cpu_seconds": {
+        "mesh": 2.108083822
+      },
+      "peak_rss_bytes": 57802752,
+      "identity": {
+        "bounds": [
+          [
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            1.0,
+            1.0,
+            2.0
+          ]
+        ],
+        "triangles": 600000,
+        "mesh_sha256": "2a337b7657ff7ca7660d3521486609eac6d95efb0f4163279991f1c5c08e6606",
+        "top_length": 1800000,
+        "top_sha256": "2e0f6b87880ecc898eed64c271f175d16429da88fef9d791f82b5f29a172c1b9"
+      }
+    },
+    {
+      "seconds": {
+        "mesh": 4.118625863000489
+      },
+      "cpu_seconds": {
+        "mesh": 4.086274759999999
+      },
+      "peak_rss_bytes": 57671680,
+      "identity": {
+        "bounds": [
+          [
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            1.0,
+            1.0,
+            2.0
+          ]
+        ],
+        "triangles": 600000,
+        "mesh_sha256": "2a337b7657ff7ca7660d3521486609eac6d95efb0f4163279991f1c5c08e6606",
+        "top_length": 1800000,
+        "top_sha256": "2e0f6b87880ecc898eed64c271f175d16429da88fef9d791f82b5f29a172c1b9"
+      }
+    },
+    {
+      "seconds": {
+        "mesh": 2.354110062999098
+      },
+      "cpu_seconds": {
+        "mesh": 2.3540831680000003
+      },
+      "peak_rss_bytes": 57802752,
+      "identity": {
+        "bounds": [
+          [
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            1.0,
+            1.0,
+            2.0
+          ]
+        ],
+        "triangles": 600000,
+        "mesh_sha256": "2a337b7657ff7ca7660d3521486609eac6d95efb0f4163279991f1c5c08e6606",
+        "top_length": 1800000,
+        "top_sha256": "2e0f6b87880ecc898eed64c271f175d16429da88fef9d791f82b5f29a172c1b9"
+      }
+    },
+    {
+      "seconds": {
+        "mesh": 2.22590732900062
+      },
+      "cpu_seconds": {
+        "mesh": 2.225850952
+      },
+      "peak_rss_bytes": 57802752,
+      "identity": {
+        "bounds": [
+          [
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            1.0,
+            1.0,
+            2.0
+          ]
+        ],
+        "triangles": 600000,
+        "mesh_sha256": "2a337b7657ff7ca7660d3521486609eac6d95efb0f4163279991f1c5c08e6606",
+        "top_length": 1800000,
+        "top_sha256": "2e0f6b87880ecc898eed64c271f175d16429da88fef9d791f82b5f29a172c1b9"
+      }
+    }
+  ],
+  "pass2": [
+    {
+      "seconds": {
+        "mesh": 1.4785509450011887
+      },
+      "cpu_seconds": {
+        "mesh": 1.4785401070000002
+      },
+      "peak_rss_bytes": 57802752,
+      "identity": {
+        "bounds": [
+          [
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            1.0,
+            1.0,
+            2.0
+          ]
+        ],
+        "triangles": 600000,
+        "mesh_sha256": "2a337b7657ff7ca7660d3521486609eac6d95efb0f4163279991f1c5c08e6606",
+        "top_length": 1800000,
+        "top_sha256": "2e0f6b87880ecc898eed64c271f175d16429da88fef9d791f82b5f29a172c1b9"
+      }
+    },
+    {
+      "seconds": {
+        "mesh": 6.740296218998992
+      },
+      "cpu_seconds": {
+        "mesh": 6.311666241
+      },
+      "peak_rss_bytes": 57802752,
+      "identity": {
+        "bounds": [
+          [
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            1.0,
+            1.0,
+            2.0
+          ]
+        ],
+        "triangles": 600000,
+        "mesh_sha256": "2a337b7657ff7ca7660d3521486609eac6d95efb0f4163279991f1c5c08e6606",
+        "top_length": 1800000,
+        "top_sha256": "2e0f6b87880ecc898eed64c271f175d16429da88fef9d791f82b5f29a172c1b9"
+      }
+    },
+    {
+      "seconds": {
+        "mesh": 2.194084909002413
+      },
+      "cpu_seconds": {
+        "mesh": 2.193630111
+      },
+      "peak_rss_bytes": 57802752,
+      "identity": {
+        "bounds": [
+          [
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            1.0,
+            1.0,
+            2.0
+          ]
+        ],
+        "triangles": 600000,
+        "mesh_sha256": "2a337b7657ff7ca7660d3521486609eac6d95efb0f4163279991f1c5c08e6606",
+        "top_length": 1800000,
+        "top_sha256": "2e0f6b87880ecc898eed64c271f175d16429da88fef9d791f82b5f29a172c1b9"
+      }
+    },
+    {
+      "seconds": {
+        "mesh": 1.601138792000711
+      },
+      "cpu_seconds": {
+        "mesh": 1.601136545
+      },
+      "peak_rss_bytes": 59375616,
+      "identity": {
+        "bounds": [
+          [
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            1.0,
+            1.0,
+            2.0
+          ]
+        ],
+        "triangles": 600000,
+        "mesh_sha256": "2a337b7657ff7ca7660d3521486609eac6d95efb0f4163279991f1c5c08e6606",
+        "top_length": 1800000,
+        "top_sha256": "2e0f6b87880ecc898eed64c271f175d16429da88fef9d791f82b5f29a172c1b9"
+      }
+    },
+    {
+      "seconds": {
+        "mesh": 1.462891857001523
+      },
+      "cpu_seconds": {
+        "mesh": 1.4628875669999999
+      },
+      "peak_rss_bytes": 57802752,
+      "identity": {
+        "bounds": [
+          [
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            1.0,
+            1.0,
+            2.0
+          ]
+        ],
+        "triangles": 600000,
+        "mesh_sha256": "2a337b7657ff7ca7660d3521486609eac6d95efb0f4163279991f1c5c08e6606",
+        "top_length": 1800000,
+        "top_sha256": "2e0f6b87880ecc898eed64c271f175d16429da88fef9d791f82b5f29a172c1b9"
+      }
+    }
+  ]
+}

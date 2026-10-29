@@ -45,6 +45,6 @@ Compare a download's SHA256 with its exact filename in [SHA256SUMS.txt](https://
 
 The release includes the deterministic Python core, command-line tools, examples, schema and agent instructions. The ordinary GUI needs no agent. An agent can use the toolkit for more specialized work, but new geometries or material profiles require their own validation rather than assuming the GUI already supports them. [Developer guide](https://github.com/kevinsullivan0/gridcad/blob/v1.0.1/docs/DESKTOP_API.md) · [Contributor contract](https://github.com/kevinsullivan0/gridcad/blob/v1.0.1/AGENTS.md) · [Exact release source](https://github.com/kevinsullivan0/gridcad/tree/v1.0.1).
 
-The desktop implementation is at the release tag linked above. The default branch retains the earlier browser implementation; this README update does not merge the desktop branch. Earlier releases remain available.
+The desktop app source is included in this repository. Use the release tag linked above for the exact published version. Earlier releases remain available.
 
 GridCAD's original code is MIT licensed, copyright 2026 Kevin Sullivan. Dependencies retain their own licenses. Private inputs and vendor software are not bundled.

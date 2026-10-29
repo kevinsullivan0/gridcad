@@ -40,3 +40,14 @@ The reviewed-ID material-only path does not use stored translation ranks to esta
 `gridcad_operator.operator.mapping_digest(plan)` defines the canonical binding: exact archive/workbook hashes, sheet/range, sorted explicit sample cells/IDs/expected channels, sorted label IDs and preserved leaf IDs. After review, record its result in `review.mapping_sha256`. The CLI recomputes it and rejects a stale or missing digest. Actions and complete source-material fingerprints are separately enforced and the entire plan is hashed in the audit. A user-authored wrong mapping can still have a valid digest: this mode is a preservation/material writer for verified mappings, not a text-recognition or native-placement proof.
 
 All target uniqueness, dense cardinality, source-material, serializer-domain, ancestor-feature and complete material-reference guards remain mandatory in this mode. The source version and observed raw transform/storage profile remain restricted. The compose fields are copied untouched, not applied, normalized or used as evidence that physical positions are correct. Unknown automatic mapping or new composition semantics still requires actual geometry/native evidence.
+
+## Explicit reference-material label policy
+
+The desktop/CLI may now produce two additional label actions:
+
+- `preserve_reference_material`: keep the complete target unchanged because its entire material definition, apart from its target-specific ID, already equals the reference.
+- `copy_native_reference`: copy the complete compatible source assignment while retaining the target's unique ID. Replacing an intentional non-picker assignment requires explicit `replacement_confirmed: true` after reviewing that target; this is not a general conflict bypass.
+
+Both require `reference_occurrence_id`, `reference_material_sha256`, and a boolean `replacement_confirmed`. Only consistent saved PolyJet EcoFlex direct materials or known valid six-channel mixers are admitted. The reference must not be changed by the same plan. Dangling references, malformed or incompatible definitions, conflicting aliases, changed fingerprints and shared mutable target IDs remain refused.
+
+For plans using either new action, `mapping_digest` additionally binds every label's action, complete source fingerprint, reference ID/fingerprint and replacement-confirmation choice. Old black-only plan digest semantics remain unchanged. The full reference definition is verified again on archive readback; manifests retain reference identity/fingerprint and the recorded replacement decision. All native-acceptance limitations still apply.

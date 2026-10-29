@@ -98,16 +98,17 @@ class ActivityTests(TestCase):
 
     def test_save_captures_paths_and_defers_success_dialog_until_delivery_finishes(self):
         app = self.app(); app.save_button = {'state': 'normal'}
+        app.include_report = Value(False)
         app.proposal = {'plan': 'captured'}; app.evidence = Value('review notes')
         app.project_path = 'original.print'; app.workbook_path = 'original.xlsx'
         app.run = mock.Mock()
-        with mock.patch('gridcad_desktop.filedialog.asksaveasfilename', return_value='new-result'):
+        with mock.patch('gridcad_desktop.filedialog.asksaveasfilename', return_value='new-result.PRINT'):
             app.save()
         _, work, done = app.run.call_args.args
         app.project_path = 'different.print'; app.workbook_path = 'different.xlsx'
-        with mock.patch('gridcad_desktop.core.save_candidate') as save:
+        with mock.patch('gridcad_desktop.core.save_print') as save:
             work()
-        save.assert_called_once_with('original.print', 'original.xlsx', {'plan': 'captured'}, 'new-result')
+        save.assert_called_once_with('original.print', 'original.xlsx', {'plan': 'captured'}, 'new-result.PRINT', include_report=False)
         with mock.patch('gridcad_desktop.messagebox.showinfo') as notice:
             done({'changed_count': 3, 'unchanged_nonproject_payloads': 5})
             notice.assert_not_called()

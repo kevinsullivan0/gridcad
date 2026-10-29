@@ -4,7 +4,7 @@ GridCAD applies the material recipes in an Excel worksheet to a rectangular grou
 
 ## Open the app
 
-Extract the entire Windows ZIP into a new folder, then open `GridCAD.exe`. Keep `GridCAD-core.exe` and the `_internal` folder beside it. You do not need Python, administrator rights, an account, an AI assistant, or an internet connection.
+Extract the entire Windows source ZIP into a new folder, then double-click `Start GridCAD.bat`. On first use it offers to install Python and the image library if needed; later launches reuse that setup offline. No administrator rights, account or AI assistant are required. The separate EXE package includes its own runtime: open `GridCAD.exe` and keep its complete folder together.
 
 This release is unsigned. If Windows or your organization blocks it, follow the applicable security policy. Do not disable protection to run GridCAD. A checksum can confirm that a download is complete, but it does not prove that software is safe.
 
@@ -19,9 +19,9 @@ Choose **Load example**, then **Match cells to samples**. The example contains 2
 3. **Open .PRINT** (`Ctrl+P`). Choose the sample group and label group. Only the selected samples and labels can change; other objects stay unchanged. You can click samples in the preview before choosing a matching worksheet range.
 4. Match the worksheet to the preview. Choose the corner where the **first selected cell** belongs, then the direction in which the **next worksheet row** runs. These directions refer to the preview on screen. Check the corners and some interior samples against the labels in your original project. GridCAD cannot read the meaning of the printed labels for you.
 5. **Match cells to samples** (`Ctrl+Enter`). The worksheet must contain one recipe for each sample. Click a sample to see its current material and, when mapped, its requested worksheet recipe. The **Cell assignments** tab lists every cell and target sample. Changing an input clears the old mapping so it cannot be saved by mistake.
-6. **Save separate result** (`Ctrl+S`). Choose a new folder name. GridCAD checks the recipes, source files, material assignments and preserved project data before writing.
+6. **Save PRINT** (`Ctrl+S`). Choose a new `.PRINT` filename. GridCAD checks the recipes, source files, material assignments and preserved project data before writing.
 
-The result folder contains `candidate_UNVERIFIED.PRINT`, the cell assignments and the validation reports. Existing result folders are never overwritten. The filename marks a result that has not yet been validated in GrabCAD; it does not mean the file checks failed.
+A normal save creates only the PRINT file you named. Select **Save a conversion report alongside the PRINT** if you also want a JSON record of the checks and remaining validation limits. Existing files are never overwritten. Naming a file does not validate it in GrabCAD: the native checks below still apply.
 
 ## Understand the preview
 
@@ -55,7 +55,7 @@ Wait for a file operation to finish before starting another. Closing during an o
 - Select one recipe cell per sample and build the mapping. Use the message shown if the count or shape does not match.
 - Resolve any listed material conflict. Rebuild the mapping after changing an input.
 - Wait for validation and preview activity to finish. A failed check must be corrected before saving.
-- Choose a new output folder. GridCAD will not replace an existing result.
+- Choose a new output filename. GridCAD will not replace an existing file.
 
 Saving records the selected mapping and the file checks. It does not record a physical-label review.
 

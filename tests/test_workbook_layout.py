@@ -38,7 +38,7 @@ class WorkbookLayoutTests(unittest.TestCase):
         app.geotab=mock.Mock();app.controls={}
         labels=[]
         for name in ('sample','labels','orientation','label_mode','label_reference',
-                     'replace_labels','summary','preview_notice','mapping_corner','mapping_direction','mapping_hint','label_choice','reference_note'):
+                     'replace_labels','include_report','summary','preview_notice','mapping_corner','mapping_direction','mapping_hint','label_choice','reference_note'):
             setattr(app,name,mock.Mock())
         app.black_label_choice='EcoFlexBlack (labels)'
         app.button=mock.Mock(side_effect=lambda *args,**kwargs:mock.Mock())

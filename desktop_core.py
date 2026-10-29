@@ -22,7 +22,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parent / 'operator'))
 from gridcad_operator import operator as op
 
-VERSION = '0.2.0-rc.7'
+VERSION = '1.0.0'
 PROFILE = 'rectangular-2170-mesh-review-v1'
 TOLERANCE = 0.0001  # mm, fixed; never enlarged to make an input fit.
 MAX_PROJECT_BYTES = 2 * 1024**3
@@ -569,3 +569,57 @@ def candidate_plan(proposal):
 
 def save_candidate(project_path, workbook_path, proposal, output_directory):
     return op.apply(project_path, workbook_path, candidate_plan(proposal), output_directory)
+
+
+def save_print(project_path, workbook_path, proposal, output_path, include_report=False):
+    """Publish one named PRINT, optionally its report, after full writer checks.
+
+    The advanced evidence bundle is kept private in a temporary directory. No
+    existing destination is replaced, including files created during validation.
+    """
+    import json
+    output = Path(output_path)
+    name = output.name
+    reserved = {'CON', 'PRN', 'AUX', 'NUL', *(f'COM{i}' for i in range(1, 10)),
+                *(f'LPT{i}' for i in range(1, 10))}
+    if (output.suffix.lower() != '.print' or name.endswith((' ', '.'))
+            or any(ord(c) < 32 or c in '<>:"/\\|?*' for c in name)
+            or name.split('.')[0].upper() in reserved):
+        op.fail('Choose a valid Windows filename ending in .PRINT.')
+    if not output.parent.is_dir():
+        op.fail('Choose an existing folder for the saved PRINT file.')
+    report = output.with_name(output.stem + '.gridcad-report.json')
+    destinations = [output] + ([report] if include_report else [])
+    for target in destinations:
+        if target.exists() or target.is_symlink():
+            op.fail(f'A file already exists at {target}. Choose another name; existing files are never replaced.')
+    published = []
+    with tempfile.TemporaryDirectory(prefix='.gridcad-save-', dir=output.parent) as temp:
+        stage = Path(temp)
+        audit = save_candidate(project_path, workbook_path, proposal, stage / 'validated')
+        audit = dict(audit, output_path=str(output))
+        if include_report:
+            audit['report_path'] = str(report)
+        candidate = stage / 'validated' / 'candidate_UNVERIFIED.PRINT'
+        sources = [candidate]
+        if include_report:
+            staged_report = stage / 'report.json'
+            with staged_report.open('x', encoding='utf-8') as handle:
+                json.dump(audit, handle, indent=2, sort_keys=True)
+                handle.write('\n'); handle.flush(); os.fsync(handle.fileno())
+            sources.append(staged_report)
+        try:
+            for source, target in zip(sources, destinations):
+                identity = source.stat()
+                os.link(source, target)
+                published.append((target, identity.st_dev, identity.st_ino))
+        except Exception:
+            for target, device, inode in reversed(published):
+                try:
+                    current = target.lstat()
+                    if (current.st_dev, current.st_ino) == (device, inode):
+                        target.unlink()
+                except FileNotFoundError:
+                    pass
+            raise
+    return audit

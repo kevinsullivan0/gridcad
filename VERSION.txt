@@ -1,2 +1,1 @@
-v0.2.0-rc.4
-Unsigned Windows desktop candidate. Native GrabCAD open/recompose/save and printing remain unverified.
+1.0.0

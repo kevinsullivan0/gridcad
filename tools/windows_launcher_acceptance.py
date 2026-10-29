@@ -67,8 +67,8 @@ def acceptance(args):
     with zipfile.ZipFile(args.zip) as z:z.extractall(out/'package with spaces')
     app=out/'package with spaces/GridCAD'
     root=Path(__file__).resolve().parents[1]
-    shutil.copy2(root/'Start GridCAD.bat',app/'Start GridCAD.bat')
-    shutil.copy2(root/'tools/source_launcher.py',app/'tools/source_launcher.py')
+    assert (app/'Start GridCAD.bat').read_bytes()==(root/'Start GridCAD.bat').read_bytes(), 'Packaged launcher missing or stale'
+    assert (app/'tools/source_launcher.py').read_bytes()==(root/'tools/source_launcher.py').read_bytes(), 'Packaged helper missing or stale'
     env=os.environ.copy();env['LOCALAPPDATA']=str(out/'local app data')
     state=Path(env['LOCALAPPDATA'])/'GridCAD/SourceLauncher'
     checks=[]

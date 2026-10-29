@@ -1,49 +1,46 @@
 # GridCAD
 
-**An offline Windows converter for rectangular, labeled material grids.** Select an Excel recipe rectangle, inspect its mapping onto the project's geometry, and save a separate `.PRINT` candidate with a preservation audit. No account, LLM, browser or network service is required at runtime.
+**Turn Excel recipes into material assignments in a GrabCAD PRINT project.** Open your workbook and project, match the cells to the samples, inspect the preview, and save a new `.PRINT` file with a name you choose. Your originals stay unchanged. No account or AI assistant is required.
 
 ## Download and start
 
-**[Download GridCAD 0.2.0-rc.7 for Windows x64](https://github.com/kevinsullivan0/gridcad/releases/download/v0.2.0-rc.7/GridCAD-Windows-x64-v0.2.0-rc.7.zip)** · [Release notes, checksums and test evidence](https://github.com/kevinsullivan0/gridcad/releases/tag/v0.2.0-rc.7)
+**[Download GridCAD 1.0 for Windows](https://github.com/kevinsullivan0/gridcad/releases/download/v1.0.0/GridCAD-Source-Windows-v1.0.0.zip)** · [All downloads and checksums](https://github.com/kevinsullivan0/gridcad/releases/tag/v1.0.0)
 
-1. Download the **Windows x64 ZIP**, not “Source code” or the portable-core ZIP.
-2. In File Explorer choose **Extract All…**. Open the extracted **GridCAD** folder and double-click **GridCAD.exe**. No installer, Python or terminal commands are needed.
-3. Keep the whole folder together, including `_internal` and `GridCAD-core.exe`; do not run from inside the ZIP or move the EXE out by itself.
-4. Try **Load example**, then **Build mapping preview**. The synthetic example is a software demonstration—**do not print it**.
-5. For your files, open the workbook and project; click, drag or Shift-click the recipe cells; choose sample/label groups and orientation. Inspect the mapping and actual physical labels, then save to a **new result folder**. Originals remain unchanged.
+1. Download the ZIP and choose **Extract All…** in File Explorer.
+2. Open the extracted **GridCAD** folder and double-click **Start GridCAD.bat**. Keep the whole folder together.
+3. On first use, follow the setup prompts. If needed, the launcher offers to install official Python for your Windows account and GridCAD's image library. Setup checks the downloads before using them. No administrator rights or security-setting changes are requested.
+4. Once setup finishes, the normal GridCAD window opens. Later launches reuse the setup and work offline. Keep the progress window open while using the app.
 
-**Unsigned release candidate:** follow your normal application-trust policy. Do not disable security protection, bypass malware/policy blocks or change administrator settings to run it. On a managed device, follow your administrator's policy. A checksum proves download consistency, not safety or publisher identity.
+An [offline EXE package](https://github.com/kevinsullivan0/gridcad/releases/download/v1.0.0/GridCAD-Windows-x64-v1.0.0.zip) is also available. It includes its own runtime, but the executable is unsigned and Windows may block it. The source launcher is an alternative way to run the same application, not a way to bypass an organization's security policy. [Setup and troubleshooting](https://github.com/kevinsullivan0/gridcad/blob/v1.0.0/docs/SOURCE_LAUNCHER.md).
 
-**Before printing:** native GrabCAD open/recompose/save and physical printing remain unverified. Every output retains `print_ready=false`; inspect and validate it in native GrabCAD first. GridCAD never submits printer jobs.
+## Convert a project
 
-## Supported workflow
+- Open your Excel `.xlsx` workbook and select the recipe cells.
+- Open the `.PRINT` project. Choose the sample and label groups, then match the worksheet directions to the preview.
+- Choose **Match cells to samples**. Click a sample to inspect its current material and requested recipe.
+- Choose **Save PRINT as…** and name the new file. A conversion report is optional; normal saves create only the PRINT file.
+- Open the result in GrabCAD and check its geometry, labels, recipes and printer settings before printing. GridCAD checks the file conversion, but does not certify native GrabCAD acceptance or submit print jobs.
 
-- **Windows x64 portable desktop.** Tested as an extracted package on GitHub-hosted Windows, including a 1024 × 768 desktop and the minimum window size—not every Windows version. No macOS/Linux GUI or ARM-native build is supplied.
-- **Excel `.xlsx` recipes:** explicit C / M / Y / K / W / T percentages totaling exactly 100. Formula results require recalculation/saving in Excel and explicit acknowledgment; missing results fail.
-- **Reviewed `.PRINT` source profile:** GrabCAD Print **1.117.12.3985**, internal schema **2170**. Matching a header is not enough: geometry, transforms, identities and materials must pass the documented checks. Other saved versions require a tested adapter, not edited headers or an override.
-- **Unambiguous rectangular layouts.** Individual samples may have different shapes or heights; triangular/hexagonal lattices, stacked 3D grids and unsupported transforms are not implemented.
-- **Existing supported material profiles only.** Preserve complete matching materials and identities; replacing conflicting label assignments requires explicit review. This is not universal CAD or arbitrary printer/material conversion.
+**Load example** lets you try the interface without your files. These are synthetic demonstration files, not a production print job.
 
-Preview work is bounded and may be sampled; its notice explains reduced detail. Exact conversion does not use the sampled display. Resource limits and unsupported inputs are refused rather than silently truncated or repaired.
+## What it supports
 
-[Supported schema](https://github.com/kevinsullivan0/gridcad/blob/v0.2.0-rc.7/docs/RECTANGULAR_SCHEMA.md) · [User manual](https://github.com/kevinsullivan0/gridcad/blob/v0.2.0-rc.7/docs/DESKTOP_MANUAL.md)
+- Windows x64. The source launcher uses official Python 3.13 with Tk; the downloadable EXE package includes its runtime.
+- Rectangular grids with distinguishable samples, including mixed shapes and heights. Irregular, triangular, hexagonal and stacked 3D layouts need other adapters.
+- Six-channel C/M/Y/K/W/T worksheet recipes totaling exactly 100%. Formula cells need current results saved by Excel.
+- The reviewed GrabCAD Print 1.117.12.3985 storage profile, schema 2170, with validated geometry, identities and materials. A matching version header alone is not sufficient.
+- Supported EcoFlex sample recipes and complete compatible label-material assignments already present in the project.
 
-## Verify and get help
+Unsupported inputs are explained rather than silently changed. Large previews may omit display detail; the saved geometry is not simplified. [User guide](https://github.com/kevinsullivan0/gridcad/blob/v1.0.0/docs/DESKTOP_MANUAL.md) · [Supported files and limits](https://github.com/kevinsullivan0/gridcad/blob/v1.0.0/docs/RECTANGULAR_SCHEMA.md).
 
-Compare the download's SHA256 with the exact filename in [SHA256SUMS.txt](https://github.com/kevinsullivan0/gridcad/releases/download/v0.2.0-rc.7/SHA256SUMS.txt). On Windows, an optional check is:
+## Help, updates and verification
 
-```powershell
-Get-FileHash ".\GridCAD-Windows-x64-v0.2.0-rc.7.zip" -Algorithm SHA256
-```
+The app's **Help** tab includes the offline guide, version, licenses, and links to this repository and releases. Updates are manual. Errors explain what happened and what to try next; optional local diagnostic reports can help a developer or your agent investigate. Nothing is uploaded automatically.
 
-**Help** opens the offline guide. Errors offer manual remedies and optional local diagnostics. Optional agent tools do not launch an agent, connect an account or upload files; sharing a report or local path remains your choice. [Agent download/checksum guide](https://github.com/kevinsullivan0/gridcad/blob/v0.2.0-rc.7/docs/AGENT_INSTALL.md).
+Compare a download's SHA256 with its exact filename in [SHA256SUMS.txt](https://github.com/kevinsullivan0/gridcad/releases/download/v1.0.0/SHA256SUMS.txt). A matching checksum confirms download consistency, not publisher identity or safety. If you prefer your agent to download and verify it, point it to [the installation guide for agents](https://github.com/kevinsullivan0/gridcad/blob/v1.0.0/docs/AGENT_INSTALL.md).
 
-The release includes [Windows GUI evidence](https://github.com/kevinsullivan0/gridcad/releases/download/v0.2.0-rc.7/GridCAD-Windows-GUI-evidence.zip). Testing covers conversion preservation, real mouse selection, responsive activity feedback and guarded saving; it is not native printer certification. Security review coverage is partial, not a clean security certification; see release notes.
+## Advanced toolkit
 
-## Source and advanced use
+The release includes the deterministic Python core, command-line tools, examples, schema and agent instructions. The ordinary GUI needs no agent. An agent can use the toolkit for more specialized work, but new geometries or material profiles require their own validation rather than assuming the GUI already supports them. [Developer guide](https://github.com/kevinsullivan0/gridcad/blob/v1.0.0/docs/DESKTOP_API.md) · [Contributor contract](https://github.com/kevinsullivan0/gridcad/blob/v1.0.0/AGENTS.md) · [Exact release source](https://github.com/kevinsullivan0/gridcad/tree/v1.0.0).
 
-[Exact release source](https://github.com/kevinsullivan0/gridcad/tree/v0.2.0-rc.7) · [API / CLI](https://github.com/kevinsullivan0/gridcad/blob/v0.2.0-rc.7/docs/DESKTOP_API.md) · [Portable Python core](https://github.com/kevinsullivan0/gridcad/releases/download/v0.2.0-rc.7/GridCAD-portable-core-v0.2.0-rc.7.zip) · [Contributor instructions](https://github.com/kevinsullivan0/gridcad/blob/v0.2.0-rc.7/AGENTS.md)
-
-The desktop implementation is at the release tag. The default branch retains the earlier browser implementation; updating this README does not merge the desktop branch. Earlier releases remain available.
-
-Original GridCAD code: [MIT License](LICENSE), copyright 2026 Kevin Sullivan. Bundled third-party runtime components retain their own licenses and notices. Private inputs and vendor software are not bundled.
+GridCAD's original code is MIT licensed, copyright 2026 Kevin Sullivan. Dependencies retain their own licenses. Private inputs and vendor software are not bundled.

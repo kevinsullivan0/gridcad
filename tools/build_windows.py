@@ -9,7 +9,7 @@ import sys
 import zipfile
 
 ROOT=Path(__file__).resolve().parents[1]
-VERSION='0.2.0-rc.7'
+VERSION='1.0.0'
 
 
 def digest(path):return hashlib.sha256(path.read_bytes()).hexdigest()
@@ -19,6 +19,23 @@ def zip_folder(folder,destination):
     with zipfile.ZipFile(destination,'w',zipfile.ZIP_DEFLATED,compresslevel=9) as z:
         for path in sorted(folder.rglob('*')):
             if path.is_file():z.write(path,Path(folder.name)/path.relative_to(folder))
+
+
+def package_source(root, destination):
+    """Build a complete launcher distribution from explicit public sources."""
+    root=Path(root);destination=Path(destination)
+    destination.parent.mkdir(parents=True,exist_ok=True)
+    files=[root/name for name in ('Start GridCAD.bat','gridcad_desktop.py',
+        'desktop_core.py','desktop_cli.py','diagnostics.py','agent_help.py',
+        'README.md','AGENTS.md','LICENSE','VERSION.txt','tools/source_launcher.py')]
+    for directory in ('resources','docs','operator','examples/rectangular','examples/pyramid','examples/mixed'):
+        files.extend(p for p in (root/directory).rglob('*') if p.is_file()
+                     and '__pycache__' not in p.parts and p.suffix not in ('.pyc','.pyo'))
+    with zipfile.ZipFile(destination,'w',zipfile.ZIP_DEFLATED,compresslevel=9) as archive:
+        for path in sorted(set(files)):
+            if path.is_symlink():raise RuntimeError('Source package cannot contain symlinks: '+str(path))
+            archive.write(path,Path('GridCAD')/path.relative_to(root))
+    return destination
 
 
 def main():
@@ -34,7 +51,7 @@ def main():
         raise RuntimeError('Unused AVIF codec unexpectedly bundled; review the exclusion before release.')
     for source in ['resources','docs','examples/rectangular','examples/pyramid','examples/mixed','operator']:
         shutil.copytree(ROOT/source,folder/source,dirs_exist_ok=True,ignore=shutil.ignore_patterns('__pycache__','*.pyc'))
-    for name in ['README.md','AGENTS.md','LICENSE','desktop_core.py','desktop_cli.py','diagnostics.py','gridcad_desktop.py','agent_help.py']:
+    for name in ['Start GridCAD.bat','VERSION.txt','README.md','AGENTS.md','LICENSE','desktop_core.py','desktop_cli.py','diagnostics.py','gridcad_desktop.py','agent_help.py']:
         shutil.copy2(ROOT/name,folder/name)
     shutil.copytree(ROOT/'tools',folder/'tools',ignore=shutil.ignore_patterns('__pycache__','*.pyc'))
     notices=folder/'THIRD_PARTY_NOTICES';notices.mkdir(exist_ok=True)
@@ -73,6 +90,7 @@ def main():
     (portable/'tools').mkdir(exist_ok=True)
     shutil.copy2(ROOT/'tools/make_desktop_examples.py',portable/'tools/make_desktop_examples.py')
     zip_folder(portable,ROOT/f'dist/GridCAD-portable-core-v{VERSION}.zip')
+    package_source(ROOT,ROOT/f'dist/GridCAD-Source-Windows-v{VERSION}.zip')
     sums=''.join(digest(p)+'  '+p.name+'\n' for p in sorted((ROOT/'dist').glob('*.zip')))
     (ROOT/'dist/SHA256SUMS.txt').write_text(sums,encoding='utf-8')
     print(sums)

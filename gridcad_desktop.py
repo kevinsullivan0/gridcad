@@ -102,7 +102,7 @@ def help_lines(text):
 
 
 PROMPT = '''Use the installed GridCAD source folder (beside GridCAD.exe), or the exact release source:
-https://github.com/kevinsullivan0/gridcad/tree/v0.2.0-rc.7
+https://github.com/kevinsullivan0/gridcad/tree/v1.0.0
 Do not assume the repository default branch matches this installed release.
 Read AGENTS.md, docs/DESKTOP_API.md, docs/RECTANGULAR_SCHEMA.md, and operator/README.md first.
 Use the portable deterministic core. Keep my original files untouched and all private
@@ -226,11 +226,12 @@ class App:
         self.black_label_choice = material_display_name(core.op.EcoFlexMaterialProvider().direct_black()) + ' — labels'
         self.label_mode=tk.StringVar(value="Direct black");self.label_reference=tk.StringVar()
         self.replace_labels=tk.BooleanVar()
+        self.include_report=tk.BooleanVar(value=False)
         self.reviewed = tk.BooleanVar(); self.material_ack = tk.BooleanVar()
         self.detail = tk.StringVar(value='Select a worksheet cell or mapped sample to inspect exact values.')
         self.summary = tk.StringVar(value='No mapping preview yet.')
         self.preview_notice = tk.StringVar(value='')
-        self.root.title('GridCAD 0.2 — Rectangular material converter')
+        self.root.title('GridCAD 1.0 — Rectangular material converter')
         if sys.platform=='win32' and resource('resources/gridcad.ico').exists():
             self.root.iconbitmap(str(resource('resources/gridcad.ico')))
         self.root.geometry('1220x820'); self.root.minsize(960, 680)
@@ -311,7 +312,7 @@ class App:
         ttk.Label(footer, textvariable=self.status, wraplength=740).pack(side='left', fill='x', expand=True)
         self.progress = ttk.Progressbar(activity_row, mode='indeterminate', length=180)
         activity_row.configure(height=max(self.activity_label.winfo_reqheight(),self.progress.winfo_reqheight())+6)
-        self.save_button = self.button(footer, 'Save separate result…', self.save, 'save', state='disabled')
+        self.save_button = self.button(footer, 'Save PRINT…', self.save, 'save', state='disabled')
         self.save_button.pack(side='right', padx=(12,0))
 
     def build_workbook(self):
@@ -410,6 +411,7 @@ class App:
         self.remember('replace_labels',ttk.Checkbutton(configuration,text='Review replacements for existing label materials…',variable=self.replace_labels,command=self.review_label_replacements)).grid(row=2,column=0,sticky='w')
         ttk.Label(configuration, textvariable=self.summary, wraplength=345).grid(row=3,column=0,sticky='ew')
         ttk.Label(configuration, textvariable=self.preview_notice, wraplength=345).grid(row=4,column=0,sticky='ew')
+        self.remember('include_report',ttk.Checkbutton(configuration,text='Save a conversion report alongside the PRINT',variable=self.include_report)).grid(row=5,column=0,sticky='w')
         view=ttk.Frame(panes);view.grid(row=0,column=1,sticky='nsew')
         view.columnconfigure(0,weight=1);view.rowconfigure(1,weight=1)
         zoomrow=ttk.Frame(view);zoomrow.grid(row=0,column=0,sticky='ew',pady=3)
@@ -554,7 +556,7 @@ class App:
                            'Releases: https://github.com/kevinsullivan0/gridcad/releases\n'
                            'Links open your browser only when clicked. No automatic update checks or downloads.\n\n'
                            'Exact installed source: '+diagnostics.SOURCE_URL+'\n\n'
-                           'Unsigned release candidate. Results have not been tested by opening, recomposing and saving them in GrabCAD, or by printing them. Your originals stay unchanged.\n\n'
+                           'Unsigned application. Results have not been tested by opening, recomposing and saving them in GrabCAD, or by printing them. Your originals stay unchanged.\n\n'
                            'Original GridCAD code: MIT License, copyright 2026 Kevin Sullivan. Read LICENSE beside the application. Third-party runtime licenses remain separate; use the Third-party licenses button to read the bundled notices.')
 
         for tag,url in (
@@ -1311,14 +1313,16 @@ class App:
     def save(self):
         self.update_save()
         if str(self.save_button['state'])=='disabled':return
-        out=filedialog.asksaveasfilename(parent=self.root,title='Name a NEW result folder (contains PRINT and audit)',initialfile='GridCAD-result',filetypes=[('New result folder','*')],confirmoverwrite=True)
+        out=filedialog.asksaveasfilename(parent=self.root,title='Save PRINT as',initialfile=Path(self.project_path).stem+'-materials.PRINT',defaultextension='.PRINT',filetypes=[('PRINT project','*.PRINT')],confirmoverwrite=True)
         if not out:return
         proposal=self.proposal
+        include_report=self.include_report.get()
         project_path,workbook_path=self.project_path,self.workbook_path
         def done(audit):
+            self.last_save_audit=audit
             self.status.set(f"Saved {audit['changed_count']} material changes. Original geometry and files were preserved. Result: {out}")
-            self.root.after_idle(lambda:messagebox.showinfo('GridCAD — separate result saved',f"{out}\ncandidate_UNVERIFIED.PRINT\n\nThe saved recipes and original geometry passed the file checks. Open and check the result in GrabCAD before printing.",parent=self.root))
-        self.run('Saving a separate result and checking the output…',lambda:core.save_candidate(project_path,workbook_path,proposal,out),done)
+            self.root.after_idle(lambda:messagebox.showinfo('GridCAD — separate result saved',f"{out}\n\nThe saved recipes and original geometry passed the file checks. Open and check the result in GrabCAD before printing.",parent=self.root))
+        self.run('Saving a separate result and checking the output…',lambda:core.save_print(project_path,workbook_path,proposal,out,include_report=include_report),done)
 
     def callback_error(self,exc_type,exc,traceback):
         self.errors.append(str(exc));self.show_error(exc)
@@ -1406,7 +1410,7 @@ class App:
     def write_qa_state(self):
         focused=self.root.focus_get()
         focused_control=next((key for key,widget in self.controls.items() if widget==focused),None)
-        state={'last_geometry_click':getattr(self,'last_geometry_click',None),'selected_sample':getattr(self,'inspected_oid',None),'tab_positions':self.tab_qa_positions(),'geometry_samples':self.geometry_qa_samples(),'focused_control':focused_control,'app_version':diagnostics.VERSION,'about_links':self.about_link_qa_points(),'status':self.status.get(),'summary':self.summary.get(),'detail':self.detail.get(),'errors':self.errors,
+        state={'last_save_audit':getattr(self,'last_save_audit',None),'last_geometry_click':getattr(self,'last_geometry_click',None),'selected_sample':getattr(self,'inspected_oid',None),'tab_positions':self.tab_qa_positions(),'geometry_samples':self.geometry_qa_samples(),'focused_control':focused_control,'app_version':diagnostics.VERSION,'about_links':self.about_link_qa_points(),'status':self.status.get(),'summary':self.summary.get(),'detail':self.detail.get(),'errors':self.errors,
                'busy':self.future is not None or self.geometry_busy(),
                'activity':self.activity.get(),'progress_visible':bool(self.progress.winfo_ismapped()),'workbook':str(self.workbook_path) if self.workbook_path else None,
                'project':str(self.project_path) if self.project_path else None,

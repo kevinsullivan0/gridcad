@@ -398,13 +398,15 @@ def main():
         click('save');time.sleep(.5);keyboard.send_keys('{ESC}');time.sleep(.4)
         assert state()['save_enabled'] and state()['proposal']
         checks.append('Canceling the save dialog keeps the valid mapping ready')
-        result=out/'new result bundle';click('save');dialog_path(result)
-        wait(lambda s:(result/'audit.json').is_file() and not s.get('busy'),'Native save dialog writes a new separate result folder')
+        export_folder=out/'export';export_folder.mkdir()
+        result=export_folder/'My materials.PRINT';click('save');dialog_path(result)
+        wait(lambda s:result.is_file() and not s.get('busy'),'Native save dialog writes the chosen PRINT filename')
         screenshot('07-saved.png');dismiss()
-        audit=json.loads((result/'audit.json').read_text());assert audit['changed_count']==24 and audit['nonmaterial_preservation_passed'] and not audit['print_ready']
+        assert sorted(p.name for p in export_folder.iterdir())==['My materials.PRINT']
+        audit=state()['last_save_audit'];assert audit['changed_count']==24 and audit['nonmaterial_preservation_passed'] and not audit['print_ready']
         assert audit['physical_mapping_reviewed'] is False
         checks.append('Saved audit truthfully records no physical-review attestation')
-        doc=core.op.project_document(result/'candidate_UNVERIFIED.PRINT');nodes,_,bodies=core.op.index(doc)
+        doc=core.op.project_document(result);nodes,_,bodies=core.op.index(doc)
         for r in range(4):
             for c in range(6):
                 oid=f'synthetic-sample-{r+1}-{c+1}';cyan=(r*7+c*3)%51;clear=(c*5)%31
@@ -444,9 +446,9 @@ def main():
         assert 'build a new mapping' not in state()['detail']
         assert 'Not mapped' not in state()['detail']
         screenshot('10-reference-ready.png')
-        destination=out/'reference copied result';click('save');dialog_path(destination)
-        wait(lambda s:(destination/'audit.json').is_file() and not s.get('busy'),'Native UI saves explicit reference material copy');dismiss()
-        original=core.op.project_document(fixture/'DO_NOT_PRINT.PRINT');saved=core.op.project_document(destination/'candidate_UNVERIFIED.PRINT')
+        destination=out/'Reference copied.PRINT';click('save');dialog_path(destination)
+        wait(lambda s:destination.is_file() and not s.get('busy'),'Native UI saves explicit reference material copy');dismiss()
+        original=core.op.project_document(fixture/'DO_NOT_PRINT.PRINT');saved=core.op.project_document(destination)
         oldnodes,_,oldbodies=core.op.index(original);newnodes,_,newbodies=core.op.index(saved)
         reference=oldnodes[REFERENCE_ID]['material']
         for oid in core.load_project(fixture/'DO_NOT_PRINT.PRINT')['containers']['synthetic-labels']['leaves']:
@@ -506,7 +508,7 @@ def main():
         converted=subprocess.run(conversion,cwd=out,env=packaged_environment,capture_output=True,text=True,check=True,timeout=60)
         cli_audit=json.loads(converted.stdout)
         assert cli_audit['changed_count']==24 and cli_audit['nonmaterial_preservation_passed'] and not cli_audit['print_ready']
-        assert core.op.project_document(cli_output/'candidate_UNVERIFIED.PRINT')==core.op.project_document(result/'candidate_UNVERIFIED.PRINT')
+        assert core.op.project_document(cli_output/'candidate_UNVERIFIED.PRINT')==core.op.project_document(result)
         assert inspect_cli()==initial_cli
         checks.append('Frozen CLI conversion preserves exact GUI candidate content and originals while GUI remains open')
         def ps_quote(value):return "'"+str(value).replace("'","''")+"'"

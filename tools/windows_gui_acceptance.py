@@ -180,7 +180,18 @@ def main():
     def enter(key,text):
         click(key);keyboard.send_keys('^a');keyboard.send_keys(str(text),with_spaces=True,vk_packet=True);time.sleep(.2)
     def dialog_path(path):
-        time.sleep(.7);keyboard.send_keys('%n');keyboard.send_keys('^a');keyboard.send_keys(str(path),with_spaces=True,vk_packet=True);keyboard.send_keys('{ENTER}');time.sleep(.5)
+        # Long native-dialog paths can lose the first VK_PACKET keystroke on
+        # the hosted Windows desktop. Paste one complete Unicode string via
+        # the real clipboard and keyboard, rather than racing character input.
+        import win32clipboard
+        time.sleep(.7);keyboard.send_keys('%n');keyboard.send_keys('^a')
+        win32clipboard.OpenClipboard()
+        try:
+            win32clipboard.EmptyClipboard()
+            win32clipboard.SetClipboardText(str(path))
+        finally:win32clipboard.CloseClipboard()
+        keyboard.send_keys('^v');time.sleep(.3)
+        keyboard.send_keys('{ENTER}');time.sleep(.5)
     def dismiss():
         time.sleep(.3)
         if 'diagnostic_close' in state().get('controls',{}):
@@ -376,6 +387,11 @@ def main():
         time.sleep(1)
         wait(lambda s:not s.get('busy'),'Minimum-window geometry repaint completes')
         check_tab_bounds(['geometry'],{'geometry':(300,100)})
+        controls=state()['controls']
+        report_control=controls['include_report'];save_control=controls['save']
+        assert abs(report_control['y']-save_control['y'])<12
+        assert report_control['x']+report_control['w']<=save_control['x']
+        checks.append('Optional conversion report is visible beside Save at the minimum window size')
         screenshot('05a-minimum-geometry.png')
         select_tab('worktab')
         check_tab_bounds(['worksheet','cache','next_rows','jump','go'],{'worksheet':(400,100)})

@@ -2,9 +2,11 @@
 
 Named single-file PRINT exports, optional conversion reports, and a complete Windows source-launcher package. The advanced evidence-bundle interface remains available. Original files, identities, geometry and material validation retain the same protections. Native GrabCAD/printer acceptance remains a separate check; a stable app version does not certify a print job.
 
+The source launcher shows setup progress and asks before installing its image library, then reuses a healthy installation without downloading or prompting again. Export diagnostics distinguish a filename collision from a mapping problem. An optional-report failure preserves the completed PRINT, and final output checks bind it to the validated conversion digest. Windows test discovery now fails directly rather than masking an earlier failed test command.
+
 ## Earlier release notes
 
-# GridCAD 1.0.0 usability candidate
+### GridCAD 0.2.0-rc.7 usability candidate
 
 The desktop preview lets you inspect samples before matching worksheet cells, including after an incomplete selection. Two controls choose the first cell corner and the direction of the next row. A valid mapping can be saved without review checkboxes or notes; the output records that physical label review has not been confirmed.
 

@@ -21,7 +21,7 @@ Choose **Load example**, then **Match cells to samples**. The example contains 2
 5. **Match cells to samples** (`Ctrl+Enter`). The worksheet must contain one recipe for each sample. Click a sample to see its current material and, when mapped, its requested worksheet recipe. The **Cell assignments** tab lists every cell and target sample. Changing an input clears the old mapping so it cannot be saved by mistake.
 6. **Save PRINT** (`Ctrl+S`). Choose a new `.PRINT` filename. GridCAD checks the recipes, source files, material assignments and preserved project data before writing.
 
-A normal save creates only the PRINT file you named. Select **Save a conversion report alongside the PRINT** if you also want a JSON record of the checks and remaining validation limits. Existing files are never overwritten. Naming a file does not validate it in GrabCAD: the native checks below still apply.
+A normal save creates only the PRINT file you named. Select **Include conversion report** beside Save if you also want a JSON record of the checks and remaining validation limits. Existing files are never overwritten. If only the optional report cannot be saved, GridCAD keeps the completed PRINT and tells you the report was not saved. Naming a file does not validate it in GrabCAD: the native checks below still apply.
 
 ## Understand the preview
 

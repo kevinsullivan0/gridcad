@@ -35,7 +35,7 @@ class LauncherTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             base=Path(td)
             with patch.object(m,'create_environment',side_effect=RuntimeError('offline')):
-                with self.assertRaisesRegex(RuntimeError,'offline'):m.ensure_environment(base)
+                with self.assertRaisesRegex(RuntimeError,'offline'):m.ensure_environment(base, setup_approved=True)
             self.assertFalse((base/'ready.json').exists())
 
     def test_incomplete_environment_is_preserved_and_rebuilt(self):
@@ -44,7 +44,7 @@ class LauncherTests(unittest.TestCase):
             base=Path(td);env=base/'runtime';env.mkdir();(env/'partial').write_text('keep')
             def create(path):path.mkdir();(path/'new').write_text('new')
             with patch.object(m,'create_environment',side_effect=create),patch.object(m,'probe_environment',return_value=True):
-                result=m.ensure_environment(base)
+                result=m.ensure_environment(base, setup_approved=True)
             self.assertTrue((result/'new').exists())
             self.assertEqual(len(list(base.glob('incomplete-*/partial'))),1)
             self.assertEqual((base/'ready.json').read_text(),m.ready_record())
@@ -54,7 +54,7 @@ class LauncherTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             base=Path(td)
             with patch.object(m,'create_environment',side_effect=lambda p:p.mkdir()),patch.object(m,'probe_environment',return_value=False):
-                with self.assertRaisesRegex(RuntimeError,'verify'):m.ensure_environment(base)
+                with self.assertRaisesRegex(RuntimeError,'verify'):m.ensure_environment(base, setup_approved=True)
             self.assertFalse((base/'ready.json').exists())
 
     def test_probe_requires_a_working_tk_window(self):

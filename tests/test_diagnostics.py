@@ -49,4 +49,17 @@ class DiagnosticsTests(unittest.TestCase):
         y=d.describe(ValueError('Unknown version'))
         self.assertIn('do not edit version',y.remedy)
 
+    def test_existing_print_filename_has_direct_save_recovery(self):
+        info=d.describe(ValueError('A file already exists at C:/output/My materials.PRINT. Choose another name; existing files are never replaced.'))
+        self.assertEqual(info.code,'GCD401')
+        self.assertIn('filename',info.title.lower())
+        self.assertIn('another name',info.remedy.lower())
+        self.assertNotIn('mapping',info.remedy.lower())
+
+    def test_invalid_print_filename_explains_save_as(self):
+        info=d.describe(ValueError('Choose a valid Windows filename ending in .PRINT.'))
+        self.assertEqual(info.code,'GCD404')
+        self.assertIn('save',info.remedy.lower())
+        self.assertIn('.PRINT',info.remedy)
+
 if __name__=='__main__':unittest.main()

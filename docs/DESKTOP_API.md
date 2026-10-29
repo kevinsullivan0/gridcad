@@ -54,6 +54,8 @@ These are separate shell alternatives, not commands to paste together. Native Gr
 
 The desktop app saves a separate result after the mapping and material checks pass. It does not require review checkboxes or notes. `core.save_candidate(...)` uses the same writer checks and records `physical_mapping_reviewed=false`; the saved file still needs checking in GrabCAD before printing. This is separate from the explicitly reviewed CLI/Python route below, whose review arguments retain their existing meaning.
 
+`core.save_print(project_path, workbook_path, proposal, output_path, include_report=False)` is the named desktop-output API. It runs the existing writer and preservation checks, then creates only the chosen `.PRINT` file. Set `include_report=True` to request a neighboring `<name>.gridcad-report.json`. Existing files are refused. A failed optional report does not delete the completed valid PRINT: the returned audit includes `report_warning` and omits `report_path`. The GUI displays that warning. The advanced `save_candidate` and reviewed `save` APIs still produce their complete evidence bundles.
+
 ## Python API
 
 ```python

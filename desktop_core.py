@@ -576,6 +576,7 @@ def save_print(project_path, workbook_path, proposal, output_path, include_repor
 
     The advanced evidence bundle is kept private in a temporary directory. No
     existing destination is replaced, including files created during validation.
+    A failed optional report never deletes an already completed PRINT.
     """
     import json
     output = Path(output_path)
@@ -588,38 +589,51 @@ def save_print(project_path, workbook_path, proposal, output_path, include_repor
         op.fail('Choose a valid Windows filename ending in .PRINT.')
     if not output.parent.is_dir():
         op.fail('Choose an existing folder for the saved PRINT file.')
+    parent_identity = output.parent.stat()
+    def check_folder():
+        try:
+            current = output.parent.stat()
+        except OSError:
+            current = None
+        if current is None or (current.st_dev, current.st_ino) != (parent_identity.st_dev, parent_identity.st_ino):
+            op.fail('The destination folder changed during saving. Choose the folder again and use another name.')
     report = output.with_name(output.stem + '.gridcad-report.json')
     destinations = [output] + ([report] if include_report else [])
     for target in destinations:
         if target.exists() or target.is_symlink():
             op.fail(f'A file already exists at {target}. Choose another name; existing files are never replaced.')
-    published = []
     with tempfile.TemporaryDirectory(prefix='.gridcad-save-', dir=output.parent) as temp:
         stage = Path(temp)
         audit = save_candidate(project_path, workbook_path, proposal, stage / 'validated')
+        check_folder()
         audit = dict(audit, output_path=str(output))
         if include_report:
             audit['report_path'] = str(report)
         candidate = stage / 'validated' / 'candidate_UNVERIFIED.PRINT'
-        sources = [candidate]
+        if candidate.is_symlink() or op.digest(candidate) != audit['output_sha256']:
+            op.fail('The validated result changed before saving. No PRINT was published; try again in a private local folder.')
         if include_report:
             staged_report = stage / 'report.json'
             with staged_report.open('x', encoding='utf-8') as handle:
                 json.dump(audit, handle, indent=2, sort_keys=True)
                 handle.write('\n'); handle.flush(); os.fsync(handle.fileno())
-            sources.append(staged_report)
-        try:
-            for source, target in zip(sources, destinations):
-                identity = source.stat()
-                os.link(source, target)
-                published.append((target, identity.st_dev, identity.st_ino))
-        except Exception:
-            for target, device, inode in reversed(published):
-                try:
-                    current = target.lstat()
-                    if (current.st_dev, current.st_ino) == (device, inode):
-                        target.unlink()
-                except FileNotFoundError:
-                    pass
-            raise
+        check_folder()
+        identity = candidate.stat()
+        os.link(candidate, output)
+        check_folder()
+        current = output.lstat()
+        if ((current.st_dev, current.st_ino) != (identity.st_dev, identity.st_ino)
+                or not stat.S_ISREG(current.st_mode)
+                or op.digest(output) != audit['output_sha256']):
+            op.fail('The saved result did not pass its final preservation check. Do not use this file; choose another name in a private local folder.')
+        if include_report:
+            try:
+                os.link(staged_report, report)
+                check_folder()
+            except OSError:
+                # Never roll back by deleting a pathname another process may
+                # have replaced. The completed PRINT remains independently
+                # validated; an optional report is not part of that validity.
+                audit.pop('report_path', None)
+                audit['report_warning'] = 'The PRINT was saved, but its optional report could not be saved. No existing file was replaced.'
     return audit

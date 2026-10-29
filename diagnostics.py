@@ -53,7 +53,15 @@ def describe(exc, context=None):
     if 'reference' in low and c.get('reference_body'):where+=' → '+str(c['reference_body'])
     code,title,help='GCD900','This operation could not be completed.','Check the selected files and settings, then try again. If the problem continues, copy the debugging prompt to ask for help.'
     expected=actual=''
-    if isinstance(exc,PermissionError):code,title,help='GCD002','GridCAD cannot access this location.','Choose a folder you can write to, or close the file in the application holding it. Do not change security protections.'
+    if isinstance(exc,FileExistsError) or 'a file already exists at ' in low:
+        code,title,help='GCD401','That filename is already in use.','Choose another name in Save PRINT. Existing files are never replaced; your selections are still ready.'
+    elif 'valid windows filename ending in .print' in low:
+        code,title,help='GCD404','This filename cannot be saved on Windows.','Use Save PRINT to choose another filename ending in .PRINT. Avoid Windows reserved names and characters such as < > : " / \\ | ? *.'
+    elif 'destination folder changed during saving' in low:
+        code,title,help='GCD405','The destination folder changed while saving.','Choose the existing folder again and save under another name. Do not move or replace that folder while GridCAD is saving.'
+    elif 'validated result changed' in low or 'saved result did not pass its final preservation check' in low:
+        code,title,help='GCD403','The result changed during saving.','Do not use the affected result. Save again under another name in a private local folder; keep the folder and files unchanged until saving finishes.'
+    elif isinstance(exc,PermissionError):code,title,help='GCD002','GridCAD cannot access this location.','Choose a folder you can write to, or close the file in the application holding it. Do not change security protections.'
     elif isinstance(exc,FileNotFoundError):code,title,help='GCD001','A selected file or folder is no longer available.','Choose the existing input again, or choose an existing parent folder for the new result.'
     elif raw in RESOURCE_DESCRIPTIONS:
         code,title,help='GCD206','This file is too large or complex to open safely.','Keep the original and export a smaller project or a values-only workbook with just the sheets you need. See Help → Supported files for the limits.'

@@ -309,11 +309,13 @@ class App:
         self.activity_label = ttk.Label(activity_row, textvariable=self.activity)
         self.activity_label.grid(row=0,column=0,sticky='ew')
         footer = ttk.Frame(body); footer.grid(row=4, column=0, sticky='ew', pady=(4,0))
-        ttk.Label(footer, textvariable=self.status, wraplength=740).pack(side='left', fill='x', expand=True)
+        footer.columnconfigure(0,weight=1)
+        ttk.Label(footer, textvariable=self.status, wraplength=600).grid(row=0,column=0,sticky='ew')
         self.progress = ttk.Progressbar(activity_row, mode='indeterminate', length=180)
         activity_row.configure(height=max(self.activity_label.winfo_reqheight(),self.progress.winfo_reqheight())+6)
         self.save_button = self.button(footer, 'Save PRINT…', self.save, 'save', state='disabled')
-        self.save_button.pack(side='right', padx=(12,0))
+        self.remember('include_report',ttk.Checkbutton(footer,text='Include conversion report',variable=self.include_report)).grid(row=0,column=1,padx=(8,0))
+        self.save_button.grid(row=0,column=2,padx=(12,0))
 
     def build_workbook(self):
         # Only the sheet viewport shrinks; navigation and cache consent keep
@@ -411,7 +413,6 @@ class App:
         self.remember('replace_labels',ttk.Checkbutton(configuration,text='Review replacements for existing label materials…',variable=self.replace_labels,command=self.review_label_replacements)).grid(row=2,column=0,sticky='w')
         ttk.Label(configuration, textvariable=self.summary, wraplength=345).grid(row=3,column=0,sticky='ew')
         ttk.Label(configuration, textvariable=self.preview_notice, wraplength=345).grid(row=4,column=0,sticky='ew')
-        self.remember('include_report',ttk.Checkbutton(configuration,text='Save a conversion report alongside the PRINT',variable=self.include_report)).grid(row=5,column=0,sticky='w')
         view=ttk.Frame(panes);view.grid(row=0,column=1,sticky='nsew')
         view.columnconfigure(0,weight=1);view.rowconfigure(1,weight=1)
         zoomrow=ttk.Frame(view);zoomrow.grid(row=0,column=0,sticky='ew',pady=3)
@@ -1313,7 +1314,7 @@ class App:
     def save(self):
         self.update_save()
         if str(self.save_button['state'])=='disabled':return
-        out=filedialog.asksaveasfilename(parent=self.root,title='Save PRINT as',initialfile=Path(self.project_path).stem+'-materials.PRINT',defaultextension='.PRINT',filetypes=[('PRINT project','*.PRINT')],confirmoverwrite=True)
+        out=filedialog.asksaveasfilename(parent=self.root,title='Save PRINT as',initialfile=Path(self.project_path).stem+'-materials.PRINT',defaultextension='.PRINT',filetypes=[('PRINT project','*.PRINT')],confirmoverwrite=False)
         if not out:return
         proposal=self.proposal
         include_report=self.include_report.get()
@@ -1321,7 +1322,9 @@ class App:
         def done(audit):
             self.last_save_audit=audit
             self.status.set(f"Saved {audit['changed_count']} material changes. Original geometry and files were preserved. Result: {out}")
-            self.root.after_idle(lambda:messagebox.showinfo('GridCAD — separate result saved',f"{out}\n\nThe saved recipes and original geometry passed the file checks. Open and check the result in GrabCAD before printing.",parent=self.root))
+            notice=f"{out}\n\nThe saved recipes and original geometry passed the file checks. Open and check the result in GrabCAD before printing."
+            if audit.get('report_warning'):notice+='\n\n'+audit['report_warning']
+            self.root.after_idle(lambda:messagebox.showinfo('GridCAD — separate result saved',notice,parent=self.root))
         self.run('Saving a separate result and checking the output…',lambda:core.save_print(project_path,workbook_path,proposal,out,include_report=include_report),done)
 
     def callback_error(self,exc_type,exc,traceback):

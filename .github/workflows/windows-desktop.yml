@@ -45,7 +45,7 @@ jobs:
       - name: Build offline Windows portable distribution
         run: python tools/build_windows.py
       - name: Source launcher first-run, repeat and recovery acceptance
-        run: python tools/windows_launcher_acceptance.py --zip dist/GridCAD-Windows-x64-v0.2.0-rc.7.zip --out launcher-qa
+        run: python tools/windows_launcher_acceptance.py --zip dist/GridCAD-Windows-x64-v0.2.0-rc.7.zip --out launcher-qa --install-fixture
       - name: Real extracted-package Windows GUI acceptance
         run: python tools/windows_gui_acceptance.py --zip dist/GridCAD-Windows-x64-v0.2.0-rc.7.zip --out desktop-qa
       - name: Package source launcher add-on

@@ -44,17 +44,18 @@ jobs:
         run: python -m unittest discover -s tests -p "test_*launcher*.py" -v
       - name: Build offline Windows portable distribution
         run: python tools/build_windows.py
-      - name: Real extracted-package Windows GUI acceptance
-        run: python tools/windows_gui_acceptance.py --zip dist/GridCAD-Windows-x64-v0.2.0-rc.7.zip --out desktop-qa
       - name: Source launcher first-run, repeat and recovery acceptance
         run: python tools/windows_launcher_acceptance.py --zip dist/GridCAD-Windows-x64-v0.2.0-rc.7.zip --out launcher-qa
+      - name: Real extracted-package Windows GUI acceptance
+        run: python tools/windows_gui_acceptance.py --zip dist/GridCAD-Windows-x64-v0.2.0-rc.7.zip --out desktop-qa
       - name: Package source launcher add-on
         if: always()
         shell: pwsh
         run: |
           python tools/package_source_launcher.py
-          if (Test-Path launcher-qa) {
-            Compress-Archive -Path launcher-qa/*.png,launcher-qa/*.log,launcher-qa/acceptance.json -DestinationPath dist/GridCAD-launcher-evidence.zip -Force
+          $evidence = @(Get-ChildItem launcher-qa -File -ErrorAction SilentlyContinue | Where-Object { $_.Extension -in '.png','.log','.json' })
+          if ($evidence.Count) {
+            Compress-Archive -LiteralPath $evidence.FullName -DestinationPath dist/GridCAD-launcher-evidence.zip -Force
           }
       - name: Archive GUI evidence
         if: always()

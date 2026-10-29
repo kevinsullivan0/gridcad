@@ -34,7 +34,9 @@ def main():
         deadline=time.monotonic()+240
         window=None
         while time.monotonic()<deadline:
-            if process.poll() is not None:raise AssertionError(f'{label}: launcher exited {process.returncode}; see log')
+            if process.poll() is not None:
+                log.flush();print((out/(label+'.log')).read_text(encoding='utf-8',errors='replace'),flush=True)
+                raise AssertionError(f'{label}: launcher exited {process.returncode}; see log')
             matches=Desktop(backend='uia').windows(title_re=r'GridCAD.*',visible_only=True)
             matches=[w for w in matches if w.class_name()=='TkTopLevel']
             if matches:window=matches[-1];break

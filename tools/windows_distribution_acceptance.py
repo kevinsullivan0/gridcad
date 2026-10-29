@@ -65,6 +65,36 @@ def validate(report: dict, base: Path) -> list[str]:
     return errors
 
 
+CONSENT_PROMPTS = (
+    'Press Enter to set up and open GridCAD, or type N to cancel',
+    'Create or update a GridCAD shortcut on your Desktop? Press Enter for Yes, or type N',
+    'Try the source launch method now? Type Y to continue, or press Enter to cancel',
+    'Install these free components now? Type Y to continue, or press Enter to cancel',
+    'Set up GridCAD now? Type Y to continue, or press Enter to cancel:',
+)
+
+
+class ConsentFeeder:
+    """One ordinary reply per newly displayed public prompt, never read-ahead.
+
+    Input is the complete append-only observed stdout log. Do not prefill a
+    parent shell's stdin: its buffered reader can consume a child's future reply.
+    """
+    def __init__(self):
+        self.cursor = 0
+        self.answered_count = 0
+
+    def next_reply(self, observed_text):
+        matches = [(position, prompt) for prompt in CONSENT_PROMPTS
+                   if (position := observed_text.find(prompt, self.cursor)) >= 0]
+        if not matches:
+            return None
+        position, prompt = min(matches)
+        self.cursor = position + len(prompt)
+        self.answered_count += 1
+        return 'Y\n'
+
+
 def make_nonexecutable_fixture(app: Path) -> None:
     """Alter only a disposable extracted copy, preserving integrity verification."""
     import hashlib
@@ -146,19 +176,23 @@ def acceptance(args):
         process = subprocess.Popen(command, cwd=out, env=env, stdin=subprocess.PIPE,
                                    stdout=log, stderr=subprocess.STDOUT, text=True)
         active.append(process)
-        # Public, ordinary prompts: shortcut, fallback, and dependencies. No
-        # production hook substitutes for consent or for the app's startup.
-        try:
-            if consent:
-                process.stdin.write('Y\nY\nY\nY\n')
-                process.stdin.flush()
-            else:
-                process.stdin.close()
-        except (BrokenPipeError, OSError):
-            pass
+        # Observe public prompts and reply only when each actually appears.
+        # Parent PowerShell and child Python must not share prefilled replies.
+        feeder = ConsentFeeder() if consent else None
+        if not consent:
+            process.stdin.close()
         window = None
         deadline = time.monotonic() + 300
         while time.monotonic() < deadline:
+            if feeder is not None:
+                observed = logpath.read_text(encoding='utf-8', errors='replace')
+                reply = feeder.next_reply(observed)
+                if reply is not None:
+                    try:
+                        process.stdin.write(reply)
+                        process.stdin.flush()
+                    except (BrokenPipeError, OSError) as exc:
+                        raise AssertionError(label + ': input closed while answering displayed prompt') from exc
             matches = [w for w in Desktop(backend='uia').windows(title_re=r'GridCAD.*', visible_only=True)
                        if w.class_name() == 'TkTopLevel']
             if matches:
@@ -205,6 +239,7 @@ def acceptance(args):
         process.wait(timeout=30)
         assert process.returncode == 0, f'{label}: launcher exit {process.returncode}'
         log.close()
+        (out / (label + '-consent.json')).write_text(json.dumps({'displayed_prompts_answered': feeder.answered_count if feeder else 0, 'stdin_closed': not consent}), encoding='utf-8')
         checks.append(label + ': actual responsive GUI and expected process mode; normal close')
 
     def expect_refusal(label, expected_code, expected_text):

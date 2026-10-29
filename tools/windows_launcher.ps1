@@ -6,6 +6,13 @@ $mutex = $null
 $log = $null
 $ready = $null
 
+function Read-Answer([string]$prompt) {
+    # Host-only Read-Host prompt text is absent from redirected diagnostics.
+    # Emit it first, then read only the answer for this consent step.
+    Write-Host $prompt
+    return Read-Host
+}
+
 function Write-Status([string]$message) {
     Write-Host $message
     if ($log) { Add-Content -LiteralPath $log -Value ((Get-Date -Format o)+' '+$message) -Encoding UTF8 }
@@ -46,7 +53,7 @@ function Install-Package([string]$from, [string]$destination, $manifest) {
     }
     Write-Status ('Set up GridCAD '+$Version+' for your account in: '+$destination)
     Write-Host 'This copies the included app only. No administrator rights, downloads or Windows setting changes are needed.'
-    $answer = Read-Host 'Press Enter to set up and open GridCAD, or type N to cancel'
+    $answer = Read-Answer 'Press Enter to set up and open GridCAD, or type N to cancel'
     if ($answer -match '^[nN]$') { throw [OperationCanceledException]::new('Setup canceled. No app was installed.') }
     $parent = Split-Path -Parent $destination
     New-Item -ItemType Directory -Force -Path $parent | Out-Null
@@ -76,7 +83,7 @@ function Offer-Shortcut([string]$folder) {
         if ($old.Description -notlike 'GridCAD * per-user launcher') { Write-Status 'An existing Desktop item named GridCAD was kept unchanged. Open the app from its installed folder.'; return }
         if ($old.TargetPath -eq (Join-Path $folder 'Start GridCAD.bat')) { return }
     }
-    $answer = Read-Host 'Create or update a GridCAD shortcut on your Desktop? Press Enter for Yes, or type N'
+    $answer = Read-Answer 'Create or update a GridCAD shortcut on your Desktop? Press Enter for Yes, or type N'
     if ($answer -match '^[nN]$') { return }
     $shortcut = $shell.CreateShortcut($shortcutPath)
     $shortcut.TargetPath = Join-Path $folder 'Start GridCAD.bat'
@@ -147,7 +154,7 @@ try {
             Write-Status ('The Windows app did not start: '+$_.Exception.Message)
         }
         Write-Host 'You can run the same included interface using verified Python instead. If needed, setup will ask before downloading its free components.'
-        $answer = Read-Host 'Try the source launch method now? Type Y to continue, or press Enter to cancel'
+        $answer = Read-Answer 'Try the source launch method now? Type Y to continue, or press Enter to cancel'
         if ($answer -notmatch '^[yY]$') { throw [OperationCanceledException]::new('Alternate launch canceled. No Windows protections were changed.') }
     }
     Write-Status 'Opening the source launch method. Keep this window open while setup or GridCAD is running.'

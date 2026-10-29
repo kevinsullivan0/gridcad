@@ -13,6 +13,32 @@ spec.loader.exec_module(journey)
 
 
 class DistributionOracleTests(unittest.TestCase):
+    def test_consent_feeder_waits_for_each_complete_displayed_prompt(self):
+        feeder = journey.ConsentFeeder()
+        first, second = journey.CONSENT_PROMPTS[:2]
+        self.assertIsNone(feeder.next_reply(''))
+        self.assertIsNone(feeder.next_reply(first[:-1]))
+        self.assertEqual(feeder.next_reply(first), 'Y\n')
+        self.assertIsNone(feeder.next_reply(first))
+        self.assertIsNone(feeder.next_reply(first + '\nworking...'))
+        self.assertEqual(feeder.next_reply(first + '\n' + second), 'Y\n')
+        self.assertIsNone(feeder.next_reply(first + '\n' + second))
+        self.assertEqual(feeder.answered_count, 2)
+
+    def test_consent_feeder_handles_repeated_and_child_prompts_without_prefill(self):
+        feeder = journey.ConsentFeeder()
+        parent, child = journey.CONSENT_PROMPTS[2], journey.CONSENT_PROMPTS[-1]
+        text = parent
+        self.assertEqual(feeder.next_reply(text), 'Y\n')
+        self.assertIsNone(feeder.next_reply(text))
+        text += '\n' + child
+        self.assertEqual(feeder.next_reply(text), 'Y\n')
+        self.assertIsNone(feeder.next_reply(text))
+        text += '\n' + child
+        self.assertEqual(feeder.next_reply(text), 'Y\n')
+        self.assertIsNone(feeder.next_reply(text))
+        self.assertEqual(feeder.answered_count, 3)
+
     def test_no_evidence_is_not_acceptance(self):
         errors = journey.validate({}, ROOT)
         self.assertTrue(any('Windows' in e for e in errors))

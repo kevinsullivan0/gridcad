@@ -67,5 +67,12 @@ class CombinedLauncherContractTests(unittest.TestCase):
         self.assertNotIn('$script:Version',source)
         self.assertNotIn('$script:log',source)
 
+    def test_consent_prompts_are_observable_before_reading_input(self):
+        source=(ROOT/'tools/windows_launcher.ps1').read_text()
+        self.assertTrue('function Read-Answer' in source,'Consent prompts need explicit output before input')
+        self.assertFalse("$answer = Read-Host '" in source,'Host-only prompts disappear in captured diagnostics')
+        batch=(ROOT/'Start GridCAD from source.bat').read_text()
+        self.assertTrue("Write-Host 'Install these free components now? Type Y to continue, or press Enter to cancel'; $answer=Read-Host;" in batch)
+
 
 if __name__=='__main__':unittest.main()

@@ -1,7 +1,0 @@
-{
-  "status": "not_run_for_this_checkpoint",
-  "checks_passed": 0,
-  "reason": "A supported full-browser run was not available in the cloud test environment. No new browser bypass or local-computer test was attempted.",
-  "coverage_instead": "Production JavaScript event handlers were exercised against real Python HTTP endpoints with a minimal DOM test double, including synthetic save/download.",
-  "limitations": "No browser rendering, real pointer hit-testing, Windows, Excel or GrabCAD acceptance is established."
-}

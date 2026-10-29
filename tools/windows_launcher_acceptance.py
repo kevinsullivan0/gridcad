@@ -95,7 +95,11 @@ def acceptance(args):
                 time.sleep(.5)
             if window is None:
                 raise AssertionError(label+': source GUI did not open; see log')
-            window.maximize();window.set_focus();time.sleep(.5);ImageGrab.grab().save(out/(label+'.png'))
+            window.maximize();window.set_focus();time.sleep(.5)
+            # Import explicitly so an unavailable encoder reports its real import
+            # error rather than Pillow's generic 'unknown extension' fallback.
+            from PIL import PngImagePlugin
+            ImageGrab.grab().save(out/(label+'.png'), format='PNG')
             window.close();process.wait(timeout=30)
             assert process.returncode==0,label
             checks.append(label+' opens and closes the real source GUI through the BAT')

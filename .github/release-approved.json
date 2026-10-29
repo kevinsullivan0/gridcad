@@ -1,11 +1,13 @@
 {
-  "tag": "v0.2.0-rc.4",
-  "source_sha": "15de8869c748248a08440d10c4507d756ef99a32",
-  "run_id": 40553534266,
-  "independent_audit_approved": true,
+  "tag": "v1.0.0",
+  "source_sha": "06ec35085f73b42483c5f8ef288a60cd77d05489",
+  "run_id": 40939240405,
+  "verification_passed": true,
   "assets": {
-    "GridCAD-Windows-x64-v0.2.0-rc.4.zip": "079881866eade79e0e34f8fa1b61d978cb49079fcccc10be253497e32d8b7103",
-    "GridCAD-Windows-GUI-evidence.zip": "31c282529499f90a3dfaa61c662bc2b47e821cc4977072307c943ffa04c47871",
-    "GridCAD-portable-core-v0.2.0-rc.4.zip": "cb70a8f72b83388184349f0c99d998fcf627c4057a05599ece8277eed7fa3b8f"
+    "GridCAD-Windows-x64-v1.0.0.zip": "3415761747eee3611be7e9475c5ed74ba7835b3d836840dedbd9a5b10748687b",
+    "GridCAD-Source-Windows-v1.0.0.zip": "6d839d28aa2c3c8e2babe6e73cb7e3671f0107bfda13c6d69046701d623208c8",
+    "GridCAD-portable-core-v1.0.0.zip": "5b350f5d2e7d8de91b9d632b12f412a550e3840a23bc9041cc8dbd68806e38e0",
+    "GridCAD-Windows-GUI-evidence.zip": "8a60d12aaa7e17f1cb3c467964a2c130f031036cddfdae5acb372dab8a95bc73",
+    "GridCAD-launcher-evidence.zip": "7bbee226a20c36d2568ac54b1b6d330dcb8fdf30025ff3c25505af6aeb9def50"
   }
 }

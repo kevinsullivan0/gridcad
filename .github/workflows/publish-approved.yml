@@ -1,7 +1,7 @@
-name: Publish audited desktop candidate
+name: Publish verified GridCAD release
 on:
   push:
-    branches: [windows-desktop]
+    branches: [release/v1.0-polish]
     paths: ['.github/release-approved.json']
 permissions: {}
 jobs:
@@ -12,7 +12,7 @@ jobs:
       actions: read
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-      - name: Verify audited immutable artifacts and publish candidate
+      - name: Verify immutable Windows artifacts and publish release
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}

@@ -14,7 +14,7 @@ import time
 import unittest
 from unittest import mock
 
-CHECKOUT = Path(os.environ.get('GRIDCAD_CHECKOUT', '/workspace/scratch/561510fd74d4/gridcad-v1'))
+CHECKOUT = Path(os.environ.get('GRIDCAD_CHECKOUT', str(Path(__file__).resolve().parents[1])))
 sys.path.insert(0, str(CHECKOUT))
 import tkinter as tk
 from tkinter import ttk

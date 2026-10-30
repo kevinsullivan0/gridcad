@@ -11,10 +11,10 @@ from tools.windows_gui_acceptance import make_progress_workbook, PROGRESS_RECIPE
 
 
 class WorkbookLayoutTests(unittest.TestCase):
-    def test_navigation_and_cache_consent_have_reserved_rows(self):
+    def test_navigation_and_formula_notice_have_reserved_rows(self):
         app=gui.App.__new__(gui.App)
         app.worktab=mock.Mock();app.controls={}
-        for name in ('sheet','cell_range','transpose','cache'):setattr(app,name,mock.Mock())
+        for name in ('sheet','cell_range','transpose','cache','formula_notice','selection_summary'):setattr(app,name,mock.Mock())
         app.black_label_choice='EcoFlexBlack (labels)'
         app.button=mock.Mock(side_effect=lambda *args,**kwargs:mock.Mock())
         frames=[]
@@ -26,12 +26,12 @@ class WorkbookLayoutTests(unittest.TestCase):
                 stack.enter_context(mock.patch.object(gui.ttk,name,side_effect=lambda *a,**k:mock.Mock()))
             stack.enter_context(mock.patch.object(gui.tk,'Canvas',side_effect=lambda *a,**k:mock.Mock()))
             app.build_workbook()
-        app.worktab.rowconfigure.assert_called_once_with(2,weight=1)
-        self.assertEqual(frames[1].grid.call_args.kwargs['row'],2)
-        self.assertEqual(frames[2].grid.call_args.kwargs['row'],3)
-        self.assertEqual(app.controls['cache'].grid.call_args.kwargs['row'],4)
+        app.worktab.rowconfigure.assert_called_once_with(3,weight=1)
+        self.assertEqual(frames[1].grid.call_args.kwargs['row'],3)
+        self.assertEqual(frames[2].grid.call_args.kwargs['row'],4)
+        self.assertNotIn('cache',app.controls)
         for frame in frames:frame.pack.assert_not_called()
-        app.controls['cache'].pack.assert_not_called()
+        self.assertTrue(hasattr(app,'worksheet_error'))
 
     def test_geometry_review_controls_have_reserved_rows(self):
         app=gui.App.__new__(gui.App)
@@ -53,10 +53,11 @@ class WorkbookLayoutTests(unittest.TestCase):
             for name in ('Combobox','Entry','Checkbutton','Scrollbar'):
                 stack.enter_context(mock.patch.object(gui.ttk,name,side_effect=lambda *a,**k:mock.MagicMock()))
             stack.enter_context(mock.patch.object(gui.tk,'Canvas',side_effect=lambda *a,**k:mock.Mock()))
+            app.field_error_labels={};app.selection_summary=mock.Mock();app.material_options={}
             app.build_geometry()
         app.geotab.rowconfigure.assert_called_once_with(0,weight=1)
         self.assertEqual(frames[0].grid.call_args.kwargs['row'],0)
-        self.assertEqual(frames[7].grid.call_args.kwargs['row'],1)
+        self.assertEqual(frames[8].grid.call_args.kwargs['row'],1)
         self.assertEqual(app.controls['geometry_settings'].grid.call_args.kwargs['row'],0)
         self.assertNotIn('reviewed',app.controls)
         self.assertNotIn('material_ack',app.controls)

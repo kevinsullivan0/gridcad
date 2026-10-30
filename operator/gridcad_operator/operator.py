@@ -537,6 +537,8 @@ def prepare(project, xlsx, plan):
     if reviewed_ids and not re.fullmatch(r'[0-9a-f]{64}', str(plan['review'].get('mapping_sha256',''))):
         fail('Reviewed-ID mode needs the source-bound independently reviewed mapping digest.')
     if plan['formula_cache_policy'] not in ('reject', 'confirmed_current_cache', 'saved_cache'): fail('Unknown formula cache policy.')
+    if plan['formula_cache_policy'] == 'saved_cache' and not candidate_only:
+        fail('Saved formula results without a freshness attestation are allowed only for unverified desktop candidates. Reviewed plans require confirmed current caches or values only.')
     doc = project_document(project)
     if doc['version'] != plan['source_version']: fail('Source version changed.')
     original = copy.deepcopy(doc)
@@ -818,7 +820,8 @@ def apply(project, xlsx, plan, out_dir):
                 elif not black(saved_nodes[oid]['material']): fail('Saved label is not direct black.')
             if not appearance_matches(saved_bodies[oid], saved_nodes[oid]['material']): fail('Saved material/appearance mismatch.')
         if digest(project)!=plan['archive_sha256'] or digest(xlsx)!=plan['workbook_sha256']: fail('Input changed during conversion.')
-        audit = {'status':'UNVERIFIED_CANDIDATE', 'source_sha256':plan['archive_sha256'],
+        audit = {'status':'UNVERIFIED_CANDIDATE', 'formula_cache_policy':plan['formula_cache_policy'],
+                 'formula_results_recalculated':False, 'source_sha256':plan['archive_sha256'],
                  'workbook_sha256':plan['workbook_sha256'], 'plan_sha256':fingerprint(plan),
                  'output_sha256':digest(candidate), 'source_version':before['version'],
                  'changed_occurrence_ids':sorted(changed),'changed_count':len(changed),

@@ -16,7 +16,7 @@ class MappingDetailRefreshTests(unittest.TestCase):
             setattr(app, name, Mock())
         app.sheet.get.return_value = 'Recipes'
         app.container_ids = {}; app.reference_ids = {}; app.revision = 1
-        app.invalidate = Mock(); app.sync_material_controls = Mock()
+        app.invalidate = Mock(); app.sync_material_controls = Mock(); app.refresh_feedback=Mock(return_value={})
         app.notebook = Mock(); app.geotab = Mock(); app.mapping_tree = Mock()
         app.draw_geometry = Mock(); app.run = Mock(); app.canvas_ids = {}; app.canvas = Mock()
         app.inspected_oid = selected

@@ -72,6 +72,16 @@ class ConversionRecoveryTests(unittest.TestCase):
         self.assertEqual(proposal['plan']['formula_cache_policy'],'saved_cache')
         core.op.prepare(self.project_path,self.book_path,core.candidate_plan(proposal))
         self.assertFalse(proposal['plan']['review']['geometry_and_labels_confirmed'])
+        audit=core.save_candidate(self.project_path,self.book_path,proposal,self.root/'saved-cache-output')
+        self.assertEqual(audit.get('formula_cache_policy'),'saved_cache')
+        self.assertIs(audit.get('formula_results_recalculated'),False)
+
+    def test_saved_policy_cannot_impersonate_reviewed_cache_confirmation(self):
+        proposal=core.propose(self.project,self.book_path,self.book,'Recipes','D4:I7','Sample',
+                             'synthetic-labels','Rows down; columns right',cache_policy='saved')
+        reviewed=core.confirm(proposal,'Synthetic physical labels reviewed for the existing reviewed API contract.')
+        with self.assertRaisesRegex(core.op.ValidationError,'saved|Saved'):
+            core.op.prepare(self.project_path,self.book_path,reviewed)
 
     def test_other_grid_dimensions_preserve_existing_label_meshes(self):
         folder=create(self.root/'other',rows=3,columns=9,pitch=18,size=11)
@@ -91,3 +101,37 @@ class ConversionRecoveryTests(unittest.TestCase):
 
 
 if __name__ == '__main__':unittest.main()
+
+class MaterialAndDestinationTests(unittest.TestCase):
+    def test_material_choices_use_actual_name_and_deduplicate_same_definition(self):
+        self.assertTrue(hasattr(gui,'label_material_choices'),'Unified metadata-backed material choices missing')
+        material=core.op.EcoFlexMaterialProvider().direct_black()
+        def body(m):return {'material':copy.deepcopy(m),'properties':{'threeDAppearance':{'value':copy.deepcopy(m['threeDAppearance'])}}}
+        project={'nodes':{'a':{'name':'Misleading body name','material':material},
+                          'b':{'name':'Another body name','material':copy.deepcopy(material)}},
+                 'bodies':{'a':body(material),'b':body(material)},'leaves':{'a','b'}}
+        choices=gui.label_material_choices(project)
+        self.assertEqual(list(choices),['EcoFlexBlack'])
+        self.assertEqual(choices['EcoFlexBlack']['appearance'],material['threeDAppearance'])
+        self.assertEqual(choices['EcoFlexBlack']['mode'],'black')
+
+    def test_output_defaults_to_existing_documents_or_last_successful_folder(self):
+        self.assertTrue(hasattr(gui,'preferred_output_directory'),'Explicit user-owned save default missing')
+        with tempfile.TemporaryDirectory() as temporary:
+            home=Path(temporary);documents=home/'Documents';documents.mkdir()
+            last=home/'my results';last.mkdir()
+            self.assertEqual(gui.preferred_output_directory(home=home),documents)
+            self.assertEqual(gui.preferred_output_directory(last,home=home),last)
+            self.assertEqual(gui.preferred_output_directory(home/'missing',home=home),documents)
+            self.assertEqual(list(documents.iterdir()),[])
+
+    def test_normal_input_folder_is_preferred_but_temp_and_app_paths_are_not(self):
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as temporary:
+            home=Path(temporary);documents=home/'Documents';documents.mkdir()
+            project=home/'project';project.mkdir();source=project/'input.PRINT'
+            app=home/'app';app.mkdir()
+            with patch.object(gui.tempfile,'gettempdir',return_value=str(home/'OS temporary')):
+                self.assertEqual(gui.preferred_output_directory(source=source,home=home,app_root=app),project)
+                self.assertEqual(gui.preferred_output_directory(source=app/'example.PRINT',home=home,app_root=app),documents)
+            self.assertEqual(gui.preferred_output_directory(source=source,home=home,app_root=app),documents)

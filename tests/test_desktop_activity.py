@@ -103,6 +103,7 @@ class ActivityTests(TestCase):
         app.project_path = 'original.print'; app.workbook_path = 'original.xlsx'
         app.run = mock.Mock()
         with mock.patch('gridcad_desktop.filedialog.asksaveasfilename', return_value='new-result.PRINT'):
+            app.last_output_directory=None
             app.save()
         _, work, done = app.run.call_args.args
         app.project_path = 'different.print'; app.workbook_path = 'different.xlsx'

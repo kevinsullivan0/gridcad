@@ -14,7 +14,10 @@ class DragLayoutAcceptance(unittest.TestCase):
         self.addCleanup(self.f.doCleanups)
         self.f.setUp();self.f.configured()
         self.app=self.f.app;self.grid=self.app.sheet_grid
-        self.app.notebook.select(self.app.worktab);self.f.pump()
+        self.app.notebook.select(self.app.worktab)
+        # Show the same bounded page as the real OS corrective-drag journey.
+        # The default A:H page cannot expose column I on any screen size.
+        self.app.page_row=self.app.page_col=4;self.app.render_sheet();self.f.pump()
 
     def bounds(self):
         return (self.grid.winfo_rootx(),self.grid.winfo_rooty(),

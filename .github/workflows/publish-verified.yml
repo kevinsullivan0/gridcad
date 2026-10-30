@@ -1,0 +1,22 @@
+name: Publish explicitly verified release
+on:
+  push:
+    branches: [main]
+    paths: [.github/release-approved.json]
+permissions:
+  actions: read
+  contents: write
+concurrency:
+  group: publish-gridcad-verified
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate the exact recorded passing artifact and publish once
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: python tools/publish_approved_release.py

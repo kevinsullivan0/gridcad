@@ -865,9 +865,15 @@ class App:
         self.book_label.configure(style='Invalid.TLabel' if 'open_workbook' in shown else 'TLabel')
         self.project_label.configure(style='Invalid.TLabel' if 'open_project' in shown else 'TLabel')
         if shown and focus:
-            key=next(key for key in ('open_workbook','open_project','sheet','range','samples','labels','mapping_corner','orientation') if key in shown)
+            order=('open_workbook','open_project','sheet','range','samples','labels','mapping_corner','orientation')
+            # A failed recipe check does not require an open PRINT. Return to
+            # the field that caused this operation, before unrelated mapping
+            # prerequisites, both before and after its diagnostic dialog.
+            key=next((key for key in order if key in self.operation_errors and key in shown),None)
+            key=key or next(key for key in order if key in shown)
             self.notebook.select(self.worktab if key in ('sheet','range') else self.geotab)
-            self.status.set('Fix the highlighted selections, then choose Match cells to samples. '+shown[key])
+            self.status.set(('Fix the highlighted field. ' if self.operation_errors else
+                'Fix the highlighted selections, then choose Match cells to samples. ')+shown[key])
             self.root.after_idle(lambda:self.controls[key].focus_force())
         return errors
 

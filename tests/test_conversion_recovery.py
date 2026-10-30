@@ -42,6 +42,30 @@ class ConversionRecoveryTests(unittest.TestCase):
         overlap = self.feedback(label_id='synthetic-assembly')
         self.assertIn('labels', overlap['errors'])
 
+    def test_workbook_error_focuses_its_range_before_unrelated_missing_project(self):
+        from unittest.mock import Mock
+        class Value:
+            def __init__(self,value=''):self.value=value
+            def get(self):return self.value
+            def set(self,value):self.value=value
+        app=gui.App.__new__(gui.App)
+        app.book=self.book;app.project=None;app.sheet=Value('Recipes')
+        app.cell_range=Value('D4:D4');app.sample=Value('');app.labels=Value('')
+        app.container_ids={};app.mapping_corner=Value('');app.mapping_direction=Value('')
+        app.selection_summary=Value();app.formula_notice=Value();app.status=Value()
+        message='Recipes!D4: missing value, saved formula result, or worksheet error.'
+        app.operation_errors={'range':message};app.validation_active=True;app.validation_errors={}
+        app.controls={'range':Mock(),'open_project':Mock()};app.field_error_labels={}
+        app.worksheet_error=Mock();app.selection_problem=Mock();app.book_label=Mock();app.project_label=Mock()
+        app.notebook=Mock();app.worktab=object();app.geotab=object();app.root=Mock()
+        app.refresh_feedback(focus=True)
+        app.root.after_idle.call_args.args[0]()
+        app.controls['range'].focus_force.assert_called_once()
+        app.controls['open_project'].focus_force.assert_not_called()
+        app.notebook.select.assert_called_once_with(app.worktab)
+        self.assertIn(message,app.status.get())
+        self.assertNotIn('Open a PRINT',app.status.get())
+
     def test_no_recipes_does_not_fabricate_a_detected_range(self):
         self.assertEqual(core.suggest_range({'A1':{'value':'A heading, not a recipe'}}), '')
         self.assertIn('range',self.feedback(selected_range='')['errors'])

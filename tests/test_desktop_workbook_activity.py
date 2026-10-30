@@ -40,7 +40,7 @@ class WorkbookActivityTests(unittest.TestCase):
                 variable.get=Mock(side_effect=AssertionError('worker touched Tk'))
             result=work()
             self.assertEqual(result,(2,(1,2)))
-            read.assert_called_once_with(self.app.book,'Sheet','A1:B2',cache_confirmed=False)
+            read.assert_called_once_with(self.app.book,'Sheet','A1:B2',cache_policy='saved')
 
     def test_recipe_result_rejects_changed_inputs(self):
         self.app.check_recipes();_,done,_=self.jobs.pop()
@@ -93,7 +93,7 @@ class WorkbookActivityTests(unittest.TestCase):
         app.load_project('new.print')
         self.assertIn('Reading',app.detail.get())
         _,done,_=self.jobs.pop()
-        done({'groups':{'Sample':['one']},'containers':{},'leaves':[], 'nodes':{}})
+        done({'groups':{'Sample':['one']},'containers':{},'leaves':[], 'nodes':{}, 'bodies':{}})
         self.assertIn('Project loaded',app.detail.get())
         self.assertNotIn('Reading',app.detail.get())
         self.assertEqual(app.project_path,Path('new.print'))

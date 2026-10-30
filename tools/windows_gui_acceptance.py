@@ -23,6 +23,34 @@ import desktop_core as core
 PROGRESS_RECIPE_COUNT = 40_000
 
 
+def native_edit_role(name,role):
+    """Require the native field label, not merely any focused Edit."""
+    if role=='filename':return name.rstrip(':')=='File name'
+    if role=='address':return name=='Address' or name.startswith('Address: ')
+    return False
+
+
+def native_window_match(windows,titles):
+    candidates=[window for window in windows if window.window_text() in titles
+                and window.is_visible() and window.is_enabled()]
+    assert len(candidates)<2,'More than one expected native dialog is visible.'
+    return candidates[0] if candidates else None
+
+
+def directory_from_native_address(value, documents):
+    """Resolve only an observed native absolute address or standard shell alias.
+
+    Windows may show its Documents known-folder name instead of its redirected
+    filesystem path. The latter must come from Windows, never a guessed home.
+    """
+    candidate=Path(value) if value else None
+    if candidate is not None and candidate.is_absolute() and candidate.is_dir():
+        return candidate.resolve()
+    if value=='Documents' and Path(documents).is_dir():
+        return Path(documents).resolve()
+    raise AssertionError('Native Save address is not an observed directory: '+repr(value))
+
+
 def make_progress_workbook(path):
     # Keep real validation work, but stay below expanded XML-name/text limits.
     # 100k inline-string cells exceeded that independent guard on Windows.
@@ -127,7 +155,18 @@ def main():
             time.sleep(.3)
         else:raise AssertionError('Configuration control could not be scrolled into view: '+key)
         assert p['w']>=8 and p['h']>=16,(key,p)
-        mouse.click(coords=(p['x']+p['w']//2,p['y']+p['h']//2));time.sleep(.25)
+        # Closing a transient Tk panel can leave Windows without an active
+        # child focus. Activate the owning top-level before the one action
+        # click, rather than letting that click be consumed by activation or
+        # retrying a command whose outcome could be uncertain.
+        import win32gui, win32process
+        point=(p['x']+p['w']//2,p['y']+p['h']//2)
+        target=win32gui.GetAncestor(win32gui.WindowFromPoint(point),2)
+        assert win32process.GetWindowThreadProcessId(target)[1]==process.pid,(key,target)
+        Application(backend='win32').connect(process=process.pid).window(handle=target).set_focus()
+        wait(lambda s:win32gui.GetForegroundWindow()==target,
+             'Owning window foreground before one OS action click: '+key)
+        mouse.click(coords=point);time.sleep(.25)
     def check_tab_bounds(keys,minimums=None):
         controls=state()['controls'];tab=controls['tabs']
         for key in keys:
@@ -166,11 +205,11 @@ def main():
         snapshot=state()
         if key=='labels':expected=snapshot['label_choices'][index]
         elif key=='label_reference':expected=snapshot['reference_choices'][index]
-        elif key=='label_mode':expected=['Direct black','Copy from reference body'][index]
+        elif key=='label_mode':expected=snapshot['material_choices'][index]
         elif key=='mapping_corner':expected=['Top left','Top right','Bottom left','Bottom right'][index]
         else:expected={'Top left':['Down','Right'],'Top right':['Down','Left'],
                        'Bottom left':['Up','Right'],'Bottom right':['Up','Left']}[snapshot['mapping_corner']][index]
-        state_key='mapping_direction' if key=='orientation' else key
+        state_key='mapping_direction' if key=='orientation' else 'material_choice' if key=='label_mode' else key
         wait(lambda s:s.get(state_key)==expected,'Explicit combobox selection: '+expected)
     def choose_top_left_rows_down():
         select_combo('mapping_corner',0);select_combo('orientation',0)
@@ -188,30 +227,61 @@ def main():
     def worksheet_tab():select_tab('worktab')
     def enter(key,text):
         click(key);keyboard.send_keys('^a',vk_packet=False);keyboard.send_keys(str(text),with_spaces=True,vk_packet=True);time.sleep(.2)
-    def dialog_path(path):
-        # Observe the real foreground edit control. Unicode packet characters
-        # with a Ctrl modifier can arrive as literal 'v'; use virtual keys and
-        # require native filename read-back before accepting the file dialog.
+    def native_dialog(titles):
+        import win32gui
+        started=time.monotonic();deadline=started+30;observed=[]
+        while time.monotonic()<deadline:
+            windows=Desktop(backend='win32').windows(process=process.pid,class_name='#32770',visible_only=True)
+            observed=[window.window_text() for window in windows]
+            window=native_window_match(windows,titles)
+            if window is not None:
+                window.set_focus()
+                wait(lambda s:win32gui.GetForegroundWindow()==window.handle,
+                     'Expected native dialog owns foreground: '+window.window_text(),timeout=10)
+                checks.append('Native dialog ready after '+str(round(time.monotonic()-started,2))+' seconds: '+window.window_text())
+                return window
+            if process.poll() is not None:raise AssertionError('App exited before native dialog.')
+            time.sleep(.1)
+        raise AssertionError('Expected native dialog did not become ready; observed owned dialogs: '+repr(observed))
+
+    def file_dialog():
+        return native_dialog({'Choose Excel recipe workbook','Choose original GrabCAD project','Save PRINT as'})
+
+    def focused_native_edit(role,dialog_handle):
         import ctypes
         from ctypes import wintypes
-        import win32clipboard, win32gui, win32process
+        import win32gui, win32process
         class GUIThreadInfo(ctypes.Structure):
             _fields_=[('cbSize',wintypes.DWORD),('flags',wintypes.DWORD),
                       ('hwndActive',wintypes.HWND),('hwndFocus',wintypes.HWND),
                       ('hwndCapture',wintypes.HWND),('hwndMenuOwner',wintypes.HWND),
                       ('hwndMoveSize',wintypes.HWND),('hwndCaret',wintypes.HWND),
                       ('rcCaret',wintypes.RECT)]
-        time.sleep(.7)
-        keyboard.send_keys('%n',vk_packet=False);time.sleep(.2)
         info=GUIThreadInfo();info.cbSize=ctypes.sizeof(info)
         get_info=ctypes.windll.user32.GetGUIThreadInfo
         get_info.argtypes=[wintypes.DWORD,ctypes.POINTER(GUIThreadInfo)]
         get_info.restype=wintypes.BOOL
-        if not get_info(0,ctypes.byref(info)) or not info.hwndFocus:
-            raise AssertionError('Native file dialog has no observable foreground focus')
-        assert win32process.GetWindowThreadProcessId(info.hwndFocus)[1]==process.pid
-        assert win32gui.GetClassName(info.hwndFocus)=='Edit',win32gui.GetClassName(info.hwndFocus)
-        edit=Desktop(backend='uia').window(handle=info.hwndFocus).wrapper_object()
+        deadline=time.monotonic()+10;observed=[]
+        while time.monotonic()<deadline:
+            if (get_info(0,ctypes.byref(info)) and info.hwndFocus
+                    and win32process.GetWindowThreadProcessId(info.hwndFocus)[1]==process.pid
+                    and win32gui.GetAncestor(info.hwndFocus,2)==dialog_handle
+                    and win32gui.GetClassName(info.hwndFocus)=='Edit'):
+                edit=Desktop(backend='uia').window(handle=info.hwndFocus).wrapper_object()
+                name=edit.element_info.name
+                identity=(int(info.hwndFocus),name,edit.element_info.automation_id)
+                if not observed or identity!=observed[-1]:observed.append(identity)
+                if native_edit_role(name,role):
+                    checks.append('Native '+role+' field identity: '+repr(identity))
+                    return edit
+            time.sleep(.05)
+        raise AssertionError('Native '+role+' Edit never acquired keyboard focus; observed identities: '+repr(observed))
+    def dialog_path(path):
+        # Real filename paste and read-back, never a mocked file chooser.
+        import win32clipboard
+        dialog=file_dialog()
+        keyboard.send_keys('%n',vk_packet=False)
+        edit=focused_native_edit('filename',dialog.handle)
         win32clipboard.OpenClipboard()
         try:
             win32clipboard.EmptyClipboard()
@@ -231,12 +301,31 @@ def main():
             if value==str(path):break
         checks.append('Native filename field read-back before Enter: '+repr(observed))
         assert value==str(path),'Native filename input did not receive complete clipboard path: '+repr(observed)
-        keyboard.send_keys('{ENTER}',vk_packet=False);time.sleep(.5)
+        keyboard.send_keys('{ENTER}',vk_packet=False)
+        import win32gui
+        wait(lambda s:not win32gui.IsWindow(dialog.handle),
+             'Native file dialog accepts the observed filename and closes',timeout=30)
+    def dialog_folder():
+        from win32com.shell import shell, shellcon
+        dialog=file_dialog();keyboard.send_keys('%d',vk_packet=False)
+        # Read the keyboard-focused native ADDRESS edit, not arbitrary list
+        # or filename edits that could happen to contain a directory name.
+        value=focused_native_edit('address',dialog.handle).get_value()
+        documents=shell.SHGetFolderPath(0,shellcon.CSIDL_PERSONAL,None,0)
+        location=directory_from_native_address(value,documents)
+        checks.append('Native Save address read-back: '+repr(value)+
+                      '; Windows-known-folder resolution: '+str(location))
+        keyboard.send_keys('{ESC}',vk_packet=False);keyboard.send_keys('%n',vk_packet=False)
+        return location
+
     def dismiss():
-        time.sleep(.3)
         if 'diagnostic_close' in state().get('controls',{}):
             click('diagnostic_close');wait(lambda s:'diagnostic_close' not in s.get('controls',{}),'Diagnostic dialog closes and ordinary workflow resumes')
-        else:keyboard.send_keys('{ENTER}');time.sleep(.3)
+        else:
+            dialog=native_dialog({'GridCAD — separate result saved'})
+            keyboard.send_keys('{ENTER}')
+            import win32gui
+            wait(lambda s:not win32gui.IsWindow(dialog.handle),'Native result message closes before the next action')
     def screenshot(name):ImageGrab.grab().save(out/name)
     def load_book(path):
         click('open_workbook');dialog_path(path)
@@ -249,9 +338,12 @@ def main():
         app=Application(backend='win32').connect(process=process.pid)
         main_window_handle=app.top_window().handle
         app.top_window().maximize();time.sleep(.7)
+        import ctypes
+        checks.append('Observed native display DPI: '+str(ctypes.windll.user32.GetDpiForWindow(main_window_handle)))
         screenshot('01-launched.png')
-        click('general_help');wait(lambda s:s.get('help_document')=='docs/DESKTOP_MANUAL.md','Ordinary Help opens offline quick start')
-        check_tab_bounds(['about','licenses','agent_settings','project_link','releases_link','help_content'],{'help_content':(400,100)})
+        select_tab('helptab');wait(lambda s:s.get('help_document')=='quick-start','One Help tab opens the short offline basics')
+        assert 'general_help' not in state()['controls']
+        check_tab_bounds(['about','licenses','agent_settings','diagnostics_settings','help_content'],{'help_content':(400,100)})
         screenshot('01a-ordinary-help.png')
         click('about');wait(lambda s:s.get('help_document')=='about','About/version view opens in extracted app')
         assert state()['app_version']==core.VERSION
@@ -333,7 +425,7 @@ def main():
         enter('jump','D4');click('go')
         drag_cells('D4','I7')
         wait(lambda s:s.get('range')=='D4:I7','Actual mouse drag chooses the complete synthetic recipe grid')
-        check_tab_bounds(['worksheet','cache','next_rows','jump','go'],{'worksheet':(400,100)})
+        check_tab_bounds(['worksheet','next_rows','jump','go'],{'worksheet':(400,100)})
         screenshot('02b-full-cell-selection.png')
         click('check_recipes');wait(lambda s:'24 recipes valid' in s.get('status',''),'All exact recipe percentages validate through visible Check recipes button')
         longfile=out/'long sheet.xlsx';make_workbook(longfile,{'D501':'2/0/0/0/98/0','E501':'0/0/0/0/0/100'},1,2)
@@ -355,12 +447,27 @@ def main():
              'Large recipe validation completes without UI freeze',timeout=120)
         assert not state().get('progress_visible')
         checks.append('Activity indicator clears after recipe completion')
+        malformed=out/'bad packed-cell recipe.xlsx';make_workbook(malformed,{'D4':'20/0/0'},1,1)
+        load_book(malformed)
+        assert state()['range']=='', 'No valid recipe block must not invent A1:B2'
+        enter('range','D4:D4');click('check_recipes')
+        wait(lambda s:s.get('diagnostic',{}).get('code')=='GCD103','Bad per-cell recipe identifies the required six-value format')
+        malformed_report=json.loads(Path(state()['diagnostic']['report']).read_text())
+        assert 'Recipes' in malformed_report['where'] and 'D4' in malformed_report['where']
+        assert 'C/M/Y/K/W/T' in malformed_report['remedy']
+        screenshot('02d-addressed-recipe-error.png');dismiss()
         cached=out/'cached formula.xlsx';make_workbook(cached,{'D4':'2/0/0/0/98/0'},1,1,formula_cache={'D4':'2/0/0/0/98/0'})
         load_book(cached);enter('range','D4:D4');click('check_recipes')
-        wait(lambda s:s.get('diagnostic',{}).get('code')=='GCD101','Unconfirmed formula cache blocked by real UI')
-        screenshot('03-formula-refusal.png')
+        wait(lambda s:'1 recipes valid' in s.get('status',''),'Saved formula result works without a blanket attestation checkbox')
+        assert 'cache' not in state()['controls'] and 'last results saved by Excel' in state()['formula_notice']
+        screenshot('03-saved-formula-notice.png')
+        missing=out/'missing formula.xlsx';make_workbook(missing,{'D4':'2/0/0/0/98/0'},1,1,formula_cache={'D4':None})
+        load_book(missing);enter('range','D4:D4');click('check_recipes')
+        wait(lambda s:s.get('diagnostic',{}).get('code')=='GCD102','Missing saved formula result remains refused without a bypass checkbox')
+        screenshot('03a-missing-saved-result.png')
         report=Path(state()['diagnostic']['report']);assert report.is_file()
-        report_json=json.loads(report.read_text());assert 'settings' in report_json and 'traceback' in report_json
+        report_json=json.loads(report.read_text());assert 'Recipes' in report_json['where'] and 'D4' in report_json['where']
+        assert 'Excel' in report_json['remedy'] and 'traceback' in report_json
         click('diagnostic_details');screenshot('03b-technical-details.png');click('diagnostic_copy')
         import win32clipboard
         win32clipboard.OpenClipboard()
@@ -368,16 +475,18 @@ def main():
         finally:win32clipboard.CloseClipboard()
         assert str(report) in prompt and 'grant file access' in prompt and 'nothing was uploaded' in prompt
         checks.append('Optional local report and copied debugging prompt expose no automatic upload or agent execution')
-        dismiss();click('cache');click('check_recipes')
-        wait(lambda s:'1 recipes valid' in s.get('status',''),'Explicit cache confirmation permits stored recipe')
-        missing=out/'missing formula.xlsx';make_workbook(missing,{'D4':'2/0/0/0/98/0'},1,1,formula_cache={'D4':None})
-        load_book(missing);enter('range','D4:D4');click('cache');click('check_recipes')
-        wait(lambda s:s.get('diagnostic',{}).get('code')=='GCD102','Missing formula cache refused despite confirmation');dismiss()
+        dismiss()
+        wait(lambda s:s.get('focused_control')=='range','Closing the recipe error restores focus to its highlighted range')
         load_book(example/'DO_NOT_PRINT.xlsx')
         click('open_project');dialog_path(example/'DO_NOT_PRINT.PRINT')
         wait(lambda s:s.get('project')==str(example/'DO_NOT_PRINT.PRINT') and not s.get('busy'),'Project loaded by native file dialog')
         assert not state()['save_enabled'];checks.append('Save unavailable until an actual complete mapping validates')
         assert not any(key in state()['controls'] for key in ('reviewed','evidence','material_ack','transpose'))
+        click('preview')
+        wait(lambda s:all(key in s.get('validation_errors',{}) for key in ('labels','mapping_corner','orientation')),'All missing selectors have actionable inline field messages')
+        wait(lambda s:s.get('focused_control')=='labels','First missing selector receives actual keyboard focus')
+        assert 'diagnostic_close' not in state()['controls']
+        screenshot('03c-required-selections.png')
         click_sample('synthetic-sample-1-1')
         wait(lambda s:'Source material:' in s.get('detail','') and 'Not mapped' in s.get('detail',''),
              'Actual preview click inspects a sample before any mapping exists')
@@ -397,24 +506,39 @@ def main():
         checks.append('Blank preview space does not inspect a distant nearest sample')
         label_index=next(i for i,v in enumerate(state()['label_choices']) if v.startswith('Printed labels '))
         select_combo('labels',label_index);choose_top_left_rows_down()
-        worksheet_tab();click_cell('D4');geometry_tab();click('preview')
-        wait(lambda s:s.get('diagnostic',{}).get('code')=='GCD205','Partial recipe selection refuses mapping, not inspection');dismiss()
+        worksheet_tab();enter('range','D4:H7');geometry_tab();click('preview')
+        wait(lambda s:all(token in s.get('validation_errors',{}).get('range','') for token in ('20','24','Recipes','D4:H7')),'20 selected cells versus24samples is explained inline with exact range')
+        assert 'diagnostic_close' not in state()['controls']
+        screenshot('03d-count-mismatch.png')
+        geometry_tab()
         assert not state()['save_enabled'] and not state()['proposal']
         click_sample('synthetic-sample-1-2')
         wait(lambda s:s.get('selected_sample')=='synthetic-sample-1-2' and 'Not mapped' in s.get('detail',''),
              'Actual preview remains inspectable after a count-mismatch error')
-        worksheet_tab();enter('range','D4:I7');geometry_tab()
+        worksheet_tab();enter('jump','D4');click('go');drag_cells('D4','I7');geometry_tab()
         click('preview');wait(lambda s:s.get('proposal') and not s.get('busy'),'Actual geometry mapping preview created')
         wait(lambda s:s.get('save_enabled'),'Valid mapping enables Save without review checkboxes or notes')
+        assert not state()['validation_errors']
+        worksheet_tab();enter('range','D4:H7');geometry_tab()
+        wait(lambda s:not s.get('save_enabled') and not s.get('proposal'),'Breaking the corrected range immediately revokes the old mapping')
+        click('preview');wait(lambda s:'range' in s.get('validation_errors',{}),'A repeated mismatch has current actionable feedback')
+        worksheet_tab();enter('range','D4:I7');geometry_tab();click('preview')
+        wait(lambda s:s.get('save_enabled') and not s.get('busy'),'Correcting again restores a fresh valid mapping')
         click_sample('synthetic-sample-1-1')
         wait(lambda s:'Recipes!D4' in s.get('detail','') and 'requested C/M/Y/K/W/T' in s.get('detail',''),
              'Mapped preview click shows exact requested recipe separately from source material')
         screenshot('04-mapping-preview.png')
-        click('zoom_in');wait(lambda s:not s.get('busy'),'Zoomed preview finishes');screenshot('05-zoomed-labels.png');click('fit')
+        click('zoom_in');wait(lambda s:not s.get('busy'),'Zoomed preview finishes')
+        click_sample('synthetic-sample-2-3')
+        wait(lambda s:s.get('selected_sample')=='synthetic-sample-2-3' and 'Recipes!F5' in s.get('detail',''),
+             'Actual zoomed preview click inspects the corresponding cell, not a stale-size hitbox')
+        screenshot('05-zoomed-labels.png');click('fit')
         wait(lambda s:not s.get('busy'),'Fit preview finishes')
         select_combo('orientation',1)
         assert not state()['save_enabled']
         click('preview');wait(lambda s:s.get('diagnostic',{}).get('code')=='GCD201','Incompatible row direction refuses export clearly');dismiss()
+        wait(lambda s:s.get('focused_control')=='range','Shape error returns to its highlighted worksheet range')
+        geometry_tab()
         click_sample('synthetic-sample-1-1')
         wait(lambda s:'Not mapped' in s.get('detail',''),'Changing directions keeps source inspection available')
         choose_top_left_rows_down();click('preview')
@@ -427,17 +551,21 @@ def main():
         time.sleep(1)
         wait(lambda s:not s.get('busy'),'Minimum-window geometry repaint completes')
         check_tab_bounds(['geometry'],{'geometry':(300,100)})
-        controls=state()['controls']
-        report_control=controls['include_report'];save_control=controls['save']
-        assert abs(report_control['y']-save_control['y'])<12
-        assert report_control['x']+report_control['w']<=save_control['x']
-        checks.append('Optional conversion report is visible beside Save at the minimum window size')
+        click_sample('synthetic-sample-3-4')
+        wait(lambda s:s.get('selected_sample')=='synthetic-sample-3-4' and 'Recipes!G6' in s.get('detail',''),
+             'Actual minimum-window preview click uses the resized geometry coordinates')
+        assert 'include_report' not in state()['controls']
+        checks.append('Normal minimum-size workflow has no conversion-report clutter')
         screenshot('05a-minimum-geometry.png')
         select_tab('worktab')
-        check_tab_bounds(['worksheet','cache','next_rows','jump','go'],{'worksheet':(400,100)})
+        check_tab_bounds(['worksheet','next_rows','jump','go'],{'worksheet':(400,100)})
         screenshot('05a-minimum-worksheet.png')
-        click('general_help');time.sleep(.3)
-        check_tab_bounds(['about','licenses','agent_settings','project_link','releases_link','help_content'],{'help_content':(400,100)})
+        select_tab('helptab')
+        if 'help_basics' in state()['controls']:click('help_basics')
+        wait(lambda s:s.get('help_document')=='quick-start','Short basics remain recoverable after About or Licenses')
+        check_tab_bounds(['about','licenses','agent_settings','diagnostics_settings','help_content'],{'help_content':(400,100)})
+        click('diagnostics_settings');wait(lambda s:'include_report' in s['controls'],'Optional report is discoverable in Diagnostics')
+        screenshot('05a-diagnostics-report.png');click('diagnostics_settings_close')
         screenshot('05a-minimum-help.png')
         select_tab('maptab')
         check_tab_bounds(['assignments'],{'assignments':(600,100)})
@@ -451,7 +579,16 @@ def main():
         select_tab('geotab')
         wait(lambda s:s.get('save_enabled'),'Valid Save remains available after tab and window changes')
         screenshot('06-ready-to-save.png')
-        click('save');time.sleep(.5);keyboard.send_keys('{ESC}');time.sleep(.4)
+        click('save');initial_folder=dialog_folder()
+        assert not initial_folder.is_relative_to(folder.resolve()) and initial_folder!=out.resolve()
+        screenshot('06a-save-default-folder.png');cancel_dialog=file_dialog()
+        # Address-bar navigation may consume Escape before the whole chooser.
+        # Click its ordinary visible Cancel button once, through real OS input.
+        cancel=Desktop(backend='uia').window(handle=cancel_dialog.handle).child_window(title='Cancel',control_type='Button').wrapper_object()
+        assert cancel.is_visible() and cancel.is_enabled()
+        cancel.click_input()
+        import win32gui
+        wait(lambda s:not win32gui.IsWindow(cancel_dialog.handle),'Native Cancel button closes Save before retry')
         assert state()['save_enabled'] and state()['proposal']
         checks.append('Canceling the save dialog keeps the valid mapping ready')
         export_folder=out/'export';export_folder.mkdir()
@@ -470,14 +607,27 @@ def main():
                 assert core.op.matches_mixer(nodes[oid]['material'],expected);assert nodes[oid]['material']==bodies[oid]['material']
         assert core.op.digest(example/'DO_NOT_PRINT.PRINT')==source_hash and core.op.digest(example/'DO_NOT_PRINT.xlsx')==workbook_hash
         checks.append('Saved candidate independently matches all known physical sample indices/recipes; original inputs unchanged')
+        original_output_hash=core.op.digest(result)
+        click('save');assert dialog_folder()==export_folder.resolve();dialog_path(result)
+        wait(lambda s:s.get('diagnostic',{}).get('code')=='GCD401','Existing output refuses overwrite with an actionable recovery dialog')
+        assert core.op.digest(result)==original_output_hash
+        screenshot('07a-existing-output-refused.png');dismiss()
+        wait(lambda s:s.get('save_enabled'),'Save remains ready after filename collision')
+        select_tab('helptab');click('diagnostics_settings');click('include_report');click('diagnostics_settings_close')
+        geometry_tab();retry=export_folder/'Retry with report.PRINT';click('save');dialog_path(retry)
+        wait(lambda s:retry.is_file() and not s.get('busy'),'Choosing another name succeeds in the same session');dismiss()
+        assert (export_folder/'Retry with report.gridcad-report.json').is_file()
+        assert core.op.digest(result)==original_output_hash
+        select_tab('helptab');click('diagnostics_settings');click('include_report');click('diagnostics_settings_close');geometry_tab()
+        checks.append('Optional diagnostic report is deliberate; normal output and source bytes remain unchanged through collision/retry')
         assert not state()['errors'];checks.append('No unhandled GUI callback errors')
         click('example')
         wait(lambda s:not s.get('busy') and not s.get('transpose') and s.get('orientation')=='Rows down; columns right','Load example resets mapping direction state')
         click('preview');wait(lambda s:s.get('proposal') and not s.get('busy'),'Example can be reopened after a completed conversion')
         assert state()['save_enabled'];checks.append('Reopened example validates again without redundant review gates')
         # Real pyramid and mixed-shape file workflows, not just unit counts.
-        for shape in ['pyramid','mixed']:
-            fixture=create(out/('generated '+shape),rows=3,columns=5,pitch=16,size=9,sample_shape=shape,height=7)
+        for shape,columns in [('pyramid',9),('mixed',12)]:
+            fixture=create(out/('generated '+shape),rows=3,columns=columns,pitch=16,size=9,sample_shape=shape,height=7)
             load_book(fixture/'DO_NOT_PRINT.xlsx')
             click('open_project');dialog_path(fixture/'DO_NOT_PRINT.PRINT')
             wait(lambda s:s.get('project')==str(fixture/'DO_NOT_PRINT.PRINT') and not s.get('busy'),'Loaded genuine '+shape+' mesh archive')
@@ -485,13 +635,22 @@ def main():
             choose_top_left_rows_down();click('preview')
             wait(lambda s:s.get('proposal') and not s.get('busy'),'Shape-independent '+shape+' grid preview')
             screenshot('08-'+shape+'-preview.png')
+            assert f'{3*columns} cells selected' in state()['selection_summary']
+            shaped_output=out/(shape+' different dimensions.PRINT');click('save');dialog_path(shaped_output)
+            wait(lambda s:shaped_output.is_file() and not s.get('busy'),'Different-dimension '+shape+' conversion saves through the real dialog');dismiss()
+            before=core.op.project_document(fixture/'DO_NOT_PRINT.PRINT');after=core.op.project_document(shaped_output)
+            changed=set(state()['last_save_audit']['changed_occurrence_ids'])
+            assert len(changed)==3*columns
+            assert core.op.stripped(before,changed)==core.op.stripped(after,changed)
+            checks.append('Different grid dimensions preserve existing multi-body/multidigit label geometry and unrelated data')
         fixture=create_reference_example(out/'reference material fixture')
         load_book(fixture/'DO_NOT_PRINT.xlsx')
         click('open_project');dialog_path(fixture/'DO_NOT_PRINT.PRINT')
         wait(lambda s:s.get('project')==str(fixture/'DO_NOT_PRINT.PRINT') and not s.get('busy'),'Reference-material fixture loaded')
         select_combo('labels',next(i for i,v in enumerate(state()['label_choices']) if v.startswith('Printed labels ')))
         choose_top_left_rows_down();select_combo('label_mode',1)
-        select_combo('label_reference',next(i for i,v in enumerate(state()['reference_choices']) if v.startswith('Reference white ')))
+        assert state()['material_choice'] in state()['reference_choices']
+        assert 'label_reference' not in state()['controls']
         click('preview');wait(lambda s:s.get('proposal') and not s.get('busy'),'Reference-copy conflict preview lists existing assignments')
         assert not state()['save_enabled'];click('replace_labels');screenshot('09-reference-conflict-review.png')
         click('label_review_cancel');assert not state()['save_enabled']
@@ -585,10 +744,10 @@ def main():
         relaunched_window=Application(backend='win32').connect(process=process.pid).top_window()
         main_window_handle=relaunched_window.handle
         relaunched_window.maximize();time.sleep(.4)
-        load_book(cached);enter('range','D4:D4');click('check_recipes')
+        load_book(missing);enter('range','D4:D4');click('check_recipes')
         # Keep one complete observed snapshot: a second read may transiently
         # return {} while the optional state file is atomically replaced.
-        diagnostic_state=wait(lambda s:s.get('diagnostic',{}).get('code')=='GCD101' and 'diagnostic_copy' in s.get('controls',{}),'Original formula error remains visible when report writing fails')
+        diagnostic_state=wait(lambda s:s.get('diagnostic',{}).get('code')=='GCD102' and 'diagnostic_copy' in s.get('controls',{}),'Original missing-result error remains visible when report writing fails')
         assert diagnostic_state['diagnostic']['report'] is None
         assert not diagnostic_state['controls']['diagnostic_copy']['enabled']
         screenshot('11-report-location-unwritable.png');dismiss()
@@ -611,6 +770,9 @@ def main():
         try:
             import win32gui
             browser_evidence['foreground_hwnd']=win32gui.GetForegroundWindow()
+            browser_evidence['owned_windows']=[{'title':w.window_text(),'handle':w.handle,
+                'visible':w.is_visible(),'enabled':w.is_enabled()}
+                for w in Desktop(backend='win32').windows(process=process.pid,visible_only=False)]
         except Exception as diagnostic_error:
             browser_evidence['foreground_error']=str(diagnostic_error)
         screenshot('failure.png')

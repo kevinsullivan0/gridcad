@@ -84,7 +84,7 @@ class DistributionOracleTests(unittest.TestCase):
     def test_exact_combined_artifact_contents(self):
         with zipfile.ZipFile(os.environ['GRIDCAD_DISTRIBUTION_ZIP']) as archive:
             names = set(archive.namelist())
-            for name in ('Start GridCAD.bat', 'Start GridCAD from source.bat',
+            for name in ('Start GridCAD.bat', 'Troubleshooting/Start GridCAD from source.bat',
                          'tools/windows_launcher.ps1', 'tools/source_launcher.py',
                          'gridcad_desktop.py', 'desktop_core.py', 'GridCAD.exe',
                          'GridCAD-core.exe', 'VERSION.txt', 'LICENSE',
@@ -92,9 +92,10 @@ class DistributionOracleTests(unittest.TestCase):
                 self.assertIn('GridCAD/' + name, names)
             self.assertTrue(any(n.startswith('GridCAD/operator/gridcad_operator/') for n in names))
             self.assertTrue(any(n.startswith('GridCAD/_internal/') for n in names))
-            for source in ('Start GridCAD.bat', 'Start GridCAD from source.bat',
+            for source in ('Start GridCAD.bat', 'Troubleshooting/Start GridCAD from source.bat',
                            'tools/windows_launcher.ps1', 'tools/source_launcher.py'):
-                self.assertEqual(archive.read('GridCAD/' + source), (ROOT / source).read_bytes())
+                self.assertEqual(archive.read('GridCAD/' + source), (ROOT / source.removeprefix('Troubleshooting/')).read_bytes())
+            self.assertNotIn('GridCAD/Start GridCAD from source.bat', names)
 
 
 if __name__ == '__main__':

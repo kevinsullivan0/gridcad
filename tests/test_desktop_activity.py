@@ -103,6 +103,7 @@ class ActivityTests(TestCase):
         app.project_path = 'original.print'; app.workbook_path = 'original.xlsx'
         app.run = mock.Mock()
         with mock.patch('gridcad_desktop.filedialog.asksaveasfilename', return_value='new-result.PRINT'):
+            app.last_output_directory=None
             app.save()
         _, work, done = app.run.call_args.args
         app.project_path = 'different.print'; app.workbook_path = 'different.xlsx'
@@ -114,3 +115,15 @@ class ActivityTests(TestCase):
             notice.assert_not_called()
             app.root.after_idle.call_args.args[0]()
             notice.assert_called_once()
+
+    def test_obsolete_failure_can_be_suppressed_without_hiding_current_errors(self):
+        app=self.app();future=Future();app.pool.submit.return_value=future
+        app.run('Old range',lambda:None,lambda result:None,on_error=lambda exc:False)
+        app.status.set('Latest input selection')
+        future.set_exception(ValueError('Old range failed'));self.poll(app)
+        app.show_error.assert_not_called();self.assertEqual(app.status.get(),'Latest input selection')
+        self.assertIsNone(app.future);self.assertFalse(app.progress_active)
+        current=Future();app.pool.submit.return_value=current
+        app.run('Current range',lambda:None,lambda result:None,on_error=lambda exc:None)
+        error=ValueError('Current error');current.set_exception(error);self.poll(app)
+        app.show_error.assert_called_once_with(error)

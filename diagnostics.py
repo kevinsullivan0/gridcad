@@ -7,7 +7,7 @@ import re
 import tempfile
 import traceback
 
-VERSION='1.0.1'
+VERSION='1.0.2'
 SOURCE_URL='https://github.com/kevinsullivan0/gridcad/tree/v'+VERSION
 
 @dataclass
@@ -46,14 +46,19 @@ RESOURCE_DESCRIPTIONS = {message: message.removeprefix('Resource limit: ') for m
 )}
 
 def describe(exc, context=None):
-    c=context or {};raw=str(exc);low=raw.lower();cell=re.match(r'^([A-Z]+[0-9]+):',raw)
+    c=context or {};raw=str(exc)
+    cell=re.match(r'^(?:(?P<sheet>.+)!)?(?P<cell>[A-Z]{1,3}[1-9][0-9]*)(?::(?P<end>[A-Z]{1,3}[1-9][0-9]*))?:',raw)
+    low=(raw[cell.end():] if cell else raw).lower()
     where=''
-    if cell:where=' → '.join(str(x) for x in [Path(str(c.get('workbook',''))).name,c.get('sheet'),cell.group(1)] if x)
+    if cell:
+        address=cell.group('cell')+(':'+cell.group('end') if cell.group('end') else '')
+        where=' → '.join(str(x) for x in [Path(str(c.get('workbook',''))).name,cell.group('sheet') or c.get('sheet'),address] if x)
     elif c.get('project'):where=Path(str(c['project'])).name
     if 'reference' in low and c.get('reference_body'):where+=' → '+str(c['reference_body'])
     code,title,help='GCD900','This operation could not be completed.','Check the selected files and settings, then try again. If the problem continues, copy the debugging prompt to ask for help.'
     expected=actual=''
     if isinstance(exc,FileExistsError) or 'a file already exists at ' in low:
+        where=str(c.get('output',''))
         code,title,help='GCD401','That filename is already in use.','Choose another name in Save PRINT. Existing files are never replaced; your selections are still ready.'
     elif 'valid windows filename ending in .print' in low:
         code,title,help='GCD404','This filename cannot be saved on Windows.','Use Save PRINT to choose another filename ending in .PRINT. Avoid Windows reserved names and characters such as < > : " / \\ | ? *.'
@@ -64,25 +69,31 @@ def describe(exc, context=None):
     elif isinstance(exc,PermissionError):code,title,help='GCD002','GridCAD cannot access this location.','Choose a folder you can write to, or close the file in the application holding it. Do not change security protections.'
     elif isinstance(exc,FileNotFoundError):code,title,help='GCD001','A selected file or folder is no longer available.','Choose the existing input again, or choose an existing parent folder for the new result.'
     elif raw in RESOURCE_DESCRIPTIONS:
-        code,title,help='GCD206','This file is too large or complex to open safely.','Keep the original and export a smaller project or a values-only workbook with just the sheets you need. See Help → Supported files for the limits.'
+        code,title,help='GCD206','This file is too large or complex to open safely.','Keep the original and export a smaller project or a values-only workbook with just the sheets you need. The original file was not truncated or repaired.'
         actual=RESOURCE_DESCRIPTIONS[raw]
     elif 'formula uses a saved result' in low:code,title,help='GCD101','This cell uses a saved formula result.','Recalculate and save the workbook in Excel, then confirm current formula results; alternatively use a values-only copy.'
-    elif 'missing value, formula cache' in low:code,title,help='GCD102','This cell has no usable recipe value.','Fill the selected cell or fix its Excel error. For formulas, recalculate and save in Excel; confirming cannot restore a missing result.'
+    elif 'missing value, formula cache' in low or 'missing value, saved formula result' in low:code,title,help='GCD102','This cell has no usable recipe value.','Fill the selected cell or fix its Excel error. For formulas, recalculate and save in Excel, or use a values-only copy. A missing saved result cannot be used.'
     elif any(x in low for x in ['input changed','source hash differs','workbook hash','archive hash','source-material hash']):
         code,title,help='GCD402','The input files have changed since the mapping was built.','Reopen the current files and build the mapping again. The old mapping cannot be used with changed files.'
     elif any(x in low for x in ['saved recipe mismatch','worksheet disagrees','readback mismatch','preservation','unexpected non-material']):
         code,title,help='GCD403','The result did not pass its safety checks.','Keep the original files and do not use this candidate. Use the debugging report to investigate; do not edit recipes or disable checks to hide the mismatch.'
-    elif 'selected group has' in low:
+    elif 'selected group has' in low or ('cells selected' in low and 'sample bodies' in low):
         code,title,help='GCD205','The number of selected cells does not match the sample group.','Select the matching recipe rectangle or sample group, then choose Match cells to samples. Do not change individual recipe percentages to fix a count mismatch.'
         match=re.search(r'Selected group has (\d+) bodies; the worksheet rectangle has (\d+) recipes',raw)
         if match:expected=match.group(1)+' recipe cells for the selected bodies';actual=match.group(2)+' selected recipe cells'
-    elif cell or 'channel' in low or 'recipe' in low:
-        code,title,help='GCD103','A recipe is not in the supported format.','Edit the indicated cell to six C/M/Y/K/W/T percentages separated by slashes, including zeros, totaling exactly 100. Save and reopen the workbook.'
-        expected='Six explicit percentages, each 0–100, totaling 100.'
-    elif 'transpose and orientation' in low:
+        else:
+            match=re.search(r'(\d+) cells selected.*?has (\d+) sample bodies',raw)
+            if match:expected=match.group(2)+' recipe cells for the selected bodies';actual=match.group(1)+' selected recipe cells'
+    elif 'transpose and orientation' in low or ('worksheet is' in low and 'in this orientation' in low):
         code,title,help='GCD201','The selected cells do not fit the grid in this direction.','Check the selected cells, the first-cell corner and the direction of the next worksheet row in the preview.'
         m=re.search(r'Geometry has (.*?) positions.*worksheet is (.*?)\.',raw)
         if m:actual='Grid: '+m.group(1)+'; selected cells: '+m.group(2)
+        else:
+            m=re.search(r'worksheet is (\d+) rows × (\d+) columns;.*? is (\d+) × (\d+) in this orientation',raw)
+            if m:expected=m.group(3)+' × '+m.group(4)+' sample positions';actual=m.group(1)+' × '+m.group(2)+' selected cells'
+    elif cell or 'channel' in low or 'recipe' in low:
+        code,title,help='GCD103','A recipe is not in the supported format.','Edit the indicated cell to six C/M/Y/K/W/T percentages separated by slashes, including zeros, totaling exactly 100. Save and reopen the workbook.'
+        expected='Six explicit percentages, each 0–100, totaling 100.'
     elif 'overlap' in low or 'touch' in low:code,title,help='GCD202','The selected objects cannot be distinguished safely.','Choose separate sample and label groups. If sample footprints overlap or touch, separate them in the source project; GridCAD will not guess.'
     elif any(x in low for x in ['lattice','grid position','planar','anchor']):code,title,help='GCD203','The samples do not form a complete rectangular grid.','Select one evenly spaced grid at a common height, with no missing or duplicate positions. Correct sample placement in the original CAD project if needed.'
     elif 'reference' in low and ('material' in low or 'label' in low):code,title,help='GCD301','This object cannot supply the label material.','Choose an object in this project with a supported saved material. If the project contains conflicting assignments, correct them in GrabCAD and reopen it.'
@@ -96,7 +107,7 @@ def describe(exc, context=None):
 
 # Only these settings may enter the local report. No workbook/project bytes, cell
 # values, material objects, environment, credentials or Python locals are captured.
-SETTINGS=('project','workbook','sheet','range','sample_group','label_container','orientation','transpose','label_mode','reference_body','operation')
+SETTINGS=('project','output','workbook','sheet','range','sample_group','label_container','orientation','transpose','label_mode','reference_body','operation')
 def create_report(exc, diagnostic, context=None, *, directory=None):
     context=context or {}
     base=Path(directory) if directory else Path(os.environ.get('LOCALAPPDATA',tempfile.gettempdir()))/'GridCAD'/'diagnostics'

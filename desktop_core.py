@@ -55,7 +55,9 @@ def read_workbook(path):
     return result
 
 
-def read_rectangle(book, sheet, selected_range, *, cache_confirmed=False):
+def read_rectangle(book, sheet, selected_range, *, cache_confirmed=False, cache_policy="reject"):
+    if cache_policy not in ("reject", "saved"):
+        op.fail("Unknown saved-formula result policy.")
     lo, hi = op.rectangle(selected_range.upper())
     if sheet not in book:
         op.fail('Choose an existing worksheet.')
@@ -66,16 +68,16 @@ def read_rectangle(book, sheet, selected_range, *, cache_confirmed=False):
             addr = address(row, col)
             value = book[sheet].get(addr)
             if not value or value['value'] is None or value['type'] == 'e':
-                op.fail(addr + ': missing value, formula cache, or worksheet error. Save a calculated values-only copy.')
-            if value['formula'] and not cache_confirmed:
-                op.fail(addr + ': formula uses a saved result. Recalculate in Excel, save, and confirm the cache, or use values only.')
+                op.fail(sheet + '!' + addr + ': missing value, saved formula result, or worksheet error. Recalculate and save in Excel, or select a values-only copy.')
+            if value['formula'] and not cache_confirmed and cache_policy != 'saved':
+                op.fail(sheet + '!' + addr + ': formula uses a saved result. Recalculate in Excel, save, and confirm the cache, or use values only.')
             try:
                 recipe = op.recipe(value['value'])
                 if provider is None:
                     provider = op.EcoFlexMaterialProvider()
                 provider.sample(recipe)  # Keep per-cell precision and source-integrity checks.
             except op.ValidationError as exc:
-                op.fail(addr + ': ' + str(exc))
+                op.fail(sheet + '!' + addr + ': ' + str(exc) + ' Put one sample recipe in each cell: C / M / Y / K / W / T percentages, for example 20 / 0 / 0 / 0 / 30 / 50.')
             cells.append({'cell': addr, 'row': row - lo[0], 'column': col - lo[1],
                           'percentages': [recipe['channels'][c] for c in op.CHANNELS]})
     return cells, (hi[0] - lo[0] + 1, hi[1] - lo[1] + 1)
@@ -91,7 +93,7 @@ def suggest_range(cells):
         except (op.ValidationError, TypeError):
             pass
     if not recipes:
-        return 'A1:B2'
+        return ''
     r, c = min(recipes)
     endc = c
     while (r, endc + 1) in recipes:
@@ -442,13 +444,13 @@ def reference_material_info(project, reference):
 
 def propose(project, workbook_path, book, sheet, selected_range, sample_name,
             label_container, orientation, *, transpose=False, cache_confirmed=False,
-            label_mode="black", label_reference=None, confirm_label_replacement=False):
+            label_mode="black", label_reference=None, confirm_label_replacement=False, cache_policy="reject"):
     if orientation not in ORIENTATIONS:
         op.fail('Choose how worksheet rows and columns run across the geometry preview.')
-    cells, shape = read_rectangle(book, sheet, selected_range, cache_confirmed=cache_confirmed)
+    cells, shape = read_rectangle(book, sheet, selected_range, cache_confirmed=cache_confirmed, cache_policy=cache_policy)
     samples = project['groups'].get(sample_name, [])
     if len(samples) != len(cells):
-        op.fail(f'Selected group has {len(samples)} bodies; the worksheet rectangle has {len(cells)} recipes. Select matching ranges/groups.')
+        op.fail(f'{sheet}!{selected_range}: {len(cells)} cells selected, but sample group {sample_name!r} has {len(samples)} sample bodies. Select {len(samples)} recipe cells or choose a matching sample group.')
     if label_container not in project['containers']:
         op.fail('Choose the complete printed-label container explicitly.')
     labels = project['containers'][label_container]['leaves']
@@ -467,7 +469,7 @@ def propose(project, workbook_path, book, sheet, selected_range, sample_name,
     ra, rd, ca, cd = ORIENTATIONS[orientation]
     h, w = shape[::-1] if transpose else shape
     if (len(axes[ra]), len(axes[ca])) != (h, w):
-        op.fail(f'Geometry has {len(axes[ra])} × {len(axes[ca])} positions in this orientation; worksheet is {h} × {w}. Check transpose and orientation.')
+        op.fail(f'{sheet}!{selected_range}: worksheet is {h} rows × {w} columns; sample group {sample_name!r} is {len(axes[ra])} × {len(axes[ca])} in this orientation. Choose the first-cell corner and next-row direction to match the project, or select the correct rectangle.')
     positions, used = {}, set()
     for r in records:
         ranks = grid_ranks[r['id']]
@@ -483,7 +485,7 @@ def propose(project, workbook_path, book, sheet, selected_range, sample_name,
             'allow_unverified_material_profile': True,
             'review': {'geometry_and_labels_confirmed': False, 'evidence': ''},
             'sheet': sheet, 'range': selected_range.upper(),
-            'formula_cache_policy': 'confirmed_current_cache' if cache_confirmed else 'reject',
+            'formula_cache_policy': 'saved_cache' if cache_policy == 'saved' else 'confirmed_current_cache' if cache_confirmed else 'reject',
             'expected_counts': {'samples': len(samples), 'labels': len(labels)},
             'samples': [], 'labels': [],
             'preserve_occurrence_ids': sorted(project['leaves'] - set(samples) - labels)}

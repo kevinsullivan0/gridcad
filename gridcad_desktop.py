@@ -61,6 +61,45 @@ def controls_from_orientation(orientation):
     return '', ''
 
 
+def selection_feedback(*, book, sheet, selected_range, project, sample_name, label_id, corner, direction):
+    """Cheap current-input feedback; recipe/material checks remain in the worker."""
+    errors = {}; selected = expected = None; formula_count = 0
+    if book is None: errors['open_workbook'] = 'Open an Excel workbook.'
+    elif sheet not in book: errors['sheet'] = 'Choose a worksheet.'
+    else:
+        try:
+            lo, hi = core.op.rectangle(selected_range.upper())
+            selected = (hi[0]-lo[0]+1)*(hi[1]-lo[1]+1)
+            formula_count = sum(1 for addr, cell in book[sheet].items()
+                                if cell.get('formula') and lo[0] <= core.op.cell_position(addr)[0] <= hi[0]
+                                and lo[1] <= core.op.cell_position(addr)[1] <= hi[1])
+        except (ValueError, core.op.ValidationError):
+            errors['range'] = 'Select a rectangle of recipe cells, or enter its range (for example D4:I7).'
+    if project is None: errors['open_project'] = 'Open a PRINT project.'
+    else:
+        if sample_name not in project['groups']:
+            errors['samples'] = 'Choose the group containing the samples.'
+        else:
+            expected = len(project['groups'][sample_name])
+            if selected is not None and selected != expected:
+                errors['range'] = (f'{sheet}!{selected_range}: {selected} cells selected; '
+                    f'sample group {sample_name!r} has {expected} sample bodies. '
+                    f'Select {expected} recipe cells or choose a matching sample group.')
+        if label_id not in project['containers']:
+            errors['labels'] = 'Choose the group containing the printed labels.'
+        elif set(project['groups'].get(sample_name, [])) & project['containers'][label_id]['leaves']:
+            errors['labels'] = 'This group also contains samples. Choose the label-only group.'
+        if corner not in ROW_DIRECTIONS:
+            errors['mapping_corner'] = 'Choose where the first selected cell appears in the preview.'
+        if direction not in ROW_DIRECTIONS.get(corner, ()):
+            errors['orientation'] = 'Choose which way the next worksheet row moves.'
+    location = f'{sheet}!{selected_range}' if sheet and selected_range else 'No recipe range selected'
+    summary = location + (f' • {selected} cells selected' if selected is not None else '')
+    summary += (f' • {expected} sample bodies expected' if expected is not None else ' • Choose a sample group to see the expected count')
+    return {'selected_count': selected, 'expected_count': expected, 'summary': summary,
+            'errors': errors, 'formula_count': formula_count}
+
+
 def material_display_name(material):
     """Use native display metadata, never infer a resin from preview RGB."""
     metadata=material.get('metadata',{})

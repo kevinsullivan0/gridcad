@@ -536,7 +536,7 @@ def prepare(project, xlsx, plan):
         fail('Mapping evidence or candidate limitations must be recorded.')
     if reviewed_ids and not re.fullmatch(r'[0-9a-f]{64}', str(plan['review'].get('mapping_sha256',''))):
         fail('Reviewed-ID mode needs the source-bound independently reviewed mapping digest.')
-    if plan['formula_cache_policy'] not in ('reject', 'confirmed_current_cache'): fail('Unknown formula cache policy.')
+    if plan['formula_cache_policy'] not in ('reject', 'confirmed_current_cache', 'saved_cache'): fail('Unknown formula cache policy.')
     doc = project_document(project)
     if doc['version'] != plan['source_version']: fail('Source version changed.')
     original = copy.deepcopy(doc)
@@ -593,7 +593,7 @@ def prepare(project, xlsx, plan):
         cells.add(pos)
         stored = sheet.get(entry['cell'])
         if not stored or stored['value'] is None or stored['type'] == 'e': fail('Missing cache/value or worksheet error.')
-        if stored['formula'] and plan['formula_cache_policy'] != 'confirmed_current_cache': fail('Formula needs confirmed current calculation cache or values-only copy.')
+        if stored['formula'] and plan['formula_cache_policy'] not in ('confirmed_current_cache', 'saved_cache'): fail('Formula needs confirmed current calculation cache or values-only copy.')
         requested = recipe(stored['value'])
         independent = validate_recipe(entry['expected_percentages'])
         if any(D(requested['channels'][c]) != D(independent['channels'][c]) for c in CHANNELS):

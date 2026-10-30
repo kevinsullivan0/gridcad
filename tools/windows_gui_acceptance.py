@@ -582,9 +582,13 @@ def main():
         click('save');initial_folder=dialog_folder()
         assert not initial_folder.is_relative_to(folder.resolve()) and initial_folder!=out.resolve()
         screenshot('06a-save-default-folder.png');cancel_dialog=file_dialog()
-        keyboard.send_keys('{ESC}')
+        # Address-bar navigation may consume Escape before the whole chooser.
+        # Click its ordinary visible Cancel button once, through real OS input.
+        cancel=Desktop(backend='uia').window(handle=cancel_dialog.handle).child_window(title='Cancel',control_type='Button').wrapper_object()
+        assert cancel.is_visible() and cancel.is_enabled()
+        cancel.click_input()
         import win32gui
-        wait(lambda s:not win32gui.IsWindow(cancel_dialog.handle),'Cancel closes the actual Save dialog before retry')
+        wait(lambda s:not win32gui.IsWindow(cancel_dialog.handle),'Native Cancel button closes Save before retry')
         assert state()['save_enabled'] and state()['proposal']
         checks.append('Canceling the save dialog keeps the valid mapping ready')
         export_folder=out/'export';export_folder.mkdir()

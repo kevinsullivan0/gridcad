@@ -23,6 +23,20 @@ import desktop_core as core
 PROGRESS_RECIPE_COUNT = 40_000
 
 
+def native_edit_role(name,role):
+    """Require the native field label, not merely any focused Edit."""
+    if role=='filename':return name.rstrip(':')=='File name'
+    if role=='address':return name=='Address' or name.startswith('Address: ')
+    return False
+
+
+def native_window_match(windows,titles):
+    candidates=[window for window in windows if window.window_text() in titles
+                and window.is_visible() and window.is_enabled()]
+    assert len(candidates)<2,'More than one expected native dialog is visible.'
+    return candidates[0] if candidates else None
+
+
 def directory_from_native_address(value, documents):
     """Resolve only an observed native absolute address or standard shell alias.
 
@@ -213,7 +227,27 @@ def main():
     def worksheet_tab():select_tab('worktab')
     def enter(key,text):
         click(key);keyboard.send_keys('^a',vk_packet=False);keyboard.send_keys(str(text),with_spaces=True,vk_packet=True);time.sleep(.2)
-    def focused_native_edit():
+    def native_dialog(titles):
+        import win32gui
+        started=time.monotonic();deadline=started+30;observed=[]
+        while time.monotonic()<deadline:
+            windows=Desktop(backend='win32').windows(process=process.pid,class_name='#32770',visible_only=True)
+            observed=[window.window_text() for window in windows]
+            window=native_window_match(windows,titles)
+            if window is not None:
+                window.set_focus()
+                wait(lambda s:win32gui.GetForegroundWindow()==window.handle,
+                     'Expected native dialog owns foreground: '+window.window_text(),timeout=10)
+                checks.append('Native dialog ready after '+str(round(time.monotonic()-started,2))+' seconds: '+window.window_text())
+                return window
+            if process.poll() is not None:raise AssertionError('App exited before native dialog.')
+            time.sleep(.1)
+        raise AssertionError('Expected native dialog did not become ready; observed owned dialogs: '+repr(observed))
+
+    def file_dialog():
+        return native_dialog({'Choose Excel recipe workbook','Choose original GrabCAD project','Save PRINT as'})
+
+    def focused_native_edit(role,dialog_handle):
         import ctypes
         from ctypes import wintypes
         import win32gui, win32process
@@ -227,17 +261,27 @@ def main():
         get_info=ctypes.windll.user32.GetGUIThreadInfo
         get_info.argtypes=[wintypes.DWORD,ctypes.POINTER(GUIThreadInfo)]
         get_info.restype=wintypes.BOOL
-        if not get_info(0,ctypes.byref(info)) or not info.hwndFocus:
-            raise AssertionError('Native file dialog has no observable foreground focus')
-        assert win32process.GetWindowThreadProcessId(info.hwndFocus)[1]==process.pid
-        assert win32gui.GetClassName(info.hwndFocus)=='Edit',win32gui.GetClassName(info.hwndFocus)
-        return Desktop(backend='uia').window(handle=info.hwndFocus).wrapper_object()
+        deadline=time.monotonic()+10;observed=[]
+        while time.monotonic()<deadline:
+            if (get_info(0,ctypes.byref(info)) and info.hwndFocus
+                    and win32process.GetWindowThreadProcessId(info.hwndFocus)[1]==process.pid
+                    and win32gui.GetAncestor(info.hwndFocus,2)==dialog_handle
+                    and win32gui.GetClassName(info.hwndFocus)=='Edit'):
+                edit=Desktop(backend='uia').window(handle=info.hwndFocus).wrapper_object()
+                name=edit.element_info.name
+                identity=(int(info.hwndFocus),name,edit.element_info.automation_id)
+                if not observed or identity!=observed[-1]:observed.append(identity)
+                if native_edit_role(name,role):
+                    checks.append('Native '+role+' field identity: '+repr(identity))
+                    return edit
+            time.sleep(.05)
+        raise AssertionError('Native '+role+' Edit never acquired keyboard focus; observed identities: '+repr(observed))
     def dialog_path(path):
         # Real filename paste and read-back, never a mocked file chooser.
         import win32clipboard
-        time.sleep(.7)
-        keyboard.send_keys('%n',vk_packet=False);time.sleep(.2)
-        edit=focused_native_edit()
+        dialog=file_dialog()
+        keyboard.send_keys('%n',vk_packet=False)
+        edit=focused_native_edit('filename',dialog.handle)
         win32clipboard.OpenClipboard()
         try:
             win32clipboard.EmptyClipboard()
@@ -257,13 +301,16 @@ def main():
             if value==str(path):break
         checks.append('Native filename field read-back before Enter: '+repr(observed))
         assert value==str(path),'Native filename input did not receive complete clipboard path: '+repr(observed)
-        keyboard.send_keys('{ENTER}',vk_packet=False);time.sleep(.5)
+        keyboard.send_keys('{ENTER}',vk_packet=False)
+        import win32gui
+        wait(lambda s:not win32gui.IsWindow(dialog.handle),
+             'Native file dialog accepts the observed filename and closes',timeout=30)
     def dialog_folder():
         from win32com.shell import shell, shellcon
-        time.sleep(.6);keyboard.send_keys('%d',vk_packet=False);time.sleep(.3)
+        dialog=file_dialog();keyboard.send_keys('%d',vk_packet=False)
         # Read the keyboard-focused native ADDRESS edit, not arbitrary list
         # or filename edits that could happen to contain a directory name.
-        value=focused_native_edit().get_value()
+        value=focused_native_edit('address',dialog.handle).get_value()
         documents=shell.SHGetFolderPath(0,shellcon.CSIDL_PERSONAL,None,0)
         location=directory_from_native_address(value,documents)
         checks.append('Native Save address read-back: '+repr(value)+
@@ -272,10 +319,13 @@ def main():
         return location
 
     def dismiss():
-        time.sleep(.3)
         if 'diagnostic_close' in state().get('controls',{}):
             click('diagnostic_close');wait(lambda s:'diagnostic_close' not in s.get('controls',{}),'Diagnostic dialog closes and ordinary workflow resumes')
-        else:keyboard.send_keys('{ENTER}');time.sleep(.3)
+        else:
+            dialog=native_dialog({'GridCAD — separate result saved'})
+            keyboard.send_keys('{ENTER}')
+            import win32gui
+            wait(lambda s:not win32gui.IsWindow(dialog.handle),'Native result message closes before the next action')
     def screenshot(name):ImageGrab.grab().save(out/name)
     def load_book(path):
         click('open_workbook');dialog_path(path)
@@ -531,7 +581,10 @@ def main():
         screenshot('06-ready-to-save.png')
         click('save');initial_folder=dialog_folder()
         assert not initial_folder.is_relative_to(folder.resolve()) and initial_folder!=out.resolve()
-        screenshot('06a-save-default-folder.png');keyboard.send_keys('{ESC}');time.sleep(.4)
+        screenshot('06a-save-default-folder.png');cancel_dialog=file_dialog()
+        keyboard.send_keys('{ESC}')
+        import win32gui
+        wait(lambda s:not win32gui.IsWindow(cancel_dialog.handle),'Cancel closes the actual Save dialog before retry')
         assert state()['save_enabled'] and state()['proposal']
         checks.append('Canceling the save dialog keeps the valid mapping ready')
         export_folder=out/'export';export_folder.mkdir()
@@ -713,6 +766,9 @@ def main():
         try:
             import win32gui
             browser_evidence['foreground_hwnd']=win32gui.GetForegroundWindow()
+            browser_evidence['owned_windows']=[{'title':w.window_text(),'handle':w.handle,
+                'visible':w.is_visible(),'enabled':w.is_enabled()}
+                for w in Desktop(backend='win32').windows(process=process.pid,visible_only=False)]
         except Exception as diagnostic_error:
             browser_evidence['foreground_error']=str(diagnostic_error)
         screenshot('failure.png')

@@ -45,8 +45,10 @@ class RecoveryAcceptance(unittest.TestCase):
             self.skipTest('Real Tk display unavailable: ' + str(exc))
         self.tmp = tempfile.TemporaryDirectory(prefix='GridCAD acceptance ')
         self.addCleanup(self.tmp.cleanup)
+        if os.environ.get('GRIDCAD_TEST_TK_SCALE'):
+            self.root.tk.call('tk','scaling',float(os.environ['GRIDCAD_TEST_TK_SCALE']))
         self.app = gui.App(self.root)
-        self.root.geometry('1200x850+0+0')
+        self.root.geometry(os.environ.get('GRIDCAD_TEST_GEOMETRY','1200x850+0+0'))
         self.root.update()
         self.dialog_text = []
         self.watch = True
@@ -56,6 +58,14 @@ class RecoveryAcceptance(unittest.TestCase):
     def shutdown(self):
         self.watch = False
         try:
+            if os.environ.get('GRIDCAD_TEST_EVIDENCE_DIR'):
+                from PIL import ImageGrab, PngImagePlugin
+                folder=Path(os.environ['GRIDCAD_TEST_EVIDENCE_DIR']);folder.mkdir(parents=True,exist_ok=True)
+                metadata=PngImagePlugin.PngInfo()
+                metadata.add_text('evidence_kind','Independent source Tk GUI, not frozen EXE or native GrabCAD')
+                metadata.add_text('tk_scaling',str(self.root.tk.call('tk','scaling')))
+                metadata.add_text('geometry',self.root.winfo_geometry())
+                ImageGrab.grab().save(folder/(self._testMethodName+'.png'),pnginfo=metadata)
             self.app.pool.shutdown(wait=True, cancel_futures=True)
             self.root.destroy()
         except tk.TclError:

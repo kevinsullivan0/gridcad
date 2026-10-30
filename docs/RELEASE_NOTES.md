@@ -1,3 +1,15 @@
+# GridCAD 1.0.2
+
+The app shows selected worksheet cells against expected samples before matching, identifies missing choices at their fields and keeps corrections recoverable. Recipe guidance states one cell per sample in C/M/Y/K/W/T order; malformed values name the worksheet and cell. Formula results are read from the saved workbook without a blanket recalculation checkbox or a false freshness claim.
+
+Current label materials use their actual names and saved preview colors. Additional direct-material support is deferred to issue #3; a tray resin name is not treated as a complete assignment. Existing label meshes and supported varying grid dimensions are preserved.
+
+Save opens in the last successful session destination, otherwise a writable normal source folder, with Documents as the fallback for examples/install/temp locations. The conversion report option lives in Diagnostics. Help contains only the short basics; the normal combined download has one first-level BAT, with the source fallback under Troubleshooting.
+
+Existing no-overwrite, source-preservation, material/profile, setup-consent and Windows-security protections remain. This release is not native GrabCAD/printer acceptance certification.
+
+## Earlier releases
+
 # GridCAD 1.0.1
 
 One complete Windows download now contains the EXE, source fallback and toolkit. `Start GridCAD.bat` copies verified included files into a versioned folder in your account and offers a Desktop shortcut that survives deletion of the download. Earlier versions and your project files are not overwritten.

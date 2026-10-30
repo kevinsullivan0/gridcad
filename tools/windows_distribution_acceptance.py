@@ -131,7 +131,7 @@ def acceptance(args):
     with zipfile.ZipFile(args.zip) as archive:
         archive.extractall(extracted)
     app = extracted / 'GridCAD'
-    for name in ('Start GridCAD.bat', 'Start GridCAD from source.bat',
+    for name in ('Start GridCAD.bat', 'Troubleshooting/Start GridCAD from source.bat',
                  'tools/windows_launcher.ps1', 'tools/source_launcher.py',
                  'GridCAD.exe', 'gridcad_desktop.py'):
         assert (app / name).is_file(), name

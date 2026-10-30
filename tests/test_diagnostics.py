@@ -63,3 +63,31 @@ class DiagnosticsTests(unittest.TestCase):
         self.assertIn('.PRINT',info.remedy)
 
 if __name__=='__main__':unittest.main()
+
+class AddressedRecoveryDiagnosticsTests(unittest.TestCase):
+    def test_missing_saved_result_names_actual_sheet_cell_and_remedy(self):
+        info=d.describe(ValueError('Sheet1!D4: missing value, saved formula result, or worksheet error. Recalculate and save in Excel, or select a values-only copy.'),
+                        {'workbook':'recipes.xlsx','project':'original.PRINT','sheet':'Other'})
+        self.assertEqual(info.code,'GCD102')
+        self.assertEqual(info.where,'recipes.xlsx → Sheet1 → D4')
+        self.assertIn('Excel',info.remedy);self.assertIn('D4',info.text())
+        self.assertNotIn('Technical details',info.text())
+
+    def test_addressed_bad_recipe_does_not_point_at_project(self):
+        info=d.describe(ValueError('Recipes!D4: Exactly six explicit percentages required. Put one sample recipe in each cell: C / M / Y / K / W / T percentages.'),
+                        {'workbook':'recipes.xlsx','project':'original.PRINT'})
+        self.assertEqual(info.code,'GCD103');self.assertIn('Recipes → D4',info.where)
+        self.assertNotIn('original.PRINT',info.where)
+
+    def test_new_count_and_shape_errors_are_not_recipe_errors(self):
+        count=d.describe(ValueError("Recipes!D4:H7: 20 cells selected, but sample group 'Sample' has 24 sample bodies. Select 24 recipe cells or choose a matching sample group."))
+        self.assertEqual(count.code,'GCD205');self.assertIn('24',count.expected);self.assertIn('20',count.actual)
+        shape=d.describe(ValueError("Recipes!D4:G9: worksheet is 6 rows × 4 columns; sample group 'Sample' is 4 × 6 in this orientation. Choose the first-cell corner and next-row direction."))
+        self.assertEqual(shape.code,'GCD201');self.assertIn('6',shape.actual);self.assertIn('direction',shape.remedy)
+
+    def test_save_collision_identifies_output_not_original_project(self):
+        info=d.describe(ValueError('A file already exists at C:/results/next.PRINT. Choose another name; existing files are never replaced.'),
+                        {'project':'C:/inputs/original.PRINT','output':'C:/results/next.PRINT'})
+        self.assertEqual(info.code,'GCD401')
+        self.assertIn('next.PRINT',info.where)
+        self.assertNotIn('original.PRINT',info.where)

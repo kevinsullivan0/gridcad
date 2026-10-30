@@ -132,6 +132,6 @@ class MaterialAndDestinationTests(unittest.TestCase):
             project=home/'project';project.mkdir();source=project/'input.PRINT'
             app=home/'app';app.mkdir()
             with patch.object(gui.tempfile,'gettempdir',return_value=str(home/'OS temporary')):
-                self.assertEqual(gui.preferred_output_directory(source=source,home=home,app_root=app),project)
+                self.assertEqual(gui.preferred_output_directory(source=source,home=home,app_root=app),project.resolve())
                 self.assertEqual(gui.preferred_output_directory(source=app/'example.PRINT',home=home,app_root=app),documents)
             self.assertEqual(gui.preferred_output_directory(source=source,home=home,app_root=app),documents)

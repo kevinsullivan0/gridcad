@@ -207,7 +207,7 @@ def help_lines(text):
 
 
 PROMPT = '''Use the installed GridCAD source folder (beside GridCAD.exe), or the exact release source:
-https://github.com/kevinsullivan0/gridcad/tree/v1.0.1
+https://github.com/kevinsullivan0/gridcad/tree/v1.0.2
 Do not assume the repository default branch matches this installed release.
 Read AGENTS.md, docs/DESKTOP_API.md, docs/RECTANGULAR_SCHEMA.md, and operator/README.md first.
 Use the portable deterministic core. Keep my original files untouched and all private
@@ -325,7 +325,7 @@ class App:
         self.revision = 0
         self.activity = tk.StringVar(value='')
         self.status = tk.StringVar(value='Choose a workbook and a supported .PRINT project, or load the synthetic example.')
-        self.sheet = tk.StringVar(); self.cell_range = tk.StringVar(value='D4:I7')
+        self.sheet = tk.StringVar(); self.cell_range = tk.StringVar(value='')
         self.sample = tk.StringVar(); self.labels = tk.StringVar(); self.orientation = tk.StringVar()
         self.transpose = tk.BooleanVar(); self.cache = tk.BooleanVar()
         self.mapping_corner = tk.StringVar(); self.mapping_direction = tk.StringVar()
@@ -624,7 +624,7 @@ class App:
         if self.label_choice.get()!=key:self.label_choice.set(key)
         self.controls['label_reference'].pack_forget()
         option=self.material_options[key]
-        self.reference_note.set('Saved material copied from this project.' if option['reference'] else 'EcoFlexBlack for printed labels. Other direct materials are not added in this version.')
+        self.reference_note.set('Saved material copied from this project.' if option['reference'] else 'Uses the supported EcoFlexBlack assignment. No other compatible saved material is available.')
         if hasattr(self,'material_swatch'):
             canvas=self.material_swatch;canvas.delete('all')
             appearance=option['appearance'];alpha=float(appearance['a'])/255
@@ -868,7 +868,7 @@ class App:
             key=next(key for key in ('open_workbook','open_project','sheet','range','samples','labels','mapping_corner','orientation') if key in shown)
             self.notebook.select(self.worktab if key in ('sheet','range') else self.geotab)
             self.status.set('Fix the highlighted selections, then choose Match cells to samples. '+shown[key])
-            self.root.after_idle(lambda:self.controls[key].focus_set())
+            self.root.after_idle(lambda:self.controls[key].focus_force())
         return errors
 
     def review_label_replacements(self):
@@ -937,14 +937,15 @@ class App:
             self.future = self.pool.submit(work)
         except Exception as exc:
             self.file_stage = ''
+            deliver_error=True
             if on_error is not None:
                 try:
-                    on_error(exc)
+                    deliver_error=on_error(exc) is not False
                 except Exception:
                     pass
             self.refresh_activity()
             self.update_save()
-            self.show_error(exc)
+            if deliver_error:self.show_error(exc)
             return False
         self.refresh_activity()
 
@@ -959,6 +960,7 @@ class App:
                 self.root.after(50, poll)
                 return
             error = None
+            deliver_error=True
             try:
                 # Keep the operation admitted/busy until delivery finishes.
                 # Completion callbacks may schedule further work with after_idle.
@@ -967,7 +969,7 @@ class App:
                 error = exc
                 if on_error is not None:
                     try:
-                        on_error(exc)
+                        deliver_error=on_error(exc) is not False
                     except Exception:
                         pass  # Preserve the original operation error.
             finally:
@@ -975,7 +977,7 @@ class App:
                 self.file_stage = ''
                 self.refresh_activity()
                 self.update_save()
-            if error is not None:
+            if error is not None and deliver_error:
                 self.show_error(error)
         self.root.after(50, poll)
         return True
@@ -1031,6 +1033,7 @@ class App:
         self.button(buttons,'Close',dialog.destroy,'diagnostic_close').pack(side='right')
         dialog.bind('<Return>',lambda _:dialog.destroy());dialog.bind('<Escape>',lambda _:dialog.destroy())
         dialog.grab_set();dialog.focus_force();self.root.wait_window(dialog)
+        if self.validation_active and self.validation_errors:self.refresh_feedback(focus=True)
 
     def choose_workbook(self):
         if self.future:return
@@ -1279,7 +1282,11 @@ class App:
                 self.status.set('Worksheet inputs changed during checking. Check recipes again.');return
             count,shape=result
             self.status.set(f'{count} recipes valid: {shape[0]} rows × {shape[1]} columns. Every channel and total checked exactly.')
-        return self.run('Checking exact recipe percentages and material limits…',work,done)
+        def failed(exc):
+            if self.book is not book or revision!=self.revision or self.sheet.get()!=sheet or self.cell_range.get()!=selected:
+                return False
+            self.operation_errors={'range':str(exc)};self.refresh_feedback(activate=True,focus=True)
+        return self.run('Checking exact recipe percentages and material limits…',work,done,on_error=failed)
 
     def preview(self):
         if self.future:return
@@ -1324,7 +1331,7 @@ class App:
                 core.op.prepare(args[0]['path'],args[1],core.candidate_plan(proposal))
             return proposal
         def failed(exc):
-            if revision!=self.revision:return
+            if revision!=self.revision:return False
             message=str(exc)
             key='labels' if 'label' in message.lower() and 'recipe' not in message.lower() else 'range'
             self.operation_errors={key:message};self.refresh_feedback(activate=True,focus=True)
@@ -1523,11 +1530,12 @@ class App:
     def save(self):
         self.update_save()
         if str(self.save_button['state'])=='disabled':return
-        out=filedialog.asksaveasfilename(parent=self.root,title='Save PRINT as',initialdir=str(preferred_output_directory(self.last_output_directory,source=self.project_path,app_root=resource(''))),initialfile=Path(self.project_path).stem+'-materials.PRINT',defaultextension='.PRINT',filetypes=[('PRINT project','*.PRINT')],confirmoverwrite=False)
+        out=filedialog.asksaveasfilename(parent=self.root,title='Save PRINT as',initialdir=str(preferred_output_directory(self.last_output_directory,source=self.project_path,app_root=(Path(sys.executable).parent if getattr(sys,'frozen',False) else Path(__file__).resolve().parent))),initialfile=Path(self.project_path).stem+'-materials.PRINT',defaultextension='.PRINT',filetypes=[('PRINT project','*.PRINT')],confirmoverwrite=False)
         if not out:return
         proposal=self.proposal
         include_report=self.include_report.get()
         project_path,workbook_path=self.project_path,self.workbook_path
+        self.operation_context={'project':str(project_path),'workbook':str(workbook_path),'output':str(out)}
         def done(audit):
             self.last_save_audit=audit
             self.last_output_directory=Path(out).parent
@@ -1627,7 +1635,7 @@ class App:
                'busy':self.future is not None or self.geometry_busy(),
                'activity':self.activity.get(),'progress_visible':bool(self.progress.winfo_ismapped()),'workbook':str(self.workbook_path) if self.workbook_path else None,
                'project':str(self.project_path) if self.project_path else None,
-               'range':self.cell_range.get(),'sheet':self.sheet.get(),'proposal':self.proposal is not None,
+               'range':self.cell_range.get(),'sheet':self.sheet.get(),'formula_notice':self.formula_notice.get(),'material_choices':list(self.material_options),'proposal':self.proposal is not None,
                'save_enabled':str(self.save_button['state'])!='disabled',
                'transpose':self.transpose.get(), 'labels':self.labels.get(),
                'label_choices':list(self.container_ids), 'orientation':self.orientation.get(),

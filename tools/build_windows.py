@@ -9,7 +9,7 @@ import sys
 import zipfile
 
 ROOT=Path(__file__).resolve().parents[1]
-VERSION='1.0.1'
+VERSION='1.0.2'
 
 
 def digest(path):return hashlib.sha256(path.read_bytes()).hexdigest()
@@ -72,6 +72,14 @@ def package_source(root, destination):
     return destination
 
 
+def copy_recovery_launcher(root, folder):
+    """Keep a single normal BAT at the combined download's first level."""
+    target=Path(folder)/'Troubleshooting/Start GridCAD from source.bat'
+    target.parent.mkdir(parents=True,exist_ok=True)
+    shutil.copy2(Path(root)/'Start GridCAD from source.bat',target)
+    return target
+
+
 def main():
     if sys.platform!='win32':raise SystemExit('Build this distribution on Windows; no cross-build claims.')
     subprocess.run([sys.executable,'tools/make_desktop_examples.py','examples/rectangular'],cwd=ROOT,check=True)
@@ -86,8 +94,9 @@ def main():
         raise RuntimeError('Unused AVIF codec unexpectedly bundled; review the exclusion before release.')
     for source in ['resources','docs','examples/rectangular','examples/pyramid','examples/mixed','operator']:
         shutil.copytree(ROOT/source,folder/source,dirs_exist_ok=True,ignore=shutil.ignore_patterns('__pycache__','*.pyc'))
-    for name in ['Start GridCAD.bat','Start GridCAD from source.bat','VERSION.txt','README.md','AGENTS.md','LICENSE','desktop_core.py','desktop_cli.py','diagnostics.py','gridcad_desktop.py','agent_help.py']:
+    for name in ['Start GridCAD.bat','VERSION.txt','README.md','AGENTS.md','LICENSE','desktop_core.py','desktop_cli.py','diagnostics.py','gridcad_desktop.py','agent_help.py']:
         shutil.copy2(ROOT/name,folder/name)
+    copy_recovery_launcher(ROOT,folder)
     shutil.copytree(ROOT/'tools',folder/'tools',ignore=shutil.ignore_patterns('__pycache__','*.pyc'))
     notices=folder/'THIRD_PARTY_NOTICES';notices.mkdir(exist_ok=True)
     for package in ['pillow','pyinstaller']:

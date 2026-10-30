@@ -5,7 +5,7 @@ Desktop profile: `rectangular-2170-mesh-review-v1`. Material writer: `gridcad.ec
 | Input | Contract |
 | --- | --- |
 | Workbook | `.xlsx`, exact selected sheet and dense A1 rectangle, at most 100,000 cells; six explicit plain decimal percentages separated by `/`, order C/M/Y/K/W/T, each 0–100, exact total 100. No normalization. Serializer precision limits also apply. |
-| Formulas | Stored values only, with explicit current-cache confirmation after Excel recalculation/save. Missing/error caches fail. Macros/external links refused. |
+| Formulas | Desktop candidates read the last results saved by Excel and record saved-cache use without claiming currentness or recalculation. Missing/error caches fail. Reviewed operator plans retain their explicit current-cache confirmation; macros/external links are refused. |
 | Source | Exact observed GrabCAD Print 1.117.12.3985 / five provider schemas 2170, one tray, one body per leaf, passive empty feature state. All existing operator version, unit, scale, orientation, ancestor, material-reference and storage-form checks remain in force. |
 | Placement | CM metadata, observed `.001` occurrence scaling, `.1` root scaling and quarter-turn tray linear block. Compose must have the observed common bounded pure-translation storage form. It is preserved, not interpreted or multiplied into the display. Rotation/shear/scale/differential compose offsets are refused. |
 | Geometry | Embedded binary STL only; every body needs an unambiguous archive member. No external paths are followed. 32 MiB / 600,000 triangles per STL; eight million triangles across unique embedded meshes (archive-member aliases share the same mesh); at most 10,000 bodies. No source geometry is rewritten. |

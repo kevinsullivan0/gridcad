@@ -1,6 +1,6 @@
 param([switch]$Source, [switch]$NoShortcut)
 $ErrorActionPreference = 'Stop'
-$Version = '1.0.1'
+$Version = '1.0.2'
 $held = $false
 $mutex = $null
 $log = $null
@@ -29,7 +29,7 @@ function Read-Manifest([string]$folder) {
         if (-not $name -or $name -match '(^[/\\]|[\\:]|(^|/)\.\.?(/|$))' -or $entry.sha256 -notmatch '^[0-9a-f]{64}$' -or $names.ContainsKey($name)) { throw 'The installation manifest contains an invalid or duplicate path. No app files were installed.' }
         $names[$name] = $true
     }
-    foreach ($required in @('Start GridCAD.bat','Start GridCAD from source.bat','GridCAD.exe','gridcad_desktop.py','tools/windows_launcher.ps1','tools/source_launcher.py')) {
+    foreach ($required in @('Start GridCAD.bat','Troubleshooting/Start GridCAD from source.bat','GridCAD.exe','gridcad_desktop.py','tools/windows_launcher.ps1','tools/source_launcher.py')) {
         if (-not $names.ContainsKey($required)) { throw ('The complete Windows package is missing '+$required+'. Download and extract the complete ZIP.') }
     }
     return $record
@@ -158,7 +158,7 @@ try {
         if ($answer -notmatch '^[yY]$') { throw [OperationCanceledException]::new('Alternate launch canceled. No Windows protections were changed.') }
     }
     Write-Status 'Opening the source launch method. Keep this window open while setup or GridCAD is running.'
-    & (Join-Path $installed 'Start GridCAD from source.bat')
+    & (Join-Path $installed 'Troubleshooting/Start GridCAD from source.bat')
     $result = $LASTEXITCODE
     if ($result -ne 0) { throw ('The source method stopped (exit code '+$result+'). Read the setup details above; check downloads or the exact blocked filename. Nothing changed Windows security policy.') }
     if (Get-Ready $ready $token) {

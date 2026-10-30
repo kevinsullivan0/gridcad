@@ -2,12 +2,13 @@
 setlocal DisableDelayedExpansion
 rem Run the source already shipped with GridCAD. No policy changes or EXE tricks.
 set "GRIDCAD_SOURCE_ROOT=%~dp0"
-if not exist "%~dp0gridcad_desktop.py" (
+if not exist "%GRIDCAD_SOURCE_ROOT%gridcad_desktop.py" if exist "%~dp0..\gridcad_desktop.py" set "GRIDCAD_SOURCE_ROOT=%~dp0..\"
+if not exist "%GRIDCAD_SOURCE_ROOT%gridcad_desktop.py" (
   echo Keep this launcher inside the complete extracted GridCAD folder.
   pause
   exit /b 1
 )
-if not exist "%~dp0tools\source_launcher.py" (
+if not exist "%GRIDCAD_SOURCE_ROOT%tools\source_launcher.py" (
   echo The launcher helper is missing. Extract the complete GridCAD source bundle again.
   pause
   exit /b 1

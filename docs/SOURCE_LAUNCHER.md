@@ -2,7 +2,7 @@
 
 ## One download, one starting point
 
-1. Download the complete **GridCAD-Windows-x64-v1.0.1.zip** from the release. In File Explorer, choose **Extract All…**. Do not open a single file from inside the ZIP.
+1. Download the complete **GridCAD-Windows-x64-v1.0.2.zip** from the release. In File Explorer, choose **Extract All…**. Do not open a single file from inside the ZIP.
 2. In the extracted **GridCAD** folder, double-click **Start GridCAD.bat**.
 3. Setup shows where it will copy the included app. Press **Enter** to continue or type **N** to cancel. No administrator rights are needed.
 4. Press **Enter** to create a Desktop shortcut, or type **N** to skip it. An unrelated existing Desktop item is not replaced. Shortcut creation is optional; the app still opens if it cannot create one.
@@ -26,7 +26,7 @@ For a deliberate source launch, open a command prompt in the installed app folde
 "Start GridCAD.bat" -Source
 ```
 
-Or double-click **Start GridCAD from source.bat** in that folder. This explicit secondary entry is for recovery; ordinary use needs only the main launcher. A successful source startup through the main launcher is remembered after the app closes normally, so later launches reuse it rather than repeatedly testing the EXE.
+Or open **Troubleshooting** in the installed app folder and double-click **Start GridCAD from source.bat**. This explicit secondary entry is for recovery; ordinary use needs only the main launcher. A successful source startup through the main launcher is remembered after the app closes normally, so later launches reuse it rather than repeatedly testing the EXE.
 
 ## Source setup consent and downloads
 
@@ -40,7 +40,7 @@ No launcher disables Smart App Control, removes download security marks, creates
 
 ## Where things live
 
-- Installed app: `%LOCALAPPDATA%\GridCAD\Apps\1.0.1`.
+- Installed app: `%LOCALAPPDATA%\GridCAD\Apps\1.0.2`.
 - Main launcher diagnostics: `%LOCALAPPDATA%\GridCAD\Launcher\last-launch.log`. It records version, installed location, launch method and observed failures, not project contents. Small per-version launch preferences live beside it; temporary readiness records are removed after each launch.
 - Private source environment: `%LOCALAPPDATA%\GridCAD\SourceLauncher`. Readiness/locking records and preserved interrupted setups are internal setup files, not PRINT exports.
 - Dedicated Python, if GridCAD needed to install it: `%LOCALAPPDATA%\GridCAD\Python313` (or an already suitable verified Python installation may be reused).

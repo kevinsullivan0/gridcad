@@ -49,6 +49,7 @@ class CellSelectionTests(unittest.TestCase):
         self.app.cell_range = Value('')
         self.app.detail = Value(); self.app.status = Value()
         self.app.selection_start = None; self.app.dragging_cells = False
+        self.app.refresh_feedback=mock.Mock()
         self.app.page_row = self.app.page_col = 1
         self.app.sheet_grid = Grid()
         self.app.cell_boxes = {(r,c):(r,c) for r in range(1,31) for c in range(1,9)}

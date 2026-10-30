@@ -840,7 +840,9 @@ class App:
             project=self.project,sample_name=self.sample.get(),label_id=self.container_ids.get(self.labels.get()),
             corner=self.mapping_corner.get(),direction=self.mapping_direction.get())
         self.selection_summary.set(state['summary'])
-        self.formula_notice.set('Selected formula cells use the last results saved by Excel. Recalculate and save in Excel when their inputs change.' if state['formula_count'] else '')
+        dragging=getattr(self,'dragging_cells',False)
+        if not dragging:
+            self.formula_notice.set('Selected formula cells use the last results saved by Excel. Recalculate and save in Excel when their inputs change.' if state['formula_count'] else '')
         errors=dict(state['errors']);errors.update(self.operation_errors)
         shown=errors if self.validation_active else {}
         previous=self.validation_errors
@@ -855,9 +857,13 @@ class App:
             if key in shown:label.grid()
             else:label.grid_remove()
         text=' '.join(shown[key] for key in ('open_workbook','sheet','range') if key in shown)
-        self.worksheet_error.configure(text=text)
-        if text:self.worksheet_error.grid()
-        else:self.worksheet_error.grid_remove()
+        # Changing a row above/under the canvas during a drag moves cells
+        # beneath the pointer. Keep viewport layout stable until mouseup;
+        # logical feedback and selected-cell highlighting still update live.
+        if not dragging:
+            self.worksheet_error.configure(text=text)
+            if text:self.worksheet_error.grid()
+            else:self.worksheet_error.grid_remove()
         count_problem=shown.get('range','')
         self.selection_problem.configure(text=count_problem)
         if count_problem:self.selection_problem.grid()
@@ -1263,10 +1269,12 @@ class App:
 
     def release_cells(self,event):
         self.drag_cells(event);self.dragging_cells=False
+        self.refresh_feedback()
         return 'break'
 
     def cancel_cell_drag(self,event=None):
         self.dragging_cells=False;self.selection_start=None
+        self.refresh_feedback()
         return 'break'
 
     def check_recipes(self):

@@ -23,6 +23,20 @@ import desktop_core as core
 PROGRESS_RECIPE_COUNT = 40_000
 
 
+def directory_from_native_address(value, documents):
+    """Resolve only an observed native absolute address or standard shell alias.
+
+    Windows may show its Documents known-folder name instead of its redirected
+    filesystem path. The latter must come from Windows, never a guessed home.
+    """
+    candidate=Path(value) if value else None
+    if candidate is not None and candidate.is_absolute() and candidate.is_dir():
+        return candidate.resolve()
+    if value=='Documents' and Path(documents).is_dir():
+        return Path(documents).resolve()
+    raise AssertionError('Native Save address is not an observed directory: '+repr(value))
+
+
 def make_progress_workbook(path):
     # Keep real validation work, but stay below expanded XML-name/text limits.
     # 100k inline-string cells exceeded that independent guard on Windows.
@@ -199,21 +213,16 @@ def main():
     def worksheet_tab():select_tab('worktab')
     def enter(key,text):
         click(key);keyboard.send_keys('^a',vk_packet=False);keyboard.send_keys(str(text),with_spaces=True,vk_packet=True);time.sleep(.2)
-    def dialog_path(path):
-        # Observe the real foreground edit control. Unicode packet characters
-        # with a Ctrl modifier can arrive as literal 'v'; use virtual keys and
-        # require native filename read-back before accepting the file dialog.
+    def focused_native_edit():
         import ctypes
         from ctypes import wintypes
-        import win32clipboard, win32gui, win32process
+        import win32gui, win32process
         class GUIThreadInfo(ctypes.Structure):
             _fields_=[('cbSize',wintypes.DWORD),('flags',wintypes.DWORD),
                       ('hwndActive',wintypes.HWND),('hwndFocus',wintypes.HWND),
                       ('hwndCapture',wintypes.HWND),('hwndMenuOwner',wintypes.HWND),
                       ('hwndMoveSize',wintypes.HWND),('hwndCaret',wintypes.HWND),
                       ('rcCaret',wintypes.RECT)]
-        time.sleep(.7)
-        keyboard.send_keys('%n',vk_packet=False);time.sleep(.2)
         info=GUIThreadInfo();info.cbSize=ctypes.sizeof(info)
         get_info=ctypes.windll.user32.GetGUIThreadInfo
         get_info.argtypes=[wintypes.DWORD,ctypes.POINTER(GUIThreadInfo)]
@@ -222,7 +231,13 @@ def main():
             raise AssertionError('Native file dialog has no observable foreground focus')
         assert win32process.GetWindowThreadProcessId(info.hwndFocus)[1]==process.pid
         assert win32gui.GetClassName(info.hwndFocus)=='Edit',win32gui.GetClassName(info.hwndFocus)
-        edit=Desktop(backend='uia').window(handle=info.hwndFocus).wrapper_object()
+        return Desktop(backend='uia').window(handle=info.hwndFocus).wrapper_object()
+    def dialog_path(path):
+        # Real filename paste and read-back, never a mocked file chooser.
+        import win32clipboard
+        time.sleep(.7)
+        keyboard.send_keys('%n',vk_packet=False);time.sleep(.2)
+        edit=focused_native_edit()
         win32clipboard.OpenClipboard()
         try:
             win32clipboard.EmptyClipboard()
@@ -244,19 +259,17 @@ def main():
         assert value==str(path),'Native filename input did not receive complete clipboard path: '+repr(observed)
         keyboard.send_keys('{ENTER}',vk_packet=False);time.sleep(.5)
     def dialog_folder():
-        import win32gui, win32process
+        from win32com.shell import shell, shellcon
         time.sleep(.6);keyboard.send_keys('%d',vk_packet=False);time.sleep(.3)
-        foreground=win32gui.GetForegroundWindow()
-        assert win32process.GetWindowThreadProcessId(foreground)[1]==process.pid
-        values=[]
-        for edit in Desktop(backend='uia').window(handle=foreground).descendants(control_type='Edit'):
-            try:values.append(edit.get_value())
-            except Exception:pass
+        # Read the keyboard-focused native ADDRESS edit, not arbitrary list
+        # or filename edits that could happen to contain a directory name.
+        value=focused_native_edit().get_value()
+        documents=shell.SHGetFolderPath(0,shellcon.CSIDL_PERSONAL,None,0)
+        location=directory_from_native_address(value,documents)
+        checks.append('Native Save address read-back: '+repr(value)+
+                      '; Windows-known-folder resolution: '+str(location))
         keyboard.send_keys('{ESC}',vk_packet=False);keyboard.send_keys('%n',vk_packet=False)
-        locations=[Path(value) for value in values if value and Path(value).is_absolute() and Path(value).is_dir()]
-        assert locations, 'Native Save directory could not be observed: '+repr(values)
-        checks.append('Native Save directory observed: '+str(locations[0]))
-        return locations[0].resolve()
+        return location
 
     def dismiss():
         time.sleep(.3)

@@ -127,7 +127,18 @@ def main():
             time.sleep(.3)
         else:raise AssertionError('Configuration control could not be scrolled into view: '+key)
         assert p['w']>=8 and p['h']>=16,(key,p)
-        mouse.click(coords=(p['x']+p['w']//2,p['y']+p['h']//2));time.sleep(.25)
+        # Closing a transient Tk panel can leave Windows without an active
+        # child focus. Activate the owning top-level before the one action
+        # click, rather than letting that click be consumed by activation or
+        # retrying a command whose outcome could be uncertain.
+        import win32gui, win32process
+        point=(p['x']+p['w']//2,p['y']+p['h']//2)
+        target=win32gui.GetAncestor(win32gui.WindowFromPoint(point),2)
+        assert win32process.GetWindowThreadProcessId(target)[1]==process.pid,(key,target)
+        Application(backend='win32').connect(process=process.pid).window(handle=target).set_focus()
+        wait(lambda s:win32gui.GetForegroundWindow()==target,
+             'Owning window foreground before one OS action click: '+key)
+        mouse.click(coords=point);time.sleep(.25)
     def check_tab_bounds(keys,minimums=None):
         controls=state()['controls'];tab=controls['tabs']
         for key in keys:
@@ -454,7 +465,11 @@ def main():
         wait(lambda s:'Recipes!D4' in s.get('detail','') and 'requested C/M/Y/K/W/T' in s.get('detail',''),
              'Mapped preview click shows exact requested recipe separately from source material')
         screenshot('04-mapping-preview.png')
-        click('zoom_in');wait(lambda s:not s.get('busy'),'Zoomed preview finishes');screenshot('05-zoomed-labels.png');click('fit')
+        click('zoom_in');wait(lambda s:not s.get('busy'),'Zoomed preview finishes')
+        click_sample('synthetic-sample-2-3')
+        wait(lambda s:s.get('selected_sample')=='synthetic-sample-2-3' and 'Recipes!F5' in s.get('detail',''),
+             'Actual zoomed preview click inspects the corresponding cell, not a stale-size hitbox')
+        screenshot('05-zoomed-labels.png');click('fit')
         wait(lambda s:not s.get('busy'),'Fit preview finishes')
         select_combo('orientation',1)
         assert not state()['save_enabled']
@@ -473,6 +488,9 @@ def main():
         time.sleep(1)
         wait(lambda s:not s.get('busy'),'Minimum-window geometry repaint completes')
         check_tab_bounds(['geometry'],{'geometry':(300,100)})
+        click_sample('synthetic-sample-3-4')
+        wait(lambda s:s.get('selected_sample')=='synthetic-sample-3-4' and 'Recipes!G6' in s.get('detail',''),
+             'Actual minimum-window preview click uses the resized geometry coordinates')
         assert 'include_report' not in state()['controls']
         checks.append('Normal minimum-size workflow has no conversion-report clutter')
         screenshot('05a-minimum-geometry.png')
